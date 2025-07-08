@@ -1,0 +1,212 @@
+{% extends 'admin_base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="p-6 max-w-5xl mx-auto bg-white rounded shadow">
+  <h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
+    {% if product %}
+      ✏️ Edit Product
+    {% else %}
+      ➕ Add Product
+    {% endif %}
+  </h2>
+
+  <form method="post" enctype="multipart/form-data" id="product-form">
+    {% csrf_token %}
+
+    <!-- Product Info -->
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Product Name</label>
+        <input type="text" name="name" value="{{ product.name|default_if_none:'' }}" required class="w-full border px-3 py-2 rounded" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Price</label>
+        <input type="number" name="price" step="0.01" value="{{ product.price|default_if_none:'' }}" required class="w-full border px-3 py-2 rounded" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Category</label>
+        <select name="category" required class="w-full border px-3 py-2 rounded">
+          <option value="">Select</option>
+          {% for cat in categories %}
+            <option value="{{ cat.id }}" {% if product.category.id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Brand</label>
+        <select name="brand" required class="w-full border px-3 py-2 rounded">
+          <option value="">Select</option>
+          {% for brand in brands %}
+            <option value="{{ brand.id }}" {% if product.brand.id == brand.id %}selected{% endif %}>{{ brand.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Description</label>
+      <textarea name="description" rows="3" class="w-full border px-3 py-2 rounded">{{ product.description|default_if_none:'' }}</textarea>
+    </div>
+
+    <!-- Colors -->
+    <div class="mb-6">
+      <label class="block text-sm font-medium mb-1">Color</label>
+      <div class="flex flex-wrap gap-3">
+        {% for color in colors %}
+          <label class="inline-flex items-center gap-2">
+            <input type="radio" name="color" value="{{ color }}" {% if selected_color == color %}checked{% endif %} required>
+            <span class="w-5 h-5 inline-block rounded-full border" style="background-color: {{ color }}"></span>
+            {{ color }}
+          </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Sizes & Stock -->
+    <div class="mb-6">
+      <label class="block text-sm font-medium mb-2">Size Stock</label>
+      <div class="grid grid-cols-3 gap-4">
+        {% for size in sizes %}
+          <div>
+            <label class="block text-sm font-medium mb-1">{{ size }}</label>
+            <input type="hidden" name="sizes[]" value="{{ size }}">
+            <input type="number" name="stocks[]" value="{% for stock in existing_stocks %}{% if stock.size == size %}{{ stock.quantity }}{% endif %}{% endfor %}" placeholder="Qty" min="0" class="w-full border px-3 py-2 rounded" required>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Product Images -->
+    <div class="mb-6">
+      <label class="block text-sm font-medium mb-1">Product Images (Min 3)</label>
+      <input type="file" id="image-input" accept="image/*" multiple class="w-full border px-3 py-2 rounded mb-3">
+
+      <div id="crop-container" class="mb-4 hidden">
+        <div id="croppie-box" class="mx-auto"></div>
+        <div class="flex justify-center gap-4 mt-4">
+          <button type="button" id="crop-btn" class="px-4 py-2 bg-green-600 text-white rounded">Crop</button>
+          <button type="button" id="skip-btn" class="px-4 py-2 bg-gray-600 text-white rounded">Skip</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-3 gap-3 mt-4" id="image-preview"></div>
+
+      {% if existing_images %}
+        <div class="grid grid-cols-3 gap-3 mt-4">
+          {% for img in existing_images %}
+            <div class="border rounded overflow-hidden">
+              <img src="{{ img.image.url }}" class="w-full h-28 object-cover" />
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Buttons -->
+    <div class="flex justify-between">
+      <a href="{% url 'product_list' %}" class="px-5 py-2 bg-gray-700 text-white rounded flex items-center gap-1">
+        <i data-lucide="arrow-left"></i> Cancel
+      </a>
+      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1">
+        ✅ Submit
+      </button>
+    </div>
+  </form>
+</div>
+
+<!-- Croppie CSS & JS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
+
+<script>
+  let files = [];
+  let currentIndex = 0;
+  let croppie = null;
+  const cropBox = document.getElementById('croppie-box');
+  const container = document.getElementById('crop-container');
+  const previewGrid = document.getElementById('image-preview');
+  const form = document.getElementById('product-form');
+  const collectedImages = [];
+
+  // Handle file upload
+  document.getElementById('image-input').addEventListener('change', function (e) {
+    files = Array.from(e.target.files);
+    currentIndex = 0;
+    previewGrid.innerHTML = '';
+    collectedImages.length = 0;
+    document.querySelectorAll('input[name="cropped_images"]').forEach(el => el.remove());
+    startCropping();
+  });
+
+  // Start cropping
+  function startCropping() {
+    if (croppie) {
+      croppie.destroy();
+      croppie = null;
+    }
+
+    if (currentIndex >= files.length) {
+      container.classList.add('hidden');
+
+      // Show all thumbnails after all crop/skip
+      collectedImages.forEach(base64 => {
+        const img = document.createElement('img');
+        img.src = base64;
+        img.className = 'rounded border w-full h-28 object-cover';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'border rounded overflow-hidden';
+        wrapper.appendChild(img);
+        previewGrid.appendChild(wrapper);
+      });
+
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      cropBox.innerHTML = '';
+      croppie = new Croppie(cropBox, {
+        viewport: { width: 200, height: 200 },
+        boundary: { width: 300, height: 300 },
+        enableZoom: true
+      });
+
+      croppie.bind({ url: e.target.result });
+      container.classList.remove('hidden');
+    };
+    reader.readAsDataURL(files[currentIndex]);
+  }
+
+  // Crop button
+  document.getElementById('crop-btn').addEventListener('click', async function () {
+    if (!croppie) return;
+    const base64 = await croppie.result({ type: 'base64', format: 'jpeg', quality: 1 });
+    saveCroppedImage(base64);
+    currentIndex++;
+    startCropping();
+  });
+
+  // Skip button
+  document.getElementById('skip-btn').addEventListener('click', function () {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      saveCroppedImage(e.target.result);
+      currentIndex++;
+      startCropping();
+    };
+    reader.readAsDataURL(files[currentIndex]);
+  });
+
+  // Save image and hidden input
+  function saveCroppedImage(base64) {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'cropped_images';
+    input.value = base64;
+    form.appendChild(input);
+    collectedImages.push(base64);
+  }
+</script>
+{% endblock %}

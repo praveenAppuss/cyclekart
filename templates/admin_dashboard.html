@@ -1,0 +1,22 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<h1 class="text-3xl font-semibold mb-6">Dashboard</h1>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div class="bg-white p-6 rounded shadow text-center">
+        <h2 class="text-xl font-bold">Users</h2>
+        <p class="text-gray-600 text-2xl mt-2">--</p> <!-- Replace with count -->
+    </div>
+    <div class="bg-white p-6 rounded shadow text-center">
+        <h2 class="text-xl font-bold">Products</h2>
+        <p class="text-gray-600 text-2xl mt-2">--</p> <!-- Replace with count -->
+    </div>
+    <div class="bg-white p-6 rounded shadow text-center">
+        <h2 class="text-xl font-bold">Orders</h2>
+        <p class="text-gray-600 text-2xl mt-2">--</p> <!-- Replace with count -->
+    </div>
+</div>
+{% endblock %}

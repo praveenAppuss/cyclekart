@@ -1,0 +1,112 @@
+{% extends "admin_base.html" %}
+
+{% block title %}User List{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">User Management</h1>
+
+<!-- 🔍 Search Form -->
+<form method="get" class="mb-6 flex gap-2">
+    <input 
+        type="text" 
+        name="q" 
+        placeholder="Search by name, email "
+        value="{{ query|default_if_none:'' }}"
+        class="px-4 py-2 border border-gray-300 rounded w-full"
+    />
+    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Search</button>
+    {% if query %}
+        <a href="{% url 'user_list' %}" class="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Clear</a>
+    {% endif %}
+</form>
+
+<!-- 👤 User Table -->
+<table class="min-w-full bg-white rounded shadow overflow-hidden">
+    <thead class="bg-gray-200">
+        <tr>
+            <th class="py-3 px-4 text-left">#</th>
+            <th class="py-3 px-4 text-left">Name</th>
+            <th class="py-3 px-4 text-left">Email</th>
+            <!-- <th class="py-3 px-4 text-left">Mobile</th> -->
+            <th class="py-3 px-4 text-left">Actions</th>
+        </tr>
+    </thead>
+    <tbody class="text-gray-700">
+        {% for user in users %}
+        <tr class="border-b hover:bg-gray-100">
+            <td class="py-2 px-4">{{ forloop.counter }}</td>
+            <td class="py-2 px-4">{{ user.username }}</td>
+            <td class="py-2 px-4">{{ user.email }}</td>
+            <!-- <td class="py-2 px-4">{{ user.mobile }}</td> -->
+            <td class="py-2 px-4">
+                <button 
+                    class="text-sm font-medium {% if user.is_blocked %}text-green-600{% else %}text-red-600{% endif %} hover:underline open-modal-btn" 
+                    data-user-id="{{ user.id }}" 
+                    data-username="{{ user.username }}" 
+                    data-action="{% if user.is_blocked %}unblock{% else %}block{% endif %}">
+                    {% if user.is_blocked %}Unblock{% else %}Block{% endif %}
+                </button>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" class="p-4 text-center text-gray-500">No users found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- 📄 Pagination -->
+{% if page_obj.has_other_pages %}
+<div class="mt-6 flex justify-center">
+    <div class="inline-flex space-x-1">
+        {% if page_obj.has_previous %}
+            <a href="?{% if query %}q={{ query }}&{% endif %}page=1" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-l">« First</a>
+            <a href="?{% if query %}q={{ query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="px-3 py-1 bg-gray-200 hover:bg-gray-300">‹ Prev</a>
+        {% endif %}
+
+        <span class="px-4 py-1 bg-gray-300 text-gray-800">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+        {% if page_obj.has_next %}
+            <a href="?{% if query %}q={{ query }}&{% endif %}page={{ page_obj.next_page_number }}" class="px-3 py-1 bg-gray-200 hover:bg-gray-300">Next ›</a>
+            <a href="?{% if query %}q={{ query }}&{% endif %}page={{ page_obj.paginator.num_pages }}" class="px-3 py-1 bg-gray-200 hover:bg-gray-300 rounded-r">Last »</a>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- ⚠️ Confirmation Modal -->
+<div id="confirmModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 hidden">
+  <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+    <h2 class="text-lg font-semibold mb-4">Confirm Action</h2>
+    <p id="modalMessage" class="mb-6 text-gray-700"></p>
+    <form id="confirmForm" method="POST">
+      {% csrf_token %}
+      <div class="flex justify-end space-x-4">
+        <button type="button" id="cancelModal" class="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Confirm</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 🧠 Modal Script -->
+<script>
+document.querySelectorAll('.open-modal-btn').forEach(button => {
+    button.addEventListener('click', () => {
+        const userId = button.dataset.userId;
+        const username = button.dataset.username;
+        const action = button.dataset.action;
+
+        document.getElementById('modalMessage').textContent = `Are you sure you want to ${action} ${username}?`;
+        document.getElementById('confirmForm').action = `/adminpanel/users/${action}/${userId}/`;
+
+        document.getElementById('confirmModal').classList.remove('hidden');
+    });
+});
+
+document.getElementById('cancelModal').addEventListener('click', () => {
+    document.getElementById('confirmModal').classList.add('hidden');
+});
+</script>
+{% endblock %}

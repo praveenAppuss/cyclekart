@@ -1,0 +1,192 @@
+{% extends "admin_base.html" %}
+{% block title %}Brand List{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Brand Management</h1>
+
+<!-- ✅ Toast Messages -->
+{% if messages %}
+<div id="toast-container" class="fixed top-5 right-5 z-50 space-y-2">
+    {% for message in messages %}
+    <div class="bg-green-500 text-white px-4 py-2 rounded shadow animate-toast">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+<style>
+@keyframes toastFade {
+    0% { opacity: 0; transform: translateY(-10px); }
+    10%, 90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-10px); }
+}
+.animate-toast {
+    animation: toastFade 3s ease-in-out forwards;
+}
+</style>
+{% endif %}
+
+<!-- 🔍 Search Bar -->
+<form method="get" class="mb-4 flex gap-2">
+    <input 
+        type="text" name="q" placeholder="Search brand..." 
+        value="{{ query|default_if_none:'' }}"
+        class="px-4 py-2 border rounded w-full"
+    />
+    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Search</button>
+    {% if query %}
+    <a href="{% url 'brand_list' %}" class="px-4 py-2 bg-gray-300 rounded">Clear</a>
+    {% endif %}
+</form>
+
+<!-- ➕ Add Button -->
+<div class="mb-4">
+    <button type="button" onclick="openAddBrandModal()" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">+ Add Brand</button>
+</div>
+
+<!-- 📋 Brand Table -->
+<table class="min-w-full bg-white rounded shadow overflow-hidden">
+    <thead class="bg-gray-200">
+        <tr>
+            <th class="px-4 py-3 text-left">#</th>
+            <th class="px-4 py-3 text-left">Brand Name</th>
+            <th class="px-4 py-3 text-left">Icon</th>
+            <th class="px-4 py-3 text-left">Description</th>
+            <th class="px-4 py-3 text-left">Status</th>
+            <th class="px-4 py-3 text-left">Created At</th>
+            <th class="px-4 py-3 text-left">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for brand in brands %}
+        <tr class="border-b hover:bg-gray-100">
+            <td class="px-4 py-2">{{ forloop.counter }}</td>
+            <td class="px-4 py-2">{{ brand.name }}</td>
+            <td class="px-4 py-2">
+                {% if brand.icon %}
+                    <img src="{{ brand.icon.url }}" alt="{{ brand.name }}" class="w-12 h-12 object-contain">
+                {% else %}
+                    <span class="text-gray-500 italic">No icon</span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-2">{{ brand.description|default:"—" }}</td>
+            <td class="px-4 py-2">
+                {% if brand.is_active %}
+                    <span class="text-green-600 font-semibold">Listed</span>
+                {% else %}
+                    <span class="text-red-600 font-semibold">Unlisted</span>
+                {% endif %}
+            </td>
+            <td class="px-4 py-2">{{ brand.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="px-4 py-2 flex flex-wrap gap-2">
+                <button type="button" onclick="openEditBrandModal('{{ brand.id }}', '{{ brand.name }}', '{{ brand.description|escapejs }}')" class="text-blue-600 hover:underline">Edit</button>
+                <form action="{% url 'toggle_brand_status' brand.id %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="text-yellow-600 hover:underline">
+                        {% if brand.is_active %}Unlist{% else %}List{% endif %}
+                    </button>
+                </form>
+                <button 
+                    type="button"
+                    class="text-red-600 hover:underline open-delete-modal"
+                    data-brand-id="{{ brand.id }}"
+                    data-brand-name="{{ brand.name }}">
+                    Delete
+                </button>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="7" class="px-4 py-4 text-center text-gray-500">No brands found.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- 📄 Pagination -->
+<div class="mt-4">
+    {% if page_obj.has_other_pages %}
+    <div class="inline-flex space-x-2">
+        {% if page_obj.has_previous %}
+        <a href="?{% if query %}q={{ query }}&{% endif %}page={{ page_obj.previous_page_number }}" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">&laquo; Prev</a>
+        {% endif %}
+        <span class="px-3 py-1 bg-gray-300 rounded">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?{% if query %}q={{ query }}&{% endif %}page={{ page_obj.next_page_number }}" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Next &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- 🗑️ Delete Confirmation Modal -->
+<div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white rounded-lg shadow-lg p-6 w-96">
+    <h2 class="text-lg font-semibold mb-4">Confirm Delete</h2>
+    <p id="modalDeleteMessage" class="mb-6 text-gray-700"></p>
+    <form id="deleteForm" method="POST">
+      {% csrf_token %}
+      <div class="flex justify-end gap-4">
+        <button type="button" id="cancelDeleteModal" class="px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ✨ Brand Modal (Add/Edit) -->
+<div id="brandModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+  <div class="bg-white rounded-lg shadow-lg p-6 w-96">
+    <h2 id="modalTitle" class="text-lg font-semibold mb-4">Add Brand</h2>
+    <form method="POST" id="brandForm" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="text" name="name" id="brandNameField" class="w-full px-4 py-2 border rounded mb-4" placeholder="Brand name" required>
+      <textarea name="description" id="brandDescriptionField" class="w-full px-4 py-2 border rounded mb-4" placeholder="Brand description"></textarea>
+      <input type="file" name="icon" accept="image/*" class="mb-4">
+      <div class="flex justify-end gap-4">
+        <button type="button" onclick="closeBrandModal()" class="px-4 py-2 bg-gray-300 text-gray-800 rounded">Cancel</button>
+        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ✅ Scripts -->
+<script>
+function openAddBrandModal() {
+    document.getElementById("modalTitle").innerText = "Add Brand";
+    document.getElementById("brandForm").action = "{% url 'add_brand' %}";
+    document.getElementById("brandNameField").value = "";
+    document.getElementById("brandDescriptionField").value = "";
+    document.getElementById("brandModal").classList.remove("hidden");
+}
+
+function openEditBrandModal(id, name, description) {
+    document.getElementById("modalTitle").innerText = "Edit Brand";
+    document.getElementById("brandForm").action = `/adminpanel/brands/edit/${id}/`;
+    document.getElementById("brandNameField").value = name;
+    document.getElementById("brandDescriptionField").value = description;
+    document.getElementById("brandModal").classList.remove("hidden");
+}
+
+function closeBrandModal() {
+    document.getElementById("brandModal").classList.add("hidden");
+}
+
+document.querySelectorAll('.open-delete-modal').forEach(button => {
+    button.addEventListener('click', () => {
+        const brandId = button.dataset.brandId;
+        const brandName = button.dataset.brandName;
+        const form = document.getElementById('deleteForm');
+        const modal = document.getElementById('deleteModal');
+
+        form.action = `/adminpanel/brands/delete/${brandId}/`;
+        document.getElementById('modalDeleteMessage').textContent = `Are you sure you want to delete "${brandName}"?`;
+        modal.classList.remove('hidden');
+    });
+});
+
+document.getElementById('cancelDeleteModal').addEventListener('click', () => {
+    document.getElementById('deleteModal').classList.add('hidden');
+});
+</script>
+
+{% endblock %}

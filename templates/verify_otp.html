@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="w-full max-w-sm mx-auto bg-white p-6 mt-12 rounded-xl shadow-md text-center">
+  <h2 class="text-xl font-semibold mb-2">Verify OTP</h2>
+  <p class="text-sm text-gray-600 mb-4">Please enter the OTP sent to your email. This OTP will expire in <span id="timer" class="text-red-500">2:00</span></p>
+
+  {% if error %}
+    <p class="text-sm text-red-600 mb-2">{{ error }}</p>
+  {% endif %}
+
+  <form method="POST">
+    {% csrf_token %}
+    <input type="text" name="otp" placeholder="Enter OTP" class="w-full mb-3 px-3 py-2 border rounded-md text-sm" required>
+    <button type="submit" class="w-full bg-blue-600 text-white text-sm py-2 rounded hover:bg-blue-700 transition">Verify</button>
+  </form>
+
+  <div class="mt-4">
+    <p class="text-xs text-gray-500">Didn't receive OTP?</p>
+    <a href="{% url 'resend_otp' %}" class="text-sm text-blue-600 hover:underline">Resend OTP</a>
+  </div>
+</div>
+
+<script>
+  let timerDisplay = document.getElementById('timer');
+  let time = 120; // 2 minutes
+
+  let countdown = setInterval(() => {
+    let minutes = Math.floor(time / 60);
+    let seconds = time % 60;
+
+    timerDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+
+    if (time <= 0) {
+      clearInterval(countdown);
+      timerDisplay.textContent = "Expired";
+    }
+
+    time--;
+  }, 1000);
+</script>
+{% endblock %}

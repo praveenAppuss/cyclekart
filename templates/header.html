@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CycleKart</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer>
+    // Toggle mobile menu
+    function toggleMenu() {
+      const menu = document.getElementById('mobileMenu');
+      menu.classList.toggle('hidden');
+    }
+  </script>
+  {% load static %}
+</head>
+<body class="bg-gray-100">
+
+  <!-- 🎯 Sticky Offer Banner -->
+  <!-- <div class="bg-black text-white text-center text-sm py-2">
+    Get 50% OFF on your first order. <a href="#" class="underline">Order now</a>
+  </div> -->
+
+  <!-- HEADER -->
+  <header class="bg-white shadow-sm sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
+
+      <!-- Logo -->
+      <a href="/" class="flex items-center gap-2">
+        <img src="{% static 'images/logo.png' %}" alt="CycleKart" class="h-8">
+        <span class="text-2xl font-bold text-gray-800">CycleKart</span>
+      </a>
+
+      <!-- Desktop Nav -->
+      <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-700">
+        <a href="#" class="hover:text-blue-700">Home</a>
+
+        <!-- Category Dropdown -->
+        <div class="relative group">
+          <button class="hover:text-blue-700">Category ▾</button>
+          <div class="absolute hidden group-hover:block bg-white shadow-md mt-2 rounded-md p-2">
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Mountain</a>
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Road</a>
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Hybrid</a>
+          </div>
+        </div>
+
+        <!-- Brand Dropdown -->
+        <div class="relative group">
+          <button class="hover:text-blue-700">Brand ▾</button>
+          <div class="absolute hidden group-hover:block bg-white shadow-md mt-2 rounded-md p-2">
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Hero</a>
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Firefox</a>
+            <a href="#" class="block px-4 py-2 hover:bg-gray-100">Bianchi</a>
+          </div>
+        </div>
+
+        <a href="#" class="hover:text-blue-700">About</a>
+        <a href="#" class="hover:text-blue-700">Contact</a>
+      </nav>
+
+      <!-- Search Bar + Icons -->
+      <div class="flex items-center gap-4">
+        <form method="GET" action="/search/" class="relative hidden md:block">
+          <input
+            type="text" name="q"
+            placeholder="Search products"
+            class="pl-8 pr-4 py-1 border border-gray-300 rounded-full text-sm focus:outline-none"
+          />
+          <span class="absolute left-2 top-1.5 text-gray-400">🔍</span>
+        </form>
+
+        <a href="#" title="Wishlist">🤍</a>
+        <a href="#" title="Cart">🛒</a>
+        <a href="#" title="Account">👤</a>
+
+        <!-- Hamburger for Mobile -->
+        <button class="md:hidden focus:outline-none" onclick="toggleMenu()">☰</button>
+      </div>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div id="mobileMenu" class="md:hidden hidden bg-white border-t border-gray-200 px-6 py-4 text-sm font-medium text-gray-700">
+      <a href="#" class="block py-1">Home</a>
+      <a href="#" class="block py-1">Category</a>
+      <a href="#" class="block py-1">Brand</a>
+      <a href="#" class="block py-1">About</a>
+      <a href="#" class="block py-1">Contact</a>
+    </div>
+  </header>
+
+  <!-- ✅ PAGE CONTENT -->
+  <main class="min-h-[75vh] flex items-center justify-center">
+    {% block content %}{% endblock content %}
+  </main>
+
+  <!-- 🌙 FOOTER -->
+  <footer class="bg-white border-t mt-10">
+    <div class="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 sm:grid-cols-4 gap-6 text-sm text-gray-700">
+      <div>
+        <h2 class="font-bold text-base mb-2">CycleKart</h2>
+        <p>Your ultimate destination for premium cycles and accessories.</p>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Support</h3>
+        <ul class="space-y-1">
+          <li><a href="#">FAQ</a></li>
+          <li><a href="#">Terms of Use</a></li>
+          <li><a href="#">Privacy Policy</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Company</h3>
+        <ul class="space-y-1">
+          <li><a href="#">About Us</a></li>
+          <li><a href="#">Contact</a></li>
+          <li><a href="#">Careers</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="font-semibold mb-2">Shop</h3>
+        <ul class="space-y-1">
+          <li><a href="#">My Account</a></li>
+          <li><a href="#">Checkout</a></li>
+          <li><a href="#">Cart</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="border-t text-center text-xs text-gray-500 py-4">
+      © 2025 CycleKart. All rights reserved.
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <!-- Prevent browser from caching pages after logout -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <title>{% block title %}Admin Panel{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="bg-gray-100">
+
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-60 bg-white border-r h-screen flex flex-col justify-between shadow-sm">
+            <div>
+                <!-- Logo/Header -->
+                <div class="flex items-center justify-center h-16 border-b font-bold text-xl">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5 mr-2"></i> Admin
+                </div>
+
+                <!-- Navigation -->
+                <nav class="p-4 space-y-2 text-sm">
+                    <a href="{% url 'admin_dashboard' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4 mr-2"></i> Dashboard
+                    </a>
+                    <a href="{% url 'product_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="box" class="w-4 h-4 mr-2"></i> Products
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="shopping-cart" class="w-4 h-4 mr-2"></i> Orders
+                    </a>
+                    <a href="{% url 'user_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="users" class="w-4 h-4 mr-2"></i> Customers
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="bar-chart" class="w-4 h-4 mr-2"></i> Report
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="ticket" class="w-4 h-4 mr-2"></i> Coupons
+                    </a>
+                    <a href="{% url 'category_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="folder" class="w-4 h-4 mr-2"></i> Category
+                    </a>
+                    <a href="{% url 'brand_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="tag" class="w-4 h-4 mr-2"></i> Brand
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="image" class="w-4 h-4 mr-2"></i> Banner Management
+                    </a>
+                    <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                        <i data-lucide="gift" class="w-4 h-4 mr-2"></i> Offer Management
+                    </a>
+                </nav>
+            </div>
+
+            <!-- Settings + Logout -->
+            <div class="p-4 space-y-2 text-sm">
+                <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                    <i data-lucide="settings" class="w-4 h-4 mr-2"></i> Settings
+                </a>
+                <a href="{% url 'admin_logout' %}"
+                    class="flex items-center px-3 py-2 rounded hover:bg-gray-100 text-red-600 font-medium">
+                    <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Logout
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="flex-1 p-6">
+            {% block content %}
+            <!-- Content goes here -->
+            {% endblock %}
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+
+</body>
+
+</html>

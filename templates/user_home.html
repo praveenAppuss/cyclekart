@@ -1,0 +1,31 @@
+{% extends 'header.html' %}
+{% load static %}
+
+{% block content %}
+
+<!-- Hero Section -->
+<section class="bg-gray-100 py-16 px-6">
+  <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
+    
+    <!-- Left Text -->
+    <div class="md:w-1/2 text-center md:text-left">
+      <h1 class="text-4xl font-bold text-gray-900 mb-4">
+        Welcome to <span class="text-blue-700">CycleKart</span>
+      </h1>
+      <p class="text-gray-600 text-lg mb-6">
+        Explore premium cycles, accessories, and more at unbeatable prices.
+        Gear up with the best ride today!
+      </p>
+      <a href="#" class="inline-block bg-blue-700 text-white py-2 px-5 rounded hover:bg-blue-800 transition">
+        Shop Now
+      </a>
+    </div>
+
+    <!-- Right Image -->
+    <div class="md:w-1/2 text-center">
+      <img src="{% static 'images/back.png' %}" alt="CycleKart Banner" class="w-full max-w-md mx-auto shadow-lg rounded">
+    </div>
+  </div>
+</section>
+
+{% endblock content %}
