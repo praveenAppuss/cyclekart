@@ -1,6 +1,10 @@
 from pathlib import Path
 from decouple import config
 
+# import logging
+
+# logging.basicConfig(level=logging.DEBUG)
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -91,10 +95,14 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # ------------------ Allauth Redirects ------------------
+
 LOGIN_REDIRECT_URL = '/home/'
-ACCOUNT_LOGOUT_REDIRECT_URL = '/accounts/login/'
-ACCOUNT_SIGNUP_REDIRECT_URL = '/verify-otp/'
-ACCOUNT_LOGIN_REDIRECT_URL = '/verify-otp/'
+ACCOUNT_LOGIN_REDIRECT_URL = '/home/'
+ACCOUNT_SIGNUP_REDIRECT_URL = '/home/'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/login/'
+
+
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Google handles it
 
 # ------------------ Email Settings ------------------
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -104,6 +112,13 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+# For password reset emails
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+ACCOUNT_FORMS = {
+    'reset_password': 'allauth.account.forms.ResetPasswordForm',
+}
 
 
 # ------------------ Allauth Core Settings ------------------
@@ -122,19 +137,16 @@ SOCIALACCOUNT_PROVIDERS = {
         'AUTH_PARAMS': {
             'access_type': 'online',
             'prompt': 'select_account',
-        },
-        'APP': {
-            'client_id': config('GOOGLE_CLIENT_ID'),
-            'secret': config('GOOGLE_CLIENT_SECRET'),
-            'key': ''
         }
     }
 }
 
 
+
 # ✅ Custom adapters to skip confirmation and auto-link Google to email
 ACCOUNT_ADAPTER = 'userapp.adapters.NoNewUsersAccountAdapter'
 SOCIALACCOUNT_ADAPTER = 'userapp.adapters.AutoConnectSocialAccountAdapter'
+
 
 # ------------------ Password Validators ------------------
 AUTH_PASSWORD_VALIDATORS = [

@@ -168,9 +168,12 @@
     reader.onload = function (e) {
       cropBox.innerHTML = '';
       croppie = new Croppie(cropBox, {
-        viewport: { width: 200, height: 200 },
-        boundary: { width: 300, height: 300 },
-        enableZoom: true
+        viewport: { width: 400, height: 400 }, // Increased size for better quality
+        boundary: { width: 450, height: 450 },
+        enableZoom: true,
+        aspectRatio: 1, // Enforce 1:1 square ratio (adjust to 4/3 or 16/9 if needed)
+        minCropBoxWidth: 300, // Minimum width for quality
+        minCropBoxHeight: 300 // Minimum height for quality
       });
 
       croppie.bind({ url: e.target.result });
@@ -182,7 +185,7 @@
   // Crop button
   document.getElementById('crop-btn').addEventListener('click', async function () {
     if (!croppie) return;
-    const base64 = await croppie.result({ type: 'base64', format: 'jpeg', quality: 1 });
+    const base64 = await croppie.result({ type: 'base64', format: 'jpeg', quality: 0.9 }); // Slightly reduced quality for file size
     saveCroppedImage(base64);
     currentIndex++;
     startCropping();
@@ -208,5 +211,13 @@
     form.appendChild(input);
     collectedImages.push(base64);
   }
+
+  // Submit handler to ensure at least 3 images
+  form.addEventListener('submit', function (e) {
+    if (collectedImages.length < 3) {
+      e.preventDefault();
+      alert('Please upload and crop at least 3 images.');
+    }
+  });
 </script>
 {% endblock %}

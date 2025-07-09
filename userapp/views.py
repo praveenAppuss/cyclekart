@@ -8,7 +8,10 @@ from django.db import transaction, IntegrityError
 from django.contrib.auth import BACKEND_SESSION_KEY
 import random
 
+from adminapp.models import Product
+
 User = get_user_model()
+
 
 # User Signup View
 def user_signup(request):
@@ -49,6 +52,7 @@ def user_signup(request):
             'mobile': mobile,
             'password': make_password(password)
         }
+        print(otp)
 
         send_mail(
             subject='CycleKart - Email Verification',
@@ -195,4 +199,5 @@ def user_logout(request):
 # Home View
 @login_required(login_url='user_login')
 def user_home(request):
-    return render(request, 'user_home.html')
+    products = Product.objects.filter(is_active=True, is_deleted=False)
+    return render(request, 'user_home.html', {'products': products})
