@@ -7,8 +7,12 @@ from django.conf import settings
 from django.db import transaction, IntegrityError
 from django.contrib.auth import BACKEND_SESSION_KEY
 import random
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
 
-from adminapp.models import Product
+from adminapp.models import Product,Category, Brand
+
 
 User = get_user_model()
 
@@ -197,7 +201,112 @@ def user_logout(request):
     return redirect('user_login')
 
 # Home View
+
+
 @login_required(login_url='user_login')
 def user_home(request):
+    all_products = list(Product.objects.filter(is_active=True, is_deleted=False))
+    featured_products = random.sample(all_products, min(len(all_products), 4))  # Picks 4 or less
+    return render(request, 'user_home.html', {'featured_products': featured_products})
+
+
+
+
+
+
+@login_required(login_url='user_login')
+def user_product_list(request):
     products = Product.objects.filter(is_active=True, is_deleted=False)
-    return render(request, 'user_home.html', {'products': products})
+
+    # --- SEARCH ---
+    query = request.GET.get('search', '').strip()
+    if query:
+        products = products.filter(Q(name__icontains=query) | Q(description__icontains=query))
+
+    # --- FILTERS ---
+    category_ids = request.GET.getlist('category')
+    brand_id = request.GET.get('brand')
+    size_list = request.GET.getlist('size')
+    color_list = request.GET.getlist('color')
+    price_max = request.GET.get('price_max')
+
+    if category_ids:
+        products = products.filter(category__id__in=category_ids)
+    if brand_id:
+        products = products.filter(brand__id=brand_id)
+    if size_list:
+        products = products.filter(size_stocks__size__in=size_list)
+    if color_list:
+        products = products.filter(colors__name__in=color_list)
+
+    if price_max:
+        try:
+            products = products.filter(price__lte=float(price_max))
+        except ValueError:
+            pass  # Invalid number input, ignore
+
+    # --- SORTING ---
+    sort_by = request.GET.get('sort')
+    if sort_by == 'price_asc':
+        products = products.order_by('price')
+    elif sort_by == 'price_desc':
+        products = products.order_by('-price')
+    elif sort_by == 'name_asc':
+        products = products.order_by('name')
+    elif sort_by == 'name_desc':
+        products = products.order_by('-name')
+
+    # --- PAGINATION ---
+    paginator = Paginator(products, 2)  # Adjust products per page as needed
+    page_number = request.GET.get('page')
+    products_page = paginator.get_page(page_number)
+
+    # --- FILTER OPTIONS ---
+    categories = Category.objects.filter(is_deleted=False, is_active=True)
+    brands = Brand.objects.filter(is_deleted=False, is_active=True)
+    colors = ['Red', 'Blue', 'Green', 'Black', 'White']  # Customize if dynamic
+    sizes = ['S', 'M', 'L']  # Customize if needed
+
+    context = {
+        'products': products_page,
+        'categories': categories,
+        'brands': brands,
+        'colors': colors,
+        'sizes': sizes,
+
+        # Persist selections
+        'query': query,
+        'selected_categories': category_ids,
+        'selected_brand': brand_id,
+        'selected_sizes': size_list,
+        'selected_colors': color_list,
+        'price_max': price_max,
+        'sort_by': sort_by,
+    }
+
+    return render(request, 'user_product_list.html', context)
+
+
+
+
+
+@login_required(login_url='user_login')
+def product_detail(request, product_id):
+    try:
+        product = Product.objects.get(id=product_id)
+        if not product.is_active or product.is_deleted:
+            return redirect('userproduct_list')
+    except Product.DoesNotExist:
+        return redirect('userproduct_list')
+
+    # Related products logic
+    related_products = Product.objects.filter(
+        category=product.category,
+        is_active=True,
+        is_deleted=False
+    ).exclude(id=product.id)[:4]
+
+    return render(request, 'product_detail.html', {
+        'product': product,
+        'related_products': related_products,
+    })

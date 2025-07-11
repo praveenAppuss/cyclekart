@@ -1,0 +1,277 @@
+{% extends 'header.html' %}
+{% load static %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50/30">
+  <div class="max-w-7xl mx-auto px-6 py-6">
+    <!-- Header -->
+    <div class="mb-6">
+      <h1 class="text-2xl font-semibold text-gray-900 mb-1">Explore Our Products</h1>
+      <p class="text-sm text-gray-500">Discover premium quality products</p>
+    </div>
+
+    <div class="flex gap-6">
+      <!-- Premium Filters Sidebar -->
+      <div class="w-64 flex-shrink-0">
+        <div class="bg-white rounded-lg border border-gray-100 p-4 shadow-sm">
+          <h3 class="text-sm font-medium text-gray-900 mb-4">Filters</h3>
+          
+          <form method="GET" class="space-y-5">
+            <!-- Compact Search Bar -->
+            <div>
+              <div class="relative">
+                <input 
+                  type="text" 
+                  name="search" 
+                  placeholder="Search products..." 
+                  value="{{ query }}" 
+                  class="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-gray-50/50"
+                >
+                <svg class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Categories -->
+            <div>
+              <h4 class="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Categories</h4>
+              <div class="space-y-1.5">
+                {% for cat in categories %}
+                <label class="flex items-center group cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    name="category" 
+                    value="{{ cat.id }}" 
+                    {% if cat.id|stringformat:"s" in selected_categories %}checked{% endif %}
+                    class="h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-1"
+                  >
+                  <span class="ml-2.5 text-sm text-gray-600 group-hover:text-gray-900">{{ cat.name }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- Brand -->
+            <div>
+              <h4 class="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Brand</h4>
+              <select name="brand" class="w-full px-2.5 py-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                <option value="">All Brands</option>
+                {% for brand in brands %}
+                <option value="{{ brand.id }}" {% if brand.id|stringformat:"s" == selected_brand %}selected{% endif %}>
+                  {{ brand.name }}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Size -->
+            <div>
+              <h4 class="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Size</h4>
+              <div class="flex flex-wrap gap-1.5">
+                {% for size in sizes %}
+                <label class="relative">
+                  <input 
+                    type="checkbox" 
+                    name="size" 
+                    value="{{ size }}" 
+                    {% if size in selected_sizes %}checked{% endif %}
+                    class="sr-only peer"
+                  >
+                  <div class="w-8 h-8 flex items-center justify-center text-xs font-medium border border-gray-200 rounded cursor-pointer peer-checked:bg-gray-900 peer-checked:text-white peer-checked:border-gray-900 hover:border-gray-300 transition-all">
+                    {{ size }}
+                  </div>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- Color Circles -->
+            <div>
+              <h4 class="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Color</h4>
+              <div class="flex flex-wrap gap-2">
+                {% for color in colors %}
+                <label class="relative group cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    name="color" 
+                    value="{{ color }}" 
+                    {% if color in selected_colors %}checked{% endif %}
+                    class="sr-only peer"
+                  >
+                  <div class="w-6 h-6 rounded-full border-2 border-gray-200 peer-checked:border-gray-900 hover:scale-110 transition-all relative
+                    {% if color == 'Red' %}bg-red-500{% elif color == 'Blue' %}bg-blue-500{% elif color == 'Black' %}bg-gray-900{% elif color == 'White' %}bg-white{% elif color == 'Green' %}bg-green-500{% elif color == 'Yellow' %}bg-yellow-500{% elif color == 'Pink' %}bg-pink-500{% elif color == 'Purple' %}bg-purple-500{% else %}bg-gray-400{% endif %}">
+                    <div class="absolute inset-0 rounded-full peer-checked:ring-2 peer-checked:ring-gray-900 peer-checked:ring-offset-1"></div>
+                  </div>
+                  <span class="absolute -bottom-5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">{{ color }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- Price Range -->
+            <div>
+              <h4 class="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Max Price</h4>
+              <input 
+                type="number" 
+                name="price_max" 
+                min="0" 
+                step="1" 
+                value="{{ price_max }}" 
+                placeholder="₹ Max price"
+                class="w-full px-2.5 py-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+            </div>
+
+            <!-- Sort By -->
+            <div>
+              <h4 class="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Sort By</h4>
+              <select name="sort" class="w-full px-2.5 py-2 text-sm border border-gray-200 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                <option value="">Default</option>
+                <option value="price_asc" {% if sort_by == 'price_asc' %}selected{% endif %}>Price: Low to High</option>
+                <option value="price_desc" {% if sort_by == 'price_desc' %}selected{% endif %}>Price: High to Low</option>
+                <option value="name_asc" {% if sort_by == 'name_asc' %}selected{% endif %}>Name: A-Z</option>
+                <option value="name_desc" {% if sort_by == 'name_desc' %}selected{% endif %}>Name: Z-A</option>
+              </select>
+            </div>
+
+            <!-- Compact Action Buttons -->
+            <div class="flex gap-2 pt-3 border-t border-gray-100">
+              <button 
+                type="submit" 
+                class="flex-1 bg-gray-900 text-white py-2 px-3 rounded-md hover:bg-gray-800 transition-colors text-sm font-medium"
+              >
+                Apply
+              </button>
+              <a 
+                href="{% url 'userproduct_list' %}" 
+                class="flex-1 text-center bg-gray-100 text-gray-600 py-2 px-3 rounded-md hover:bg-gray-200 transition-colors text-sm font-medium"
+              >
+                Clear
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Products Grid -->
+      <div class="flex-1">
+        <!-- Results Header -->
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-sm text-gray-500">
+            {% if products %}
+              Showing {{ products|length }} of {{ products.paginator.count }} products
+            {% else %}
+              No products found
+            {% endif %}
+          </p>
+        </div>
+
+        <!-- Premium Products Grid -->
+        {% if products %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+          {% for product in products %}
+          <div class="group bg-white rounded-lg border border-gray-100 overflow-hidden hover:shadow-lg hover:border-gray-200 transition-all duration-300">
+            <!-- Product Image -->
+            <div class="aspect-square bg-gray-50/50 overflow-hidden relative">
+              <img 
+                src="{{ product.thumbnail.url }}" 
+                alt="{{ product.name }}" 
+                class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300"
+              >
+              <!-- Quick View Button -->
+              <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
+                <a href="{% url 'product_detail' product_id=product.id %}" ><button class="bg-white text-gray-900 px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 shadow-lg">
+                  Quick View
+                </button></a>
+              </div>
+            </div>
+            
+            <!-- Product Info -->
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
+                {{ product.name }}
+              </h3>
+              <div class="flex items-center justify-between">
+                <p class="text-base font-semibold text-gray-900">₹{{ product.price|floatformat:0 }}</p>
+                {% if product.original_price and product.original_price != product.price %}
+                <p class="text-xs text-gray-400 line-through">₹{{ product.original_price|floatformat:0 }}</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <!-- Elegant Empty State -->
+        <div class="text-center py-20">
+          <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+            <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2 2v-5m16 0h-2M4 13h2"></path>
+            </svg>
+          </div>
+          <h3 class="text-lg font-medium text-gray-900 mb-1">No products found</h3>
+          <p class="text-sm text-gray-500 mb-4">Try adjusting your search or filters</p>
+          <a href="{% url 'userproduct_list' %}" class="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors text-sm font-medium">
+            Reset filters
+          </a>
+        </div>
+        {% endif %}
+
+        <!-- Elegant Pagination -->
+        {% if products.has_other_pages %}
+        <div class="mt-8 flex justify-center">
+          <nav class="flex items-center space-x-1">
+            {% if products.has_previous %}
+            <a 
+              href="?{% if request.GET %}{{ request.GET.urlencode|safe }}&{% endif %}page={{ products.previous_page_number }}" 
+              class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              ←
+            </a>
+            {% endif %}
+
+            <!-- Page Numbers -->
+            {% for num in products.paginator.page_range %}
+              {% if products.number == num %}
+              <span class="px-3 py-1.5 text-sm font-medium text-white bg-gray-900 border border-gray-900 rounded-md">
+                {{ num }}
+              </span>
+              {% elif num > products.number|add:'-3' and num < products.number|add:'3' %}
+              <a 
+                href="?{% if request.GET %}{{ request.GET.urlencode|safe }}&{% endif %}page={{ num }}" 
+                class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                {{ num }}
+              </a>
+              {% endif %}
+            {% endfor %}
+
+            {% if products.has_next %}
+            <a 
+              href="?{% if request.GET %}{{ request.GET.urlencode|safe }}&{% endif %}page={{ products.next_page_number }}" 
+              class="px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 transition-colors"
+            >
+              →
+            </a>
+            {% endif %}
+          </nav>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;               /* Standard property (modern support) */
+  box-orient: vertical;        /* Standard syntax */
+  overflow: hidden;
+}
+</style>
+
+{% endblock %}
