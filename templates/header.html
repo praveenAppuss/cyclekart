@@ -27,7 +27,7 @@
 
       <!-- Desktop Nav -->
       <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-700">
-        <a href="#" class="hover:text-blue-700">Home</a>
+        <a href="{% url 'user_home'  %}" class="hover:text-blue-700">Home</a>
 
         <!-- Category Dropdown -->
         <div class="relative group">
@@ -79,7 +79,7 @@
 
     <!-- Mobile Menu -->
     <div id="mobileMenu" class="md:hidden hidden bg-white border-t border-gray-200 px-6 py-4 text-sm font-medium text-gray-700">
-      <a href="#" class="block py-1">Home</a>
+      <a href="{% url 'user_home'  %}" class="block py-1">Home</a>
       <a href="#" class="block py-1">Category</a>
       <a href="#" class="block py-1">Brand</a>
       <a href="#" class="block py-1">About</a>

@@ -120,7 +120,6 @@ ACCOUNT_FORMS = {
     'reset_password': 'allauth.account.forms.ResetPasswordForm',
 }
 
-
 # ------------------ Allauth Core Settings ------------------
 ACCOUNT_AUTHENTICATION_METHOD = 'email'
 ACCOUNT_EMAIL_REQUIRED = True

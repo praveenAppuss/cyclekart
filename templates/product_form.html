@@ -4,11 +4,7 @@
 {% block content %}
 <div class="p-6 max-w-5xl mx-auto bg-white rounded shadow">
   <h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
-    {% if product %}
-      ✏️ Edit Product
-    {% else %}
-      ➕ Add Product
-    {% endif %}
+    {% if product %} Edit Product {% else %} Add Product {% endif %}
   </h2>
 
   <form method="post" enctype="multipart/form-data" id="product-form">
@@ -94,7 +90,7 @@
       <div class="grid grid-cols-3 gap-3 mt-4" id="image-preview"></div>
 
       {% if existing_images %}
-        <div class="grid grid-cols-3 gap-3 mt-4">
+        <div class="grid grid-cols-3 gap-3 mt-4" id="existing-image-preview">
           {% for img in existing_images %}
             <div class="border rounded overflow-hidden">
               <img src="{{ img.image.url }}" class="w-full h-28 object-cover" />
@@ -110,10 +106,21 @@
         <i data-lucide="arrow-left"></i> Cancel
       </a>
       <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1">
-        ✅ Submit
+         Submit
       </button>
     </div>
   </form>
+</div>
+
+<!-- Modal -->
+<div id="image-warning-modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-50">
+  <div class="bg-white rounded-lg p-6 w-96 shadow-lg">
+    <h2 class="text-lg font-semibold mb-2 text-red-600">Upload Required</h2>
+    <p class="text-sm text-gray-700">Please upload and crop at least <strong>3 product images</strong> before submitting.</p>
+    <div class="mt-4 flex justify-end">
+      <button id="close-warning-modal" class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">OK</button>
+    </div>
+  </div>
 </div>
 
 <!-- Croppie CSS & JS -->
@@ -130,17 +137,21 @@
   const form = document.getElementById('product-form');
   const collectedImages = [];
 
-  // Handle file upload
+  const isEditMode = {{ product.id|yesno:"true,false" }};
+
   document.getElementById('image-input').addEventListener('change', function (e) {
     files = Array.from(e.target.files);
     currentIndex = 0;
     previewGrid.innerHTML = '';
     collectedImages.length = 0;
     document.querySelectorAll('input[name="cropped_images"]').forEach(el => el.remove());
+
+    const existing = document.querySelector('#existing-image-preview');
+    if (existing) existing.innerHTML = '';
+
     startCropping();
   });
 
-  // Start cropping
   function startCropping() {
     if (croppie) {
       croppie.destroy();
@@ -149,8 +160,6 @@
 
     if (currentIndex >= files.length) {
       container.classList.add('hidden');
-
-      // Show all thumbnails after all crop/skip
       collectedImages.forEach(base64 => {
         const img = document.createElement('img');
         img.src = base64;
@@ -160,7 +169,6 @@
         wrapper.appendChild(img);
         previewGrid.appendChild(wrapper);
       });
-
       return;
     }
 
@@ -168,12 +176,12 @@
     reader.onload = function (e) {
       cropBox.innerHTML = '';
       croppie = new Croppie(cropBox, {
-        viewport: { width: 400, height: 400 }, // Increased size for better quality
+        viewport: { width: 400, height: 400 },
         boundary: { width: 450, height: 450 },
         enableZoom: true,
-        aspectRatio: 1, // Enforce 1:1 square ratio (adjust to 4/3 or 16/9 if needed)
-        minCropBoxWidth: 300, // Minimum width for quality
-        minCropBoxHeight: 300 // Minimum height for quality
+        aspectRatio: 1,
+        minCropBoxWidth: 300,
+        minCropBoxHeight: 300
       });
 
       croppie.bind({ url: e.target.result });
@@ -182,16 +190,14 @@
     reader.readAsDataURL(files[currentIndex]);
   }
 
-  // Crop button
   document.getElementById('crop-btn').addEventListener('click', async function () {
     if (!croppie) return;
-    const base64 = await croppie.result({ type: 'base64', format: 'jpeg', quality: 0.9 }); // Slightly reduced quality for file size
+    const base64 = await croppie.result({ type: 'base64', format: 'jpeg', quality: 0.9 });
     saveCroppedImage(base64);
     currentIndex++;
     startCropping();
   });
 
-  // Skip button
   document.getElementById('skip-btn').addEventListener('click', function () {
     const reader = new FileReader();
     reader.onload = function (e) {
@@ -202,7 +208,6 @@
     reader.readAsDataURL(files[currentIndex]);
   });
 
-  // Save image and hidden input
   function saveCroppedImage(base64) {
     const input = document.createElement('input');
     input.type = 'hidden';
@@ -212,12 +217,15 @@
     collectedImages.push(base64);
   }
 
-  // Submit handler to ensure at least 3 images
   form.addEventListener('submit', function (e) {
-    if (collectedImages.length < 3) {
+    if (!isEditMode && collectedImages.length < 3) {
       e.preventDefault();
-      alert('Please upload and crop at least 3 images.');
+      document.getElementById('image-warning-modal').classList.remove('hidden');
     }
+  });
+
+  document.getElementById('close-warning-modal').addEventListener('click', function () {
+    document.getElementById('image-warning-modal').classList.add('hidden');
   });
 </script>
 {% endblock %}
