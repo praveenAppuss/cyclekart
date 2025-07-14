@@ -3,6 +3,24 @@
 
 {% block content %}
 <div class="p-6 max-w-6xl mx-auto bg-white rounded shadow-sm">
+
+  <!-- ✅ Toast Container -->
+  {% if messages %}
+    <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-2">
+      {% for message in messages %}
+        <div class="toast px-4 py-2 rounded text-sm shadow-md text-white animate-fade-in
+          {% if message.tags == 'success' %} bg-green-600
+          {% elif message.tags == 'error' %} bg-red-600
+          {% elif message.tags == 'warning' %} bg-yellow-500 text-black
+          {% else %} bg-gray-700
+          {% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Header and Add Button -->
   <div class="flex justify-between items-center mb-4">
     <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
       <i data-lucide="package" class="w-5 h-5 text-blue-600"></i>
@@ -13,7 +31,7 @@
     </a>
   </div>
 
-  <!-- Search with Clear -->
+  <!-- Search -->
   <form method="get" class="mb-3">
     <div class="flex gap-2 items-center">
       <input type="text" name="q" placeholder="Search products..." value="{{ query }}"
@@ -94,7 +112,6 @@
         <li><a href="?page=1{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">« First</a></li>
         <li><a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">‹ Prev</a></li>
       {% endif %}
-
       {% for num in page_obj.paginator.page_range %}
         {% if num == 1 or num == page_obj.paginator.num_pages or num >= page_obj.number|add:'-2' and num <= page_obj.number|add:'2' %}
           {% if num == page_obj.number %}
@@ -106,7 +123,6 @@
           <li><span class="px-2">...</span></li>
         {% endif %}
       {% endfor %}
-
       {% if page_obj.number < page_obj.paginator.num_pages %}
         <li><a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">Next ›</a></li>
         <li><a href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">Last »</a></li>
@@ -115,7 +131,7 @@
   </div>
   {% endif %}
 
-  <!-- List/Unlist Modal -->
+  <!-- Modals -->
   <div id="statusModal" class="fixed inset-0 hidden bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded shadow-lg w-80 p-5 text-center">
       <h3 class="text-lg font-semibold mb-3">Confirm Status Change</h3>
@@ -130,7 +146,6 @@
     </div>
   </div>
 
-  <!-- Delete Modal -->
   <div id="deleteModal" class="fixed inset-0 hidden bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded shadow-lg w-80 p-5 text-center">
       <h3 class="text-lg font-semibold mb-3">Confirm Delete</h3>
@@ -146,17 +161,43 @@
   </div>
 </div>
 
-<!-- Modals JS -->
+<!-- Toast Fade CSS -->
+<style>
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-in-out;
+  }
+</style>
+
+<!-- Toast Auto-hide JS -->
 <script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toasts = document.querySelectorAll('.toast');
+    toasts.forEach((toast) => {
+      setTimeout(() => {
+        toast.style.transition = 'opacity 0.5s ease';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+      }, 3000);
+    });
+  });
+
   function openStatusModal(productId, productName, isActive) {
     const modal = document.getElementById('statusModal');
     const form = document.getElementById('statusForm');
     const text = document.getElementById('statusModalText');
     modal.classList.remove('hidden');
-
     const action = isActive === 'True' ? 'unlist' : 'list';
     text.textContent = `Are you sure you want to ${action} "${productName}"?`;
-
     form.action = `{% url 'toggle_product_status' 0 %}`.replace('0', productId);
   }
 
@@ -169,7 +210,6 @@
     const form = document.getElementById('deleteForm');
     const text = document.getElementById('deleteModalText');
     modal.classList.remove('hidden');
-
     text.textContent = `Are you sure you want to delete "${productName}"?`;
     form.action = `{% url 'delete_product' 0 %}`.replace('0', productId);
   }
@@ -178,5 +218,4 @@
     document.getElementById('deleteModal').classList.add('hidden');
   }
 </script>
-
 {% endblock %}
