@@ -16,6 +16,8 @@ from userapp.models import CustomUser
 import re
 from django.views.decorators.cache import never_cache
 from .utils import no_cache_view
+from .models import Address
+from .forms import AddressForm
 
 User = get_user_model()
 
@@ -300,3 +302,118 @@ def product_detail(request, product_id):
         'color': color,
         'related_products': related_products,
     })
+
+
+
+# user profile section ---------------------------------------------------
+
+@login_required
+def profile_view(request):
+    user = request.user
+    user_addresses = Address.objects.filter(user=user)  # Only current user
+    default_address = user_addresses.filter(is_default=True).first()
+
+    return render(request, 'profile.html', {
+        'user': user,
+        'user_addresses': user_addresses,
+        'default_address': default_address,
+    })
+
+
+
+@login_required
+def upload_profile_image(request):
+    if request.method == 'POST' and request.FILES.get('profile_image'):
+        request.user.profile_image = request.FILES['profile_image']
+        request.user.save()
+    return redirect('profile')
+
+
+@login_required
+def update_profile(request):
+    if request.method == 'POST':
+        user = request.user
+        user.username = request.POST.get('username', user.username)
+        user.email = request.POST.get('email', user.email)
+        user.mobile = request.POST.get('mobile', user.mobile)
+        user.save()
+
+        selected_address_id = request.POST.get('selected_user')
+        if selected_address_id:
+            try:
+                # Reset current default
+                Address.objects.filter(user=user, is_default=True).update(is_default=False)
+
+                # Set new default
+                address = Address.objects.get(id=selected_address_id, user=user)
+                address.is_default = True
+                address.save()
+            except Address.DoesNotExist:
+                pass  # silently ignore if someone messes with the form
+
+        messages.success(request, "Profile updated successfully.")
+        return redirect('profile')
+
+    return redirect('profile')
+
+    
+
+# Address management section---------------------------------
+
+import json
+from django.utils.safestring import mark_safe
+
+@login_required
+def address_list(request):
+    addresses = Address.objects.filter(user=request.user)
+    form = AddressForm()
+
+    # Send data to frontend for JS auto-fill
+    address_json_map = {
+        str(a.id): {
+            'full_name': a.full_name,
+            'mobile': a.mobile,
+            'address_line': a.address_line,
+            'district': a.district,
+            'state': a.state,
+            'pin_code': a.pin_code,
+            'country': a.country,
+        }
+        for a in addresses
+    }
+
+    context = {
+        'addresses': addresses,
+        'form': form,
+        'address_json_map': mark_safe(json.dumps(address_json_map))
+    }
+    return render(request, 'address_page.html', context)
+
+
+
+@login_required
+def add_address(request):
+    if request.method == 'POST':
+        form = AddressForm(request.POST)
+        if form.is_valid():
+            address = form.save(commit=False)
+            address.user = request.user
+            address.save()
+            return redirect('address_list')  
+    return redirect('address_list')
+
+@login_required
+def update_address(request, pk):
+    address = get_object_or_404(Address, pk=pk, user=request.user)
+    if request.method == 'POST':
+        form = AddressForm(request.POST, instance=address)
+        if form.is_valid():
+            form.save()
+            return redirect('address_list')
+    return redirect('address_list')
+
+@login_required
+def delete_address(request, pk):
+    address = get_object_or_404(Address, pk=pk, user=request.user)
+    address.delete()
+    return redirect('address_list')

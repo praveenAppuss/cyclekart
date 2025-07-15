@@ -1,0 +1,173 @@
+{% extends 'header.html' %}
+{% load static %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+<div class="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+
+  <!-- Sidebar -->
+  {% include 'sidebar.html' %}
+
+  <!-- Main Content -->
+  <div class="flex-1 p-6">
+
+    <h2 class="text-2xl font-bold mb-4">Shipping address</h2>
+
+    <!-- Add New Button -->
+    <div class="flex justify-between items-center mb-4">
+      <button onclick="toggleModal()" class="bg-black text-white px-4 py-2 rounded hover:bg-gray-800">+ Add new</button>
+
+      <!-- Dropdown for existing addresses -->
+      {% if addresses %}
+      <select id="addressDropdown" onchange="fillAddressForm()" class="border px-4 py-2 rounded">
+        {% for address in addresses %}
+        <option value="{{ address.id }}"
+          data-full_name="{{ address.full_name }}"
+          data-mobile="{{ address.mobile }}"
+          data-address_line="{{ address.address_line }}"
+          data-district="{{ address.district }}"
+          data-state="{{ address.state }}"
+          data-pin_code="{{ address.pin_code }}"
+          data-country="{{ address.country }}"
+          {% if forloop.first %}selected{% endif %}>
+          {{ address.full_name }}
+        </option>
+        {% endfor %}
+      </select>
+      {% endif %}
+    </div>
+
+    <!-- Address Form (Editable) -->
+    {% if addresses %}
+    <form id="addressForm" method="post" action="{% url 'update_address' addresses.0.id %}">
+      {% csrf_token %}
+      <div class="grid grid-cols-2 gap-4">
+        <input type="text" id="address_line" name="address_line" placeholder="Street Address" class="border p-2 rounded" readonly>
+        <input type="text" id="district" name="district" placeholder="District" class="border p-2 rounded" readonly>
+        <input type="text" id="full_name" name="full_name" placeholder="Full Name" class="border p-2 rounded" readonly>
+        <input type="text" id="pin_code" name="pin_code" placeholder="Pin Code" class="border p-2 rounded" readonly>
+        <input type="text" id="state" name="state" placeholder="State" class="border p-2 rounded" readonly>
+        <input type="text" id="mobile" name="mobile" placeholder="Mobile" class="border p-2 rounded" readonly>
+        <input type="text" id="country" name="country" placeholder="Country" class="border p-2 rounded" readonly>
+      </div>
+
+      <div class="mt-4 flex gap-2">
+        <button type="button" onclick="makeEditable()" class="bg-black text-white px-4 py-2 rounded">✏️ Edit</button>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hidden" id="saveBtn">💾 Save</button>
+        <a id="deleteLink" href="{% url 'delete_address' addresses.0.id %}" class="text-red-600 text-xl ml-auto">🗑️</a>
+      </div>
+    </form>
+    {% else %}
+    <div class="text-center text-gray-500 mt-20">
+      <p class="flex items-center justify-center gap-2 text-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17.657 16.657L13.414 12.414M6 12a6 6 0 1112 0 6 6 0 01-12 0z" />
+        </svg>
+        No address found. Add a new one to continue.
+      </p>
+    </div>
+    {% endif %}
+
+    <!-- ADD MODAL -->
+    <div id="addModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
+      <div class="bg-white rounded p-6 w-full max-w-xl relative">
+        <button onclick="toggleModal()" class="absolute top-2 right-4 text-xl">✖</button>
+        <h3 class="text-lg font-bold mb-4">Add New Address</h3>
+
+        <form method="post" action="{% url 'add_address' %}">
+          {% csrf_token %}
+          <div class="grid grid-cols-2 gap-4">
+            <input name="full_name" placeholder="Full Name" required class="border p-2 rounded">
+            <input name="mobile" placeholder="Mobile" required class="border p-2 rounded">
+            <input name="address_line" placeholder="Street/Area" required class="border p-2 rounded">
+            <input name="district" placeholder="District" required class="border p-2 rounded">
+            <input name="state" placeholder="State" required class="border p-2 rounded">
+            <input name="pin_code" placeholder="Pincode" required class="border p-2 rounded">
+            <input name="country" placeholder="Country" required class="border p-2 rounded">
+          </div>
+
+          <div class="mt-4 flex justify-end gap-2">
+            <button type="button" onclick="toggleModal()" class="px-4 py-2 border rounded">Cancel</button>
+            <button type="submit" class="bg-black text-white px-4 py-2 rounded">Save Address</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TOAST ALERTS (ONLY FOR THIS PAGE) -->
+    <div
+      x-data="{ show: false, message: '', type: 'success' }"
+      x-show="show"
+      x-transition
+      x-init="
+        window.addEventListener('toast', event => {
+          message = event.detail.message;
+          type = event.detail.type;
+          show = true;
+          setTimeout(() => show = false, 3000);
+        })
+      "
+      class="fixed top-6 right-6 px-4 py-2 rounded-lg shadow-lg text-white z-50"
+      :class="type === 'success' ? 'bg-green-600' : 'bg-red-600'"
+    >
+      <p x-text="message"></p>
+    </div>
+
+    {% if messages %}
+    <script>
+      {% for message in messages %}
+      window.addEventListener('DOMContentLoaded', () => {
+        window.dispatchEvent(new CustomEvent("toast", {
+          detail: {
+            message: "{{ message|escapejs }}",
+            type: "{{ message.tags }}"
+          }
+        }));
+      });
+      {% endfor %}
+    </script>
+    {% endif %}
+
+  </div>
+</div>
+
+<!-- Scripts -->
+<script>
+  function toggleModal() {
+    const modal = document.getElementById("addModal");
+    modal.classList.toggle("hidden");
+  }
+
+  function makeEditable() {
+    document.querySelectorAll("#addressForm input").forEach(input => input.removeAttribute("readonly"));
+    document.getElementById("saveBtn").classList.remove("hidden");
+  }
+
+  function fillAddressForm() {
+    const select = document.getElementById("addressDropdown");
+    const option = select.selectedOptions[0];
+    if (!option) return;
+
+    const addressId = option.value;
+    document.getElementById("addressForm").action = `/addresses/update/${addressId}/`;
+    document.getElementById("deleteLink").href = `/addresses/delete/${addressId}/`;
+
+    document.getElementById("full_name").value = option.dataset.full_name;
+    document.getElementById("mobile").value = option.dataset.mobile;
+    document.getElementById("address_line").value = option.dataset.address_line;
+    document.getElementById("district").value = option.dataset.district;
+    document.getElementById("state").value = option.dataset.state;
+    document.getElementById("pin_code").value = option.dataset.pin_code;
+    document.getElementById("country").value = option.dataset.country;
+  }
+
+  // Automatically fill the first address if available
+  document.addEventListener('DOMContentLoaded', function () {
+    if (document.getElementById("addressDropdown")) {
+      fillAddressForm();
+    }
+  });
+</script>
+{% endblock %}
