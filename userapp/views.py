@@ -13,11 +13,18 @@ from django.shortcuts import get_object_or_404
 from django.contrib import messages
 from adminapp.models import Product,Category, Brand
 from userapp.models import CustomUser
-
+import re
+from django.views.decorators.cache import never_cache
+from .utils import no_cache_view
 
 User = get_user_model()
 
+@no_cache_view
+@never_cache
 def user_signup(request):
+    if request.user.is_authenticated:
+        return redirect('user_home')
+
     if request.method == 'POST':
         username = request.POST.get('username', '').strip()
         email = request.POST.get('email', '').strip()
@@ -26,16 +33,29 @@ def user_signup(request):
         confirm_password = request.POST.get('confirm_password', '')
         errors = {}
 
+        # Basic validations
         if not username:
             errors['username'] = "Username is required."
+        elif len(username) < 4:
+            errors['username'] = "Username must be at least 3 characters long."
+
         if not email:
             errors['email'] = "Email is required."
+        elif not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            errors['email'] = "Enter a valid email address."
         elif CustomUser.objects.filter(email=email).exists():
             errors['email'] = "Email already exists."
+
         if not mobile:
             errors['mobile'] = "Mobile number is required."
+        elif not re.match(r"^\d{10}$", mobile):
+            errors['mobile'] = "Enter a valid 10-digit mobile number."
+
         if not password:
             errors['password'] = "Password is required."
+        elif len(password) < 6:
+            errors['password'] = "Password must be at least 6 characters long."
+
         if password != confirm_password:
             errors['confirm_password'] = "Passwords do not match."
 
@@ -44,9 +64,10 @@ def user_signup(request):
                 'errors': errors,
                 'username': username,
                 'email': email,
-                'mobile': mobile
+                'mobile': mobile,
             })
 
+        # Send OTP and store session
         otp = str(random.randint(100000, 999999))
         request.session['otp'] = otp
         request.session['signup_data'] = {
@@ -64,14 +85,18 @@ def user_signup(request):
             recipient_list=[email],
             fail_silently=False,
         )
-
         return redirect('verify_otp')
 
     return render(request, 'user_signup.html')
 
 
 
+@no_cache_view
+@never_cache
 def verify_otp(request):
+    if request.user.is_authenticated:
+        return redirect('user_home')
+
     if request.method == 'POST':
         entered_otp = request.POST.get('otp')
         session_otp = request.session.get('otp')
@@ -122,23 +147,40 @@ def verify_otp(request):
         return render(request, 'verify_otp.html', {'error': 'Invalid OTP'})
     return render(request, 'verify_otp.html')
 
-
-
+@no_cache_view
+@never_cache
 def user_login(request):
+    if request.user.is_authenticated:
+        return redirect('user_home')
+
     if request.method == 'POST':
         email = request.POST.get('email', '').strip()
         password = request.POST.get('password', '')
         errors = {}
+
+        if not email:
+            errors['email'] = "Email is required."
+        elif not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            errors['email'] = "Enter a valid email address."
+
+        if not password:
+            errors['password'] = "Password is required."
+
+        if errors:
+            return render(request, 'user_login.html', {'errors': errors})
+
         try:
             user = CustomUser.objects.get(email=email)
         except CustomUser.DoesNotExist:
             errors['email'] = "Email not found."
             return render(request, 'user_login.html', {'errors': errors})
+
         if not user.check_password(password):
             errors['password'] = "Incorrect password."
             return render(request, 'user_login.html', {'errors': errors})
+
         if user.is_blocked:
-            messages.error(request,"your account is  currently suspended")
+            messages.error(request, "Your account is currently suspended.")
         else:
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             return redirect('user_home')
@@ -146,14 +188,13 @@ def user_login(request):
     return render(request, 'user_login.html')
 
 
+
 def resend_otp(request):
     signup_data = request.session.get('signup_data')
     if not signup_data:
         return redirect('user_signup')
-
     otp = str(random.randint(100000, 999999))
     request.session['otp'] = otp
-
     send_mail(
         subject='CycleKart - Resend OTP',
         message=f'Your new OTP is: {otp}',
@@ -161,7 +202,6 @@ def resend_otp(request):
         recipient_list=[signup_data['email']],
         fail_silently=False,
     )
-
     return redirect('verify_otp')
 
 

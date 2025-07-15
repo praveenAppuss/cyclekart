@@ -26,7 +26,7 @@
 
     <div>
       <label class="block text-xs text-gray-600 mb-1">Name</label>
-      <input type="text" name="username" value="{{ username }}" required class="w-full px-3 py-2 text-sm border rounded-md" />
+      <input type="text" name="username" value="{{ username|default:'' }}" class="w-full px-3 py-2 text-sm border rounded-md" />
       {% if errors.username %}
         <p class="text-red-600 text-xs mt-1">{{ errors.username }}</p>
       {% endif %}
@@ -34,7 +34,7 @@
 
     <div>
       <label class="block text-xs text-gray-600 mb-1">Email</label>
-      <input type="email" name="email" value="{{ email }}" required class="w-full px-3 py-2 text-sm border rounded-md" />
+      <input type="email" name="email" value="{{ email|default:'' }}" class="w-full px-3 py-2 text-sm border rounded-md" />
       {% if errors.email %}
         <p class="text-red-600 text-xs mt-1">{{ errors.email }}</p>
       {% endif %}
@@ -42,7 +42,7 @@
 
     <div>
       <label class="block text-xs text-gray-600 mb-1">Password</label>
-      <input type="password" name="password" required class="w-full px-3 py-2 text-sm border rounded-md" />
+      <input type="password" name="password" class="w-full px-3 py-2 text-sm border rounded-md" />
       {% if errors.password %}
         <p class="text-red-600 text-xs mt-1">{{ errors.password }}</p>
       {% endif %}
@@ -50,7 +50,7 @@
 
     <div>
       <label class="block text-xs text-gray-600 mb-1">Confirm Password</label>
-      <input type="password" name="confirm_password" required class="w-full px-3 py-2 text-sm border rounded-md" />
+      <input type="password" name="confirm_password" class="w-full px-3 py-2 text-sm border rounded-md" />
       {% if errors.confirm_password %}
         <p class="text-red-600 text-xs mt-1">{{ errors.confirm_password }}</p>
       {% endif %}
@@ -58,7 +58,7 @@
 
     <div>
       <label class="block text-xs text-gray-600 mb-1">Mobile</label>
-      <input type="text" name="mobile" value="{{ mobile }}" required class="w-full px-3 py-2 text-sm border rounded-md" />
+      <input type="text" name="mobile" value="{{ mobile|default:'' }}" class="w-full px-3 py-2 text-sm border rounded-md" />
       {% if errors.mobile %}
         <p class="text-red-600 text-xs mt-1">{{ errors.mobile }}</p>
       {% endif %}
