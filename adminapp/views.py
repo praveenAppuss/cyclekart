@@ -294,7 +294,6 @@ def add_product(request):
     color_choices = ['Red', 'Blue', 'Green', 'Black', 'White', 'Yellow']
     size_choices = ['S', 'M', 'L']
 
-    #  Color to Hex mapping
     color_hex_map = {
         'Red': '#ff0000',
         'Blue': '#0000ff',
@@ -303,6 +302,9 @@ def add_product(request):
         'White': '#ffffff',
         'Yellow': '#ffff00',
     }
+
+    errors = {}
+    old = {}
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -315,12 +317,45 @@ def add_product(request):
         stocks = request.POST.getlist('stocks[]')
         cropped_images = request.POST.getlist('cropped_images')
 
-        #  Basic validation
-        if not name or not category_id or not brand_id or not color or not sizes or not stocks or len(cropped_images) < 3:
-            messages.error(request, "Please fill all required fields and upload at least 3 cropped images.")
-            return redirect('add_product')
+        old = {
+            'name': name,
+            'category': category_id,
+            'brand': brand_id,
+            'description': description,
+            'color': color,
+            'price': price,
+            'stocks': stocks,
+        }
 
-        #  Create product
+        # Validation
+        if Product.objects.filter(name__iexact=name).exists():
+            errors['name'] = "Product with this name already exists."
+
+        if not name:
+            errors['name'] = "Product name is required."
+        if not category_id:
+            errors['category'] = "Please select a category."
+        if not brand_id:
+            errors['brand'] = "Please select a brand."
+        if not color:
+            errors['color'] = "Please select a color."
+        if not sizes or not stocks:
+            errors['stocks'] = "Please provide size and stock."
+        if len(cropped_images) < 3:
+            errors['images'] = "Please upload at least 3 cropped images."
+
+        if errors:
+            return render(request, 'product_form.html', {
+                'categories': categories,
+                'brands': brands,
+                'colors': color_choices,
+                'sizes': size_choices,
+                'product': {},
+                'errors': errors,
+                'old': old
+            })
+
+        # Create product
         product = Product.objects.create(
             name=name,
             slug=slugify(name),
@@ -330,19 +365,19 @@ def add_product(request):
             description=description
         )
 
-        #  Save product color with hex code
+        # Save color
         ProductColor.objects.create(
             product=product,
             name=color,
-            hex_code=color_hex_map.get(color, '#000000')  # fallback to black
+            hex_code=color_hex_map.get(color, '#000000')
         )
 
-        #  Save size & stock
+        # Save size and stock
         for size, stock in zip(sizes, stocks):
             if size and stock:
                 ProductSizeStock.objects.create(product=product, size=size, quantity=int(stock))
 
-        #  Save cropped images
+        # Save images
         for i, img_str in enumerate(cropped_images):
             try:
                 format, img_data = img_str.split(';base64,')
@@ -351,14 +386,13 @@ def add_product(request):
                 image_file = ContentFile(base64.b64decode(img_data), name=file_name)
                 new_img = ProductImage.objects.create(product=product, image=image_file)
 
-                # Set thumbnail for the first image
                 if i == 0:
                     product.thumbnail = new_img.image
                     product.save()
 
             except Exception as e:
                 print("Image saving error:", e)
-                messages.warning(request, "One of the cropped images could not be saved.")
+                messages.warning(request, "Some images could not be saved.")
 
         messages.success(request, 'Product added successfully.')
         return redirect('product_list')
@@ -369,7 +403,10 @@ def add_product(request):
         'colors': color_choices,
         'sizes': size_choices,
         'product': {},
+        'errors': {},
+        'old': {}
     })
+
 
 
 
