@@ -4,7 +4,7 @@
 {% block content %}
 <div class="p-6 max-w-5xl mx-auto bg-white rounded shadow">
   <h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
-    {% if product %} Edit Product {% else %} Add Product {% endif %}
+    {% if product.id %} Edit Product {% else %} Add Product {% endif %}
   </h2>
 
   <form method="post" enctype="multipart/form-data" id="product-form">
@@ -14,42 +14,47 @@
     <div class="grid grid-cols-2 gap-4 mb-4">
       <div>
         <label class="block text-sm font-medium mb-1">Product Name</label>
-        <input type="text" name="name" value="{{ product.name|default_if_none:'' }}" required
-          class="w-full border px-3 py-2 rounded" />
+        <input type="text" name="name" value="{{ old.name|default:'' }}" class="w-full border px-3 py-2 rounded" />
         {% if errors.name %}<p class="text-red-600 text-sm mt-1">{{ errors.name }}</p>{% endif %}
       </div>
 
       <div>
         <label class="block text-sm font-medium mb-1">Price</label>
-        <input type="number" name="price" step="0.01" value="{{ product.price|default_if_none:'' }}" required
+        <input type="number" name="price" step="0.01" value="{{ old.price|default:'' }}"
           class="w-full border px-3 py-2 rounded" />
       </div>
+
       <div>
         <label class="block text-sm font-medium mb-1">Category</label>
-        <select name="category" required class="w-full border px-3 py-2 rounded">
+        <select name="category" class="w-full border px-3 py-2 rounded">
           <option value="">Select</option>
           {% for cat in categories %}
-          <option value="{{ cat.id }}" {% if product.category.id==cat.id %}selected{% endif %}>{{ cat.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div>
-        <label class="block text-sm font-medium mb-1">Brand</label>
-        <select name="brand" required class="w-full border px-3 py-2 rounded">
-          <option value="">Select</option>
-          {% for brand in brands %}
-          <option value="{{ brand.id }}" {% if product.brand.id==brand.id %}selected{% endif %}>{{ brand.name }}
+          <option value="{{ cat.id }}" {% if old.category|default_if_none:''|stringformat:"s" == cat.id|stringformat:"s" %}selected{% endif %}>
+            {{ cat.name }}
           </option>
           {% endfor %}
         </select>
+        {% if errors.category %}<p class="text-red-600 text-sm mt-1">{{ errors.category }}</p>{% endif %}
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Brand</label>
+        <select name="brand" class="w-full border px-3 py-2 rounded">
+          <option value="">Select</option>
+          {% for brand in brands %}
+          <option value="{{ brand.id }}" {% if old.brand|default_if_none:''|stringformat:"s" == brand.id|stringformat:"s" %}selected{% endif %}>
+            {{ brand.name }}
+          </option>
+          {% endfor %}
+        </select>
+        {% if errors.brand %}<p class="text-red-600 text-sm mt-1">{{ errors.brand }}</p>{% endif %}
       </div>
     </div>
 
     <!-- Description -->
     <div class="mb-4">
       <label class="block text-sm font-medium mb-1">Description</label>
-      <textarea name="description" rows="3"
-        class="w-full border px-3 py-2 rounded">{{ product.description|default_if_none:'' }}</textarea>
+      <textarea name="description" rows="3" class="w-full border px-3 py-2 rounded">{{ old.description|default:'' }}</textarea>
     </div>
 
     <!-- Colors -->
@@ -58,35 +63,36 @@
       <div class="flex flex-wrap gap-3">
         {% for color in colors %}
         <label class="inline-flex items-center gap-2">
-          <input type="radio" name="color" value="{{ color }}" {% if selected_color==color %}checked{% endif %}
-            required>
+          <input type="radio" name="color" value="{{ color }}" {% if old.color == color or selected_color == color %}checked{% endif %}>
           <span class="w-5 h-5 inline-block rounded-full border" style="background-color: {{ color }}"></span>
           {{ color }}
         </label>
         {% endfor %}
       </div>
+      {% if errors.color %}<p class="text-red-600 text-sm mt-1">{{ errors.color }}</p>{% endif %}
     </div>
 
     <!-- Sizes & Stock -->
     <div class="mb-6">
       <label class="block text-sm font-medium mb-2">Size Stock</label>
       <div class="grid grid-cols-3 gap-4">
-        {% for size in sizes %}
+        {% for size, stock in zipped_stocks %}
         <div>
           <label class="block text-sm font-medium mb-1">{{ size }}</label>
           <input type="hidden" name="sizes[]" value="{{ size }}">
-          <input type="number" name="stocks[]"
-            value="{% for stock in existing_stocks %}{% if stock.size == size %}{{ stock.quantity }}{% endif %}{% endfor %}"
-            placeholder="Qty" min="0" class="w-full border px-3 py-2 rounded" required>
+          <input type="number" name="stocks[]" value="{{ stock }}" placeholder="Qty" min="0"
+            class="w-full border px-3 py-2 rounded">
         </div>
         {% endfor %}
       </div>
+      {% if errors.stocks %}<p class="text-red-600 text-sm mt-1">{{ errors.stocks }}</p>{% endif %}
     </div>
 
     <!-- Product Images -->
     <div class="mb-6">
       <label class="block text-sm font-medium mb-1">Product Images (Min 3)</label>
       <input type="file" id="image-input" accept="image/*" multiple class="w-full border px-3 py-2 rounded mb-3">
+      {% if errors.images %}<p class="text-red-600 text-sm mt-1">{{ errors.images }}</p>{% endif %}
 
       <div id="crop-container" class="mb-4 hidden">
         <div id="croppie-box" class="mx-auto"></div>
@@ -137,12 +143,9 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
 
-<!-- Safely set isEditMode -->
 <script>
-  const isEditMode = {{ product.id|default: "0" }} > 0;
-</script>
+  const isEditMode = {% if product.id %}true{% else %}false{% endif %};
 
-<script>
   let files = [];
   let currentIndex = 0;
   let croppie = null;
@@ -192,9 +195,7 @@
         viewport: { width: 400, height: 400 },
         boundary: { width: 450, height: 450 },
         enableZoom: true,
-        aspectRatio: 1,
-        minCropBoxWidth: 300,
-        minCropBoxHeight: 300
+        aspectRatio: 1
       });
 
       croppie.bind({ url: e.target.result });

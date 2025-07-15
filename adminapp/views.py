@@ -305,6 +305,7 @@ def add_product(request):
 
     errors = {}
     old = {}
+    zipped_stocks = []
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -322,15 +323,17 @@ def add_product(request):
             'category': category_id,
             'brand': brand_id,
             'description': description,
-            'color': color,
+            'color': str(color),
             'price': price,
             'stocks': stocks,
         }
 
+        # 👇 create zipped list for template rendering
+        zipped_stocks = list(zip(size_choices, stocks))
+
         # Validation
         if Product.objects.filter(name__iexact=name).exists():
             errors['name'] = "Product with this name already exists."
-
         if not name:
             errors['name'] = "Product name is required."
         if not category_id:
@@ -352,10 +355,12 @@ def add_product(request):
                 'sizes': size_choices,
                 'product': {},
                 'errors': errors,
-                'old': old
+                'old': old,
+                'zipped_stocks': zipped_stocks,
+                'existing_images': [],
             })
 
-        # Create product
+        # ✅ Create product
         product = Product.objects.create(
             name=name,
             slug=slugify(name),
@@ -365,19 +370,19 @@ def add_product(request):
             description=description
         )
 
-        # Save color
+        # ✅ Save color
         ProductColor.objects.create(
             product=product,
             name=color,
             hex_code=color_hex_map.get(color, '#000000')
         )
 
-        # Save size and stock
+        # ✅ Save size and stock
         for size, stock in zip(sizes, stocks):
             if size and stock:
                 ProductSizeStock.objects.create(product=product, size=size, quantity=int(stock))
 
-        # Save images
+        # ✅ Save images
         for i, img_str in enumerate(cropped_images):
             try:
                 format, img_data = img_str.split(';base64,')
@@ -397,6 +402,9 @@ def add_product(request):
         messages.success(request, 'Product added successfully.')
         return redirect('product_list')
 
+    # For GET request: use blank values
+    zipped_stocks = list(zip(size_choices, [''] * len(size_choices)))
+
     return render(request, 'product_form.html', {
         'categories': categories,
         'brands': brands,
@@ -404,7 +412,9 @@ def add_product(request):
         'sizes': size_choices,
         'product': {},
         'errors': {},
-        'old': {}
+        'old': {},
+        'zipped_stocks': zipped_stocks,
+        'existing_images': [],
     })
 
 
@@ -418,13 +428,14 @@ def edit_product(request, product_id):
     brands = Brand.objects.filter(is_active=True, is_deleted=False)
     color_choices = ['Red', 'Blue', 'Green', 'Black', 'White', 'Yellow']
     size_choices = ['S', 'M', 'L']
-    existing_stocks = ProductSizeStock.objects.filter(product=product)
     existing_images = ProductImage.objects.filter(product=product)
-
-    # ✅ Get the existing color (if any)
     existing_color = ''
     if product.colors.exists():
         existing_color = product.colors.first().name
+
+    # Default stocks mapping (e.g., {'S': 10, 'M': 0, 'L': 5})
+    stock_map = {stock.size: stock.quantity for stock in ProductSizeStock.objects.filter(product=product)}
+    zipped_stocks = [(size, stock_map.get(size, '')) for size in size_choices]
 
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -449,17 +460,17 @@ def edit_product(request, product_id):
         product.price = price
         product.save()
 
-        # ✅ Update or create color (overwrite existing color if only one is allowed)
+        # Update color
         ProductColor.objects.filter(product=product).delete()
         ProductColor.objects.create(product=product, name=color)
 
-        # ✅ Replace old stock records
+        # Replace stocks
         ProductSizeStock.objects.filter(product=product).delete()
         for size, stock in zip(sizes, stocks):
             if size and stock:
                 ProductSizeStock.objects.create(product=product, size=size, quantity=int(stock))
 
-        # ✅ Only replace images if new ones were uploaded
+        # Replace images if new ones uploaded
         if cropped_images:
             ProductImage.objects.filter(product=product).delete()
             for i, img_str in enumerate(cropped_images):
@@ -486,8 +497,18 @@ def edit_product(request, product_id):
         'colors': color_choices,
         'sizes': size_choices,
         'selected_color': existing_color,
-        'existing_stocks': existing_stocks,
+        'zipped_stocks': zipped_stocks,
         'existing_images': existing_images,
+        'errors': {},
+        'old': {
+            'name': product.name,
+            'category': str(product.category_id),
+            'brand': str(product.brand_id),
+            'description': product.description,
+            'color': existing_color,
+            'price': product.price,
+            'stocks': [stock_map.get(size, '') for size in size_choices],
+        }
     })
 
 
