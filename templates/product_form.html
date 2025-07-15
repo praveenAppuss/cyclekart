@@ -103,10 +103,10 @@
     <!-- Buttons -->
     <div class="flex justify-between">
       <a href="{% url 'product_list' %}" class="px-5 py-2 bg-gray-700 text-white rounded flex items-center gap-1">
-        <i data-lucide="arrow-left"></i> Cancel
+        Cancel
       </a>
       <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1">
-         Submit
+        Submit
       </button>
     </div>
   </form>
@@ -127,6 +127,11 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
 
+<!-- Safely set isEditMode -->
+<script>
+  const isEditMode = {{ product.id|default:"0" }} > 0;
+</script>
+
 <script>
   let files = [];
   let currentIndex = 0;
@@ -136,8 +141,6 @@
   const previewGrid = document.getElementById('image-preview');
   const form = document.getElementById('product-form');
   const collectedImages = [];
-
-  const isEditMode = {{ product.id|yesno:"true,false" }};
 
   document.getElementById('image-input').addEventListener('change', function (e) {
     files = Array.from(e.target.files);
@@ -218,7 +221,8 @@
   }
 
   form.addEventListener('submit', function (e) {
-    if (!isEditMode && collectedImages.length < 3) {
+    const croppedCount = document.querySelectorAll('input[name="cropped_images"]').length;
+    if (!isEditMode && croppedCount < 3) {
       e.preventDefault();
       document.getElementById('image-warning-modal').classList.remove('hidden');
     }
