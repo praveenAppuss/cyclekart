@@ -29,7 +29,7 @@
 
             <!-- Zoom box -->
             <div id="zoomBox" style="width: 500px; height: 450px;"
-              class="hidden absolute top-0 left-full ml-6  z-50 border border-gray-200 shadow-lg rounded overflow-hidden bg-white">
+              class="hidden absolute top-0 left-full ml-6 z-50 border border-gray-200 shadow-lg rounded overflow-hidden bg-white">
               <img id="zoomedImage" src="{{ product.thumbnail.url }}"
                 class="absolute object-cover max-w-none pointer-events-none" />
             </div>
@@ -52,18 +52,17 @@
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-2">
               {% for i in "12345" %}
-              {% if forloop.counter <= 4 %} <svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
-                <path
-                  d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                </svg>
-                {% else %}
-                <svg class="w-4 h-4 text-gray-300 fill-current" viewBox="0 0 20 20">
-                  <path
-                    d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                </svg>
-                {% endif %}
-                {% endfor %}
-                <span class="text-sm text-blue-600 ml-1">(0 Reviews)</span>
+              {% if forloop.counter <= 4 %}
+              <svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+              </svg>
+              {% else %}
+              <svg class="w-4 h-4 text-gray-300 fill-current" viewBox="0 0 20 20">
+                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+              </svg>
+              {% endif %}
+              {% endfor %}
+              <span class="text-sm text-blue-600 ml-1">(0 Reviews)</span>
             </div>
             <span class="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded">IN STOCK</span>
           </div>
@@ -73,60 +72,73 @@
             <span class="text-2xl font-bold text-gray-900">₹{{ product.price|floatformat:0 }}</span>
             {% if product.original_price and product.original_price != product.price %}
             <span class="text-lg text-gray-500 line-through ml-2">₹{{ product.original_price|floatformat:0 }}</span>
-            <span class="text-sm text-green-600 ml-2">(Save ₹{{
-              product.original_price|floatformat:0|add:"-"|add:product.price|floatformat:0 }})</span>
+            <span class="text-sm text-green-600 ml-2">(Save ₹{{ product.original_price|floatformat:0|add:"-"|add:product.price|floatformat:0 }})</span>
             {% endif %}
           </div>
 
           <!-- Size -->
           <div class="mb-4">
             <h3 class="text-sm font-medium text-gray-900 mb-1">Select Size</h3>
-            <div class="flex gap-2">
-              <div class="w-10 h-10 border rounded flex items-center justify-center">S</div>
-              <div class="w-10 h-10 border rounded flex items-center justify-center">M</div>
-              <div class="w-10 h-10 border rounded flex items-center justify-center">L</div>
+            <div class="flex gap-2" id="sizeOptions">
+              <div class="w-10 h-10 border rounded flex items-center justify-center cursor-pointer size-option">S</div>
+              <div class="w-10 h-10 border rounded flex items-center justify-center cursor-pointer size-option">M</div>
+              <div class="w-10 h-10 border rounded flex items-center justify-center cursor-pointer size-option">L</div>
             </div>
           </div>
 
           <!-- Color -->
+          <div class="mb-4">
+            <h3 class="text-sm font-medium text-gray-900 mb-1">Color</h3>
+            {% if color %}
+              <div class="w-6 h-6 rounded-full border-2 border-gray-900" style="background-color: {{ color.hex_code|default:'#000' }};" title="{{ color.name }}"></div>
+            {% else %}
+              <span class="text-gray-500 text-sm">No color available</span>
+            {% endif %}
+          </div>
 
-         <!-- Color -->
-<div class="mb-4">
-  <h3 class="text-sm font-medium text-gray-900 mb-1">Color</h3>
-  {% if color %}
-    <div 
-      class="w-6 h-6 rounded-full border-2 border-gray-900" 
-      style="background-color: {{ color.hex_code|default:'#000' }};" 
-      title="{{ color.name }}">
-    </div>
-  {% else %}
-    <span class="text-gray-500 text-sm">No color available</span>
-  {% endif %}
-</div>
-
-
-
-          <!-- Add to Cart -->
-          <div class="flex space-x-3 mt-6">
-            <button class="flex-1 bg-gray-800 text-white py-3 px-6 rounded font-medium text-center">ADD TO CART</button>
-            <div class="p-3 border rounded">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
+          <!-- Quantity Selector -->
+          <div class="mb-4">
+            <h3 class="text-sm font-medium text-gray-900 mb-1">Quantity</h3>
+            <div class="flex items-center gap-3">
+              <button id="decreaseQty" disabled class="bg-gray-200 text-gray-500 px-2 rounded" aria-label="Decrease quantity">-</button>
+              <input type="text" id="quantity" class="w-12 border text-center rounded" value="1" readonly>
+              <button id="increaseQty" disabled class="bg-gray-200 text-gray-500 px-2 rounded" aria-label="Increase quantity">+</button>
+              <span id="stockMessage" class="text-sm text-slate-500 ml-2"></span>
             </div>
           </div>
 
+          <!-- Add to Cart and Wishlist -->
+          <div class="flex space-x-3 mt-6">
+            <form method="post" action="{% url 'add_to_cart' product.id %}" class="flex-1">
+              {% csrf_token %}
+              <input type="hidden" name="quantity" id="formQuantity" value="1">
+              <input type="hidden" name="size" id="formSize" value="">
+              <button id="addToCartBtn" disabled type="submit" class="w-full bg-gray-400 cursor-not-allowed text-white py-3 px-6 rounded font-medium text-center" aria-label="Add {{ product.name }} to cart">
+                ADD TO CART
+              </button>
+            </form>
+            <form method="post" action="{% url 'add_to_wishlist' product.id %}">
+              {% csrf_token %}
+              <button type="submit" class="p-3 border rounded" aria-label="Add {{ product.name }} to wishlist">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+            </form>
+          </div>
 
         </div>
       </div>
     </div>
   </div>
+
   <!-- Description -->
   <div class="mt-6 pt-6 border-t ml-10">
     <h3 class="text-sm font-medium text-gray-900 mb-2">Details</h3>
     <p class="text-sm text-gray-600">{{ product.description }}</p>
   </div>
+
   <!-- Related Products Section -->
   <div class="mt-16 border-t pt-10">
     <h2 class="text-2xl font-semibold text-gray-800 mb-6">You May Also Like</h2>
@@ -143,21 +155,13 @@
       {% endfor %}
     </div>
   </div>
-
 </div>
 
 <!-- CSS for lens & zoom -->
 <style>
-  #lens {
-    width: 120px;
-    height: 120px;
-  }
-
-  #zoomedImage {
-    position: absolute;
-    top: 0;
-    left: 0;
-  }
+  #lens { width: 120px; height: 120px; }
+  #zoomedImage { position: absolute; top: 0; left: 0; }
+  .size-option.selected { background-color: #111827; color: white; }
 </style>
 
 <!-- JavaScript -->
@@ -167,29 +171,36 @@
     const zoomedImage = document.getElementById("zoomedImage");
     const lens = document.getElementById("lens");
     const zoomBox = document.getElementById("zoomBox");
-
     const zoomLevel = 2.5;
+    const sizeOptions = document.querySelectorAll('.size-option');
+    const addToCartBtn = document.getElementById('addToCartBtn');
+    const formSize = document.getElementById('formSize');
+    const formQty = document.getElementById('formQuantity');
+    const qtyInput = document.getElementById('quantity');
+    const incBtn = document.getElementById('increaseQty');
+    const decBtn = document.getElementById('decreaseQty');
+    const stockMessage = document.getElementById('stockMessage');
+
+    // Initialize stock and max quantity from template context
+    const stockData = JSON.parse(document.getElementById('stock').textContent);
+    let stock = stockData.quantity || 5;
+    let maxQuantity = Math.min(5, stock); // Limit to 5 or stock
+    stockMessage.textContent = stock > 0 ? `Stock: ${stock} left` : 'Out of stock';
 
     const moveLens = (e) => {
       const rect = mainImage.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-
       let lensX = x - lens.offsetWidth / 2;
       let lensY = y - lens.offsetHeight / 2;
-
       const maxX = mainImage.offsetWidth - lens.offsetWidth;
       const maxY = mainImage.offsetHeight - lens.offsetHeight;
-
       lensX = Math.max(0, Math.min(lensX, maxX));
       lensY = Math.max(0, Math.min(lensY, maxY));
-
       lens.style.left = `${lensX}px`;
       lens.style.top = `${lensY}px`;
-
       zoomedImage.style.left = `-${lensX * zoomLevel}px`;
       zoomedImage.style.top = `-${lensY * zoomLevel}px`;
-
       zoomedImage.style.width = `${mainImage.offsetWidth * zoomLevel}px`;
       zoomedImage.style.height = `${mainImage.offsetHeight * zoomLevel}px`;
     };
@@ -198,11 +209,7 @@
       lens.classList.remove("hidden");
       zoomBox.classList.remove("hidden");
     });
-
-    mainImage.addEventListener("mousemove", (e) => {
-      moveLens(e);
-    });
-
+    mainImage.addEventListener("mousemove", moveLens);
     mainImage.addEventListener("mouseleave", () => {
       lens.classList.add("hidden");
       zoomBox.classList.add("hidden");
@@ -214,6 +221,55 @@
       lens.classList.add("hidden");
       zoomBox.classList.add("hidden");
     };
+
+    sizeOptions.forEach(option => {
+      option.addEventListener('click', () => {
+        sizeOptions.forEach(o => o.classList.remove('selected'));
+        option.classList.add('selected');
+        formSize.value = option.textContent;
+        addToCartBtn.disabled = false;
+        addToCartBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
+        addToCartBtn.classList.add('bg-gray-800', 'cursor-pointer');
+        incBtn.disabled = false;
+        decBtn.disabled = false;
+        updateQuantityButtons(); // Update quantity buttons after size selection
+      });
+    });
+
+    function updateQuantityButtons() {
+      const quantity = parseInt(qtyInput.value);
+      incBtn.disabled = quantity >= maxQuantity || stock === 0;
+      decBtn.disabled = quantity <= 1 || stock === 0;
+      addToCartBtn.disabled = quantity > stock || stock === 0 || !formSize.value;
+      addToCartBtn.classList.toggle('bg-gray-400', quantity > stock || stock === 0 || !formSize.value);
+      addToCartBtn.classList.toggle('bg-gray-800', quantity <= stock && stock > 0 && formSize.value);
+      addToCartBtn.classList.toggle('cursor-not-allowed', quantity > stock || stock === 0 || !formSize.value);
+      addToCartBtn.classList.toggle('cursor-pointer', quantity <= stock && stock > 0 && formSize.value);
+    }
+
+    incBtn.addEventListener('click', () => {
+      let current = parseInt(qtyInput.value);
+      if (current < maxQuantity && stock > 0) {
+        qtyInput.value = current + 1;
+        formQty.value = qtyInput.value;
+      }
+      updateQuantityButtons();
+    });
+
+    decBtn.addEventListener('click', () => {
+      let current = parseInt(qtyInput.value);
+      if (current > 1 && stock > 0) {
+        qtyInput.value = current - 1;
+        formQty.value = qtyInput.value;
+      }
+      updateQuantityButtons();
+    });
+
+    // Initial state
+    updateQuantityButtons();
   });
 </script>
+
+<!-- Hidden element for json_script -->
+{{ stock_data|json_script:"stock" }}
 {% endblock %}

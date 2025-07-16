@@ -11,13 +11,15 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
-from adminapp.models import Product,Category, Brand
-from userapp.models import CustomUser
+from adminapp.models import Product,Category,Brand,ProductSizeStock
+from userapp.models import CustomUser,Address,Cart,CartItem,Wishlist,Order,OrderItem
 import re
 from django.views.decorators.cache import never_cache
 from .utils import no_cache_view
-from .models import Address
+
 from .forms import AddressForm
+import json
+from django.utils.safestring import mark_safe
 
 User = get_user_model()
 
@@ -337,31 +339,26 @@ def update_profile(request):
         user.email = request.POST.get('email', user.email)
         user.mobile = request.POST.get('mobile', user.mobile)
         user.save()
-
         selected_address_id = request.POST.get('selected_user')
         if selected_address_id:
             try:
                 # Reset current default
                 Address.objects.filter(user=user, is_default=True).update(is_default=False)
-
                 # Set new default
                 address = Address.objects.get(id=selected_address_id, user=user)
                 address.is_default = True
                 address.save()
             except Address.DoesNotExist:
                 pass  # silently ignore if someone messes with the form
-
         messages.success(request, "Profile updated successfully.")
         return redirect('profile')
-
     return redirect('profile')
 
     
 
 # Address management section---------------------------------
 
-import json
-from django.utils.safestring import mark_safe
+
 
 @login_required
 def address_list(request):
@@ -417,3 +414,220 @@ def delete_address(request, pk):
     address = get_object_or_404(Address, pk=pk, user=request.user)
     address.delete()
     return redirect('address_list')
+
+
+
+
+# Cart Management
+@login_required
+def add_to_cart(request, product_id):
+    product = get_object_or_404(Product, id=product_id)
+
+    # Check if product or category is unavailable
+    if not product.is_active or product.is_deleted or not product.category.is_active or product.category.is_deleted:
+        messages.error(request, "This product is unavailable.")
+        return redirect('product_detail', product_id=product.id)
+
+    size = request.POST.get('size')
+    quantity = request.POST.get('quantity', 1)  # Default to 1 if not provided
+    try:
+        quantity = int(quantity)
+    except (ValueError, TypeError):
+        messages.error(request, "Invalid quantity.")
+        return redirect('product_detail', product_id=product.id)
+
+    try:
+        stock_entry = ProductSizeStock.objects.get(product=product, size=size)
+    except ProductSizeStock.DoesNotExist:
+        messages.error(request, "Invalid size selected.")
+        return redirect('product_detail', product_id=product.id)
+
+    if stock_entry.quantity < 1:
+        messages.warning(request, f"Size {size} is out of stock.")
+        return redirect('product_detail', product_id=product.id)
+
+    max_quantity = min(stock_entry.quantity, 5)  # Limit to 5 or stock, whichever is lower
+    if quantity < 1 or quantity > max_quantity:
+        messages.warning(request, f"Quantity must be between 1 and {max_quantity}.")
+        return redirect('product_detail', product_id=product.id)
+
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+
+    cart_item, created = CartItem.objects.get_or_create(
+        cart=cart,
+        product=product,
+        size=size,
+        defaults={'quantity': quantity}
+    )
+
+    if not created:
+        new_quantity = min(cart_item.quantity + quantity, max_quantity)
+        if new_quantity > max_quantity:
+            messages.warning(request, f"Cannot add more. Max limit is {max_quantity}.")
+        else:
+            cart_item.quantity = new_quantity
+            cart_item.save()
+            messages.success(request, f"{product.name} quantity updated in cart.")
+    else:
+        cart_item.quantity = quantity
+        cart_item.save()
+        messages.success(request, f"{product.name} added to cart.")
+
+    # Remove from wishlist if exists
+    Wishlist.objects.filter(user=request.user, product=product).delete()
+    return redirect('cart_view')
+
+@login_required
+def cart_view(request):
+    cart = Cart.objects.filter(user=request.user).first()
+    cart_items = cart.items.select_related('product') if cart else []
+    total = 0
+    has_unavailable_items = False
+
+    for item in cart_items:
+        item.subtotal = item.quantity * item.product.price
+        total += item.subtotal
+        try:
+            item.stock = ProductSizeStock.objects.get(product=item.product, size=item.size).quantity
+            item.max_quantity = min(item.stock, 5)  # Max 5 items
+            if (item.product.is_deleted or not item.product.is_active or 
+                not item.product.category.is_active or item.quantity > item.stock):
+                has_unavailable_items = True
+        except ProductSizeStock.DoesNotExist:
+            has_unavailable_items = True
+            item.stock = 0
+            item.max_quantity = 0
+
+    return render(request, 'cart.html', {
+        'cart_items': cart_items,
+        'cart_total': total,
+        'has_unavailable_items': has_unavailable_items,
+    })
+
+@login_required
+def update_cart_quantity(request, cart_item_id):
+    cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
+    
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        try:
+            stock_entry = ProductSizeStock.objects.get(product=cart_item.product, size=cart_item.size)
+            max_quantity = min(stock_entry.quantity, 5)  # Max 5 items
+        except ProductSizeStock.DoesNotExist:
+            messages.error(request, "Selected size stock not found.")
+            return redirect('cart_view')
+
+        if action == 'increment' and cart_item.quantity < max_quantity:
+            cart_item.quantity += 1
+            messages.success(request, f"Quantity updated for {cart_item.product.name}.")
+        elif action == 'decrement' and cart_item.quantity > 1:
+            cart_item.quantity -= 1
+            messages.success(request, f"Quantity updated for {cart_item.product.name}.")
+        else:
+            messages.warning(request, f"Cannot update quantity. Max limit: {max_quantity} or minimum reached.")
+
+        cart_item.save()
+    return redirect('cart_view')
+
+@login_required
+def remove_from_cart(request, cart_item_id):
+    cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
+    product_name = cart_item.product.name
+    cart_item.delete()
+    messages.success(request, f"{product_name} removed from cart.")
+    return redirect('cart_view')
+
+# Wishlist Management
+@login_required
+def wishlist_view(request):
+    wishlist_items = Wishlist.objects.filter(user=request.user).select_related('product')
+    sizes = ProductSizeStock.objects.filter(
+        product__in=[item.product for item in wishlist_items]
+    ).values('product_id', 'size', 'quantity')
+    size_map = {}
+    for item in sizes:
+        if item['quantity'] > 0:  # Only include sizes with stock
+            size_map.setdefault(item['product_id'], []).append(item['size'])
+
+    return render(request, 'wishlist.html', {
+        'wishlist_items': wishlist_items,
+        'sizes': size_map,  # Ensure this is passed even if empty
+    })
+
+@login_required
+def add_to_wishlist(request, product_id):
+    product = get_object_or_404(Product, id=product_id)
+
+    if not product.is_active or not product.category.is_active or product.is_deleted or product.category.is_deleted:
+        messages.error(request, "This product is unavailable.")
+        return redirect('product_detail', product_id=product.id)
+
+    wishlist_item, created = Wishlist.objects.get_or_create(user=request.user, product=product)
+    if created:
+        messages.success(request, f"{product.name} added to wishlist.")
+    else:
+        messages.info(request, f"{product.name} is already in your wishlist.")
+    return redirect('wishlist_view')
+
+@login_required
+def remove_from_wishlist(request, wishlist_id):
+    item = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
+    product_name = item.product.name
+    item.delete()
+    messages.success(request, f"{product_name} removed from wishlist.")
+    return redirect('wishlist_view')
+
+@login_required
+def add_to_cart_from_wishlist(request):
+    if request.method == 'POST':
+        product_id = request.POST.get('product_id')
+        size = request.POST.get('size')
+        product = get_object_or_404(Product, id=product_id)
+
+        # Check product/category availability
+        if not product.is_active or not product.category.is_active or product.is_deleted or product.category.is_deleted:
+            messages.error(request, "This product is unavailable.")
+            return redirect('wishlist_view')
+
+        # Validate size
+        if not size:
+            messages.error(request, "Please select a size.")
+            return redirect('wishlist_view')
+
+        # Check stock availability
+        try:
+            stock_entry = ProductSizeStock.objects.get(product=product, size=size)
+            if stock_entry.quantity < 1:
+                messages.warning(request, f"Size {size} is out of stock.")
+                return redirect('wishlist_view')
+        except ProductSizeStock.DoesNotExist:
+            messages.error(request, "Invalid size selected.")
+            return redirect('wishlist_view')
+
+        # Add to cart
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        max_quantity = min(stock_entry.quantity, 5)  # Max 5 items per product
+        cart_item, created = CartItem.objects.get_or_create(
+            cart=cart,
+            product=product,
+            size=size,
+            defaults={'quantity': 1}
+        )
+
+        if not created:
+            if cart_item.quantity < max_quantity:
+                cart_item.quantity += 1
+                cart_item.save()
+                messages.success(request, f"{product.name} quantity updated in cart.")
+            else:
+                messages.warning(request, f"Cannot add more. Only {stock_entry.quantity} left or max limit reached.")
+                return redirect('wishlist_view')
+        else:
+            cart_item.save()
+            messages.success(request, f"{product.name} added to cart.")
+
+        # Remove from wishlist
+        Wishlist.objects.filter(user=request.user, product=product).delete()
+        return redirect('cart_view')
+
+    return redirect('wishlist_view')

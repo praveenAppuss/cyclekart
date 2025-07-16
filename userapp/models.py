@@ -40,11 +40,24 @@ class Cart(models.Model):
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    size = models.CharField(max_length=2, blank=True, null=True)  # Optional if you're tracking sizes
+    size = models.CharField(max_length=2, blank=True, null=True)
     quantity = models.PositiveIntegerField(default=1)
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"
+
+
+class Wishlist(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='wishlist_items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'product')  # Prevent duplicate wishlist entries
+
+    def __str__(self):
+        return f"{self.user.username} - {self.product.name}"
+
 
 
 class Order(models.Model):

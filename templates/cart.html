@@ -1,0 +1,107 @@
+{% extends 'header.html' %}
+{% load static %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-10 px-6">
+  <div class="max-w-6xl mx-auto">
+    <!-- Messages -->
+    {% if messages %}
+      <div class="mb-4">
+        {% for message in messages %}
+          <div class="p-4 rounded-lg {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <h2 class="text-3xl font-bold text-slate-800 mb-6">Your Cart</h2>
+
+    {% if cart_items %}
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <!-- Cart Items -->
+        <div class="md:col-span-2 space-y-6">
+          {% for item in cart_items %}
+            <div class="flex items-center justify-between bg-white rounded-xl shadow-sm p-4 border border-slate-200">
+              <div class="flex items-center space-x-4">
+                <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-20 h-20 object-cover rounded-md border border-slate-200">
+                <div>
+                  <h3 class="text-lg font-semibold text-slate-800">{{ item.product.name }}</h3>
+                  <p class="text-slate-500 text-sm">Price: ₹{{ item.product.price }}</p>
+                  <p class="text-slate-500 text-sm">Size: {{ item.size|default:"N/A" }}</p>
+                  <p class="text-slate-500 text-sm">Subtotal: ₹{{ item.subtotal }}</p>
+                  {% if item.stock > 0 and item.quantity <= item.stock %}
+                    <p class="text-slate-500 text-sm">Stock: {{ item.stock }} left</p>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="flex items-center space-x-4">
+                {% if item.product.is_deleted or not item.product.is_active or not item.product.category.is_active or item.quantity > item.stock %}
+                  <span class="text-red-500 text-sm font-medium">Unavailable</span>
+                {% else %}
+                  <form method="POST" action="{% url 'update_cart_quantity' item.id %}" class="flex items-center space-x-2">
+                    {% csrf_token %}
+                    <button name="action" value="decrement" class="px-2 py-1 bg-slate-200 rounded" aria-label="Decrease quantity of {{ item.product.name }}">−</button>
+                    <span class="px-3 font-semibold">{{ item.quantity }}</span>
+                    <button name="action" value="increment" class="{% if item.quantity >= item.max_quantity %}bg-slate-400 cursor-not-allowed{% else %}bg-slate-200{% endif %} px-2 py-1 rounded" {% if item.quantity >= item.max_quantity %}disabled{% endif %} aria-label="Increase quantity of {{ item.product.name }}">+</button>
+                  </form>
+                {% endif %}
+                <form method="POST" action="{% url 'remove_from_cart' item.id %}">
+                  {% csrf_token %}
+                  <button class="text-red-600 hover:text-red-800 transition-colors" aria-label="Remove {{ item.product.name }} from cart">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- Cart Summary -->
+        <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200 h-fit">
+          <h3 class="text-xl font-bold mb-4 text-slate-800">Summary</h3>
+          <div class="space-y-3 text-slate-700">
+            <div class="flex justify-between">
+              <span>Subtotal</span>
+              <span>₹{{ cart_total }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span>Taxes</span>
+              <span>₹0.00</span> <!-- Placeholder -->
+            </div>
+            <div class="flex justify-between">
+              <span>Discount</span>
+              <span>-₹0.00</span> <!-- Placeholder -->
+            </div>
+            <div class="flex justify-between">
+              <span>Shipping</span>
+              <span>Free</span>
+            </div>
+            <hr>
+            <div class="flex justify-between font-bold text-slate-900">
+              <span>Total</span>
+              <span>₹{{ cart_total }}</span>
+            </div>
+          </div>
+          {% if cart_items and not has_unavailable_items %}
+            <a href="#" class="mt-6 block text-center bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
+              Proceed to Checkout
+            </a>
+          {% else %}
+            <button disabled class="mt-6 block text-center bg-slate-400 text-white px-4 py-2 rounded-lg font-medium cursor-not-allowed">
+              Proceed to Checkout
+            </button>
+          {% endif %}
+        </div>
+      </div>
+    {% else %}
+      <div class="text-center py-20">
+        <h3 class="text-xl font-semibold text-slate-600 mb-2">Your cart is empty 🛒</h3>
+        <a href="{% url 'userproduct_list' %}" class="text-blue-600 hover:underline">Continue Shopping</a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
