@@ -2,6 +2,21 @@
 {% load static %}
 
 {% block content %}
+<!-- Toast message container -->
+<div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="toast px-4 py-2 rounded shadow-md text-white text-sm
+                  {% if message.tags == 'success' %}bg-green-600
+                  {% elif message.tags == 'error' %}bg-red-600
+                  {% elif message.tags == 'warning' %}bg-yellow-500
+                  {% else %}bg-blue-600{% endif %}">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>
+
 <div class="min-h-screen bg-gray-50/30">
   <div class="max-w-7xl mx-auto px-6 py-6">
 
@@ -52,28 +67,35 @@
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-2">
               {% for i in "12345" %}
-              {% if forloop.counter <= 4 %}
-              <svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
-                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-              </svg>
-              {% else %}
-              <svg class="w-4 h-4 text-gray-300 fill-current" viewBox="0 0 20 20">
-                <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-              </svg>
-              {% endif %}
-              {% endfor %}
-              <span class="text-sm text-blue-600 ml-1">(0 Reviews)</span>
+              {% if forloop.counter <= 4 %} <svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                <path
+                  d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                </svg>
+                {% else %}
+                <svg class="w-4 h-4 text-gray-300 fill-current" viewBox="0 0 20 20">
+                  <path
+                    d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                </svg>
+                {% endif %}
+                {% endfor %}
+                <span class="text-sm text-blue-600 ml-1">(0 Reviews)</span>
             </div>
             <span class="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded">IN STOCK</span>
           </div>
 
           <!-- Price -->
           <div class="mb-6">
-            <span class="text-2xl font-bold text-gray-900">₹{{ product.price|floatformat:0 }}</span>
-            {% if product.original_price and product.original_price != product.price %}
-            <span class="text-lg text-gray-500 line-through ml-2">₹{{ product.original_price|floatformat:0 }}</span>
-            <span class="text-sm text-green-600 ml-2">(Save ₹{{ product.original_price|floatformat:0|add:"-"|add:product.price|floatformat:0 }})</span>
-            {% endif %}
+            {% if product.discount_price and product.discount_price < product.price %} <span
+              class="text-2xl font-bold text-gray-900">₹{{ product.discount_price|floatformat:0 }}</span>
+              <span class="text-lg text-gray-500 line-through ml-2">₹{{ product.price|floatformat:0 }}</span>
+              {% if savings > 0 %}
+              <span class="text-sm text-green-600 ml-2">
+                You save ₹{{ savings|floatformat:0 }}
+              </span>
+              {% endif %}
+              {% else %}
+              <span class="text-2xl font-bold text-gray-900">₹{{ product.price|floatformat:0 }}</span>
+              {% endif %}
           </div>
 
           <!-- Size -->
@@ -89,10 +111,12 @@
           <!-- Color -->
           <div class="mb-4">
             <h3 class="text-sm font-medium text-gray-900 mb-1">Color</h3>
-            {% if color %}
-              <div class="w-6 h-6 rounded-full border-2 border-gray-900" style="background-color: {{ color.hex_code|default:'#000' }};" title="{{ color.name }}"></div>
+            {% if product.colors.exists %}
+            <div class="w-6 h-6 rounded-full border-2 border-gray-900"
+              style="background-color: {{ product.colors.first.hex_code|default:'#000' }};"
+              title="{{ product.colors.first.name }}"></div>
             {% else %}
-              <span class="text-gray-500 text-sm">No color available</span>
+            <span class="text-gray-500 text-sm">No color available</span>
             {% endif %}
           </div>
 
@@ -100,9 +124,11 @@
           <div class="mb-4">
             <h3 class="text-sm font-medium text-gray-900 mb-1">Quantity</h3>
             <div class="flex items-center gap-3">
-              <button id="decreaseQty" disabled class="bg-gray-200 text-gray-500 px-2 rounded" aria-label="Decrease quantity">-</button>
+              <button id="decreaseQty" disabled class="bg-gray-200 text-gray-500 px-2 rounded"
+                aria-label="Decrease quantity">-</button>
               <input type="text" id="quantity" class="w-12 border text-center rounded" value="1" readonly>
-              <button id="increaseQty" disabled class="bg-gray-200 text-gray-500 px-2 rounded" aria-label="Increase quantity">+</button>
+              <button id="increaseQty" disabled class="bg-gray-200 text-gray-500 px-2 rounded"
+                aria-label="Increase quantity">+</button>
               <span id="stockMessage" class="text-sm text-slate-500 ml-2"></span>
             </div>
           </div>
@@ -113,7 +139,9 @@
               {% csrf_token %}
               <input type="hidden" name="quantity" id="formQuantity" value="1">
               <input type="hidden" name="size" id="formSize" value="">
-              <button id="addToCartBtn" disabled type="submit" class="w-full bg-gray-400 cursor-not-allowed text-white py-3 px-6 rounded font-medium text-center" aria-label="Add {{ product.name }} to cart">
+              <button id="addToCartBtn" disabled type="submit"
+                class="w-full bg-gray-400 cursor-not-allowed text-white py-3 px-6 rounded font-medium text-center"
+                aria-label="Add {{ product.name }} to cart">
                 ADD TO CART
               </button>
             </form>
@@ -157,11 +185,24 @@
   </div>
 </div>
 
+
 <!-- CSS for lens & zoom -->
 <style>
-  #lens { width: 120px; height: 120px; }
-  #zoomedImage { position: absolute; top: 0; left: 0; }
-  .size-option.selected { background-color: #111827; color: white; }
+  #lens {
+    width: 120px;
+    height: 120px;
+  }
+
+  #zoomedImage {
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  .size-option.selected {
+    background-color: #111827;
+    color: white;
+  }
 </style>
 
 <!-- JavaScript -->
@@ -268,7 +309,16 @@
     // Initial state
     updateQuantityButtons();
   });
+
+  
 </script>
+<script>
+  setTimeout(() => {
+    const toasts = document.querySelectorAll('.toast');
+    toasts.forEach(toast => toast.remove());
+  }, 3000);
+</script>
+
 
 <!-- Hidden element for json_script -->
 {{ stock_data|json_script:"stock" }}

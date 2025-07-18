@@ -285,7 +285,6 @@ def product_list(request):
         'page_obj': page_obj,
     })
 
-
 @superuser_required
 @never_cache
 def add_product(request):
@@ -314,6 +313,7 @@ def add_product(request):
         description = request.POST.get('description', '').strip()
         color = request.POST.get('color')
         price = request.POST.get('price', '0.00')
+        discount_price = request.POST.get('discount_price', None)  # New field
         sizes = request.POST.getlist('sizes[]')
         stocks = request.POST.getlist('stocks[]')
         cropped_images = request.POST.getlist('cropped_images')
@@ -325,6 +325,7 @@ def add_product(request):
             'description': description,
             'color': str(color),
             'price': price,
+            'discount_price': discount_price,  # New field
             'stocks': stocks,
         }
 
@@ -346,6 +347,14 @@ def add_product(request):
             errors['stocks'] = "Please provide size and stock."
         if len(cropped_images) < 3:
             errors['images'] = "Please upload at least 3 cropped images."
+        try:
+            price = float(price)
+            if discount_price:
+                discount_price = float(discount_price)
+                if discount_price > price:
+                    errors['discount_price'] = "Discount price cannot exceed original price."
+        except ValueError:
+            errors['price'] = "Price must be a valid number."
 
         if errors:
             return render(request, 'product_form.html', {
@@ -367,6 +376,7 @@ def add_product(request):
             category_id=category_id,
             brand_id=brand_id,
             price=price,
+            discount_price=discount_price,  # New field
             description=description
         )
 
@@ -417,9 +427,6 @@ def add_product(request):
         'existing_images': [],
     })
 
-
-
-
 @superuser_required
 @never_cache
 def edit_product(request, product_id):
@@ -444,6 +451,7 @@ def edit_product(request, product_id):
         description = request.POST.get('description', '').strip()
         color = request.POST.get('color')
         price = request.POST.get('price', '0.00')
+        discount_price = request.POST.get('discount_price', None)  # New field
         sizes = request.POST.getlist('sizes[]')
         stocks = request.POST.getlist('stocks[]')
         cropped_images = request.POST.getlist('cropped_images')
@@ -458,6 +466,7 @@ def edit_product(request, product_id):
         product.brand_id = brand_id
         product.description = description
         product.price = price
+        product.discount_price = discount_price  # New field
         product.save()
 
         # Update color
@@ -507,10 +516,10 @@ def edit_product(request, product_id):
             'description': product.description,
             'color': existing_color,
             'price': product.price,
+            'discount_price': product.discount_price,  # New field
             'stocks': [stock_map.get(size, '') for size in size_choices],
         }
     })
-
 
 @superuser_required
 @never_cache

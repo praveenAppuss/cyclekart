@@ -181,7 +181,7 @@
               >
               <!-- Quick View Button -->
               <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
-                <a href="{% url 'product_detail' product_id=product.id %}" ><button class="bg-white text-gray-900 px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 shadow-lg">
+                <a href="{% url 'product_detail' product_id=product.id %}"><button class="bg-white text-gray-900 px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 shadow-lg">
                   Quick View
                 </button></a>
               </div>
@@ -192,10 +192,23 @@
               <h3 class="font-medium text-gray-900 text-sm mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
                 {{ product.name }}
               </h3>
+              <!-- Dummy Rating -->
+              <div class="flex items-center text-xs text-gray-600 mb-1">
+                {% for i in "xxxxx"|make_list %}
+                  {% if forloop.counter <= 4.5 %} <!-- Dummy rating of 4.5/5 -->
+                    <i class="fas fa-star text-yellow-500"></i>
+                  {% else %}
+                    <i class="fas fa-star text-gray-300"></i>
+                  {% endif %}
+                {% endfor %}
+                <span class="ml-1">(4.5/5)</span>
+              </div>
               <div class="flex items-center justify-between">
-                <p class="text-base font-semibold text-gray-900">₹{{ product.price|floatformat:0 }}</p>
-                {% if product.original_price and product.original_price != product.price %}
-                <p class="text-xs text-gray-400 line-through">₹{{ product.original_price|floatformat:0 }}</p>
+                {% if product.discount_price and product.discount_price < product.price %}
+                  <p class="text-base font-semibold text-gray-900">₹{{ product.discount_price|floatformat:0 }}</p>
+                  <p class="text-xs text-gray-400 line-through">₹{{ product.price|floatformat:0 }}</p>
+                {% else %}
+                  <p class="text-base font-semibold text-gray-900">₹{{ product.price|floatformat:0 }}</p>
                 {% endif %}
               </div>
             </div>
@@ -274,4 +287,6 @@
 }
 </style>
 
+<!-- Font Awesome for Star Icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 {% endblock %}

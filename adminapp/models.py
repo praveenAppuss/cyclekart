@@ -29,14 +29,15 @@ class Product(models.Model):
     slug = models.SlugField(unique=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='products')
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Original price")
+    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Discounted price (leave blank if no discount)")
     description = models.TextField(blank=True)
-    thumbnail = models.ImageField(upload_to='thumbnails/', blank=True, null=True)  # ✅ Add this line
+    thumbnail = models.ImageField(upload_to='thumbnails/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    is_trending = models.BooleanField(default=False)  # ✅ Add this
-    is_new = models.BooleanField(default=False)   
+    is_trending = models.BooleanField(default=False)
+    is_new = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if not self.slug:

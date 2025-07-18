@@ -25,6 +25,13 @@
       </div>
 
       <div>
+        <label class="block text-sm font-medium mb-1">Discount Price (Optional)</label>
+        <input type="number" name="discount_price" step="0.01" value="{{ old.discount_price|default:'' }}"
+          class="w-full border px-3 py-2 rounded" placeholder="Enter discounted price" />
+        {% if errors.discount_price %}<p class="text-red-600 text-sm mt-1">{{ errors.discount_price }}</p>{% endif %}
+      </div>
+
+      <div>
         <label class="block text-sm font-medium mb-1">Category</label>
         <select name="category" class="w-full border px-3 py-2 rounded">
           <option value="">Select</option>

@@ -2,106 +2,151 @@
 {% load static %}
 
 {% block content %}
-<div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 py-10 px-6">
+<div class="min-h-screen bg-white py-10 px-4">
   <div class="max-w-6xl mx-auto">
-    <!-- Messages -->
+
+    <!-- Toast Messages -->
     {% if messages %}
-      <div class="mb-4">
+      <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
         {% for message in messages %}
-          <div class="p-4 rounded-lg {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
+          <div data-message="{{ message }}" class="toast p-4 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
             {{ message }}
           </div>
         {% endfor %}
       </div>
     {% endif %}
 
-    <h2 class="text-3xl font-bold text-slate-800 mb-6">Your Cart</h2>
+    <h2 class="text-xl font-bold text-gray-800 mb-6">Your Cart</h2>
 
     {% if cart_items %}
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <!-- Cart Items -->
-        <div class="md:col-span-2 space-y-6">
-          {% for item in cart_items %}
-            <div class="flex items-center justify-between bg-white rounded-xl shadow-sm p-4 border border-slate-200">
-              <div class="flex items-center space-x-4">
-                <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-20 h-20 object-cover rounded-md border border-slate-200">
-                <div>
-                  <h3 class="text-lg font-semibold text-slate-800">{{ item.product.name }}</h3>
-                  <p class="text-slate-500 text-sm">Price: ₹{{ item.product.price }}</p>
-                  <p class="text-slate-500 text-sm">Size: {{ item.size|default:"N/A" }}</p>
-                  <p class="text-slate-500 text-sm">Subtotal: ₹{{ item.subtotal }}</p>
-                  {% if item.stock > 0 and item.quantity <= item.stock %}
-                    <p class="text-slate-500 text-sm">Stock: {{ item.stock }} left</p>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+      <!-- Cart Items -->
+      <div class="lg:col-span-2 space-y-6">
+        {% for item in cart_items %}
+        <div class="flex justify-between items-center bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md p-5 transition-shadow">
+          <div class="flex items-center space-x-5">
+            <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-20 h-20 rounded-lg object-cover border border-gray-300" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
+            <div>
+              <h3 class="text-lg font-semibold text-gray-900">{{ item.product.name }}</h3>
+              <div class="flex items-center mt-1 text-sm space-x-6 text-gray-600">
+                <div class="flex items-center gap-1">
+                  Color:
+                  {% if item.product.colors.exists %}
+                    <span class="inline-block w-4 h-4 rounded-full border ml-1" style="background-color: {{ item.product.colors.first.hex_code|default:'#000000' }}"></span>
+                  {% else %}
+                    <span class="text-gray-400">N/A</span>
                   {% endif %}
                 </div>
+                <div>Size: <span class="font-medium">{{ item.size|default:"N/A" }}</span></div>
+                <div class="text-green-600 font-medium">(In Stock)</div>
               </div>
-              <div class="flex items-center space-x-4">
-                {% if item.product.is_deleted or not item.product.is_active or not item.product.category.is_active or item.quantity > item.stock %}
-                  <span class="text-red-500 text-sm font-medium">Unavailable</span>
-                {% else %}
-                  <form method="POST" action="{% url 'update_cart_quantity' item.id %}" class="flex items-center space-x-2">
-                    {% csrf_token %}
-                    <button name="action" value="decrement" class="px-2 py-1 bg-slate-200 rounded" aria-label="Decrease quantity of {{ item.product.name }}">−</button>
-                    <span class="px-3 font-semibold">{{ item.quantity }}</span>
-                    <button name="action" value="increment" class="{% if item.quantity >= item.max_quantity %}bg-slate-400 cursor-not-allowed{% else %}bg-slate-200{% endif %} px-2 py-1 rounded" {% if item.quantity >= item.max_quantity %}disabled{% endif %} aria-label="Increase quantity of {{ item.product.name }}">+</button>
-                  </form>
-                {% endif %}
-                <form method="POST" action="{% url 'remove_from_cart' item.id %}">
-                  {% csrf_token %}
-                  <button class="text-red-600 hover:text-red-800 transition-colors" aria-label="Remove {{ item.product.name }} from cart">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                  </button>
-                </form>
-              </div>
-            </div>
-          {% endfor %}
-        </div>
-
-        <!-- Cart Summary -->
-        <div class="bg-white rounded-xl shadow-sm p-6 border border-slate-200 h-fit">
-          <h3 class="text-xl font-bold mb-4 text-slate-800">Summary</h3>
-          <div class="space-y-3 text-slate-700">
-            <div class="flex justify-between">
-              <span>Subtotal</span>
-              <span>₹{{ cart_total }}</span>
-            </div>
-            <div class="flex justify-between">
-              <span>Taxes</span>
-              <span>₹0.00</span> <!-- Placeholder -->
-            </div>
-            <div class="flex justify-between">
-              <span>Discount</span>
-              <span>-₹0.00</span> <!-- Placeholder -->
-            </div>
-            <div class="flex justify-between">
-              <span>Shipping</span>
-              <span>Free</span>
-            </div>
-            <hr>
-            <div class="flex justify-between font-bold text-slate-900">
-              <span>Total</span>
-              <span>₹{{ cart_total }}</span>
             </div>
           </div>
-          {% if cart_items and not has_unavailable_items %}
-            <a href="#" class="mt-6 block text-center bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200">
-              Proceed to Checkout
-            </a>
-          {% else %}
-            <button disabled class="mt-6 block text-center bg-slate-400 text-white px-4 py-2 rounded-lg font-medium cursor-not-allowed">
-              Proceed to Checkout
+          <div class="flex items-center space-x-5">
+            <span class="text-md font-semibold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
+            <form method="POST" action="{% url 'update_cart_quantity' item.id %}" class="flex items-center space-x-2">
+              {% csrf_token %}
+              <button name="action" value="decrement" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300">−</button>
+              <span class="px-2 font-semibold">{{ item.quantity }}</span>
+              <button name="action" value="increment"
+                class="{% if item.quantity >= item.max_quantity %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %} px-2 py-1 rounded"
+                {% if item.quantity >= item.max_quantity %}disabled{% endif %}>+</button>
+            </form>
+            <!-- Remove Button triggers Modal -->
+            <button onclick="openRemoveModal('{{ item.id }}')" class="text-red-600 hover:text-red-800">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
             </button>
-          {% endif %}
+          </div>
         </div>
+        {% endfor %}
       </div>
+
+      <!-- Order Summary -->
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-md p-6 sticky top-20">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">Order Summary</h3>
+        <div class="space-y-3 text-gray-700 text-sm">
+          <div class="flex justify-between">
+            <span>Subtotal</span>
+            <span class="font-medium">₹{{ cart_total|floatformat:0 }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Total Discount</span>
+            <span class="font-medium text-green-600">-₹{{ total_discount|floatformat:0 }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Shipping</span>
+            <span class="font-medium text-green-600">Free</span>
+          </div>
+          <div class="flex justify-between">
+            <span>Tax</span>
+            <span class="font-medium">₹{{ taxes|floatformat:2 }}</span>
+          </div>
+          <hr class="border-gray-200">
+          <div class="flex justify-between text-lg font-bold text-gray-900">
+            <span>Total</span>
+            <span>₹{{ total|floatformat:2 }}</span>
+          </div>
+        </div>
+
+        {% if cart_items and not has_unavailable_items %}
+          <a href="#" class="mt-6 block text-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">Proceed to Checkout</a>
+        {% else %}
+          <button disabled class="mt-6 block text-center bg-gray-400 text-white px-4 py-2 rounded-lg font-medium cursor-not-allowed">Proceed to Checkout</button>
+        {% endif %}
+      </div>
+    </div>
     {% else %}
-      <div class="text-center py-20">
-        <h3 class="text-xl font-semibold text-slate-600 mb-2">Your cart is empty 🛒</h3>
-        <a href="{% url 'userproduct_list' %}" class="text-blue-600 hover:underline">Continue Shopping</a>
-      </div>
+    <div class="text-center py-20">
+      <h3 class="text-xl font-semibold text-gray-600 mb-2">Your cart is empty 🛒</h3>
+      <a href="{% url 'userproduct_list' %}" class="text-blue-600 hover:underline">Continue Shopping</a>
+    </div>
     {% endif %}
   </div>
 </div>
+
+<!-- Remove Confirmation Modal -->
+<div id="removeModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full text-center space-y-4">
+    <h2 class="text-xl font-semibold text-gray-800">Remove Item</h2>
+    <p class="text-gray-600">Are you sure you want to remove this item from your cart?</p>
+    <form id="removeForm" method="POST">
+      {% csrf_token %}
+      <div class="flex justify-center space-x-4 mt-4">
+        <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md">Yes, Remove</button>
+        <button type="button" onclick="closeRemoveModal()" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-md">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- JavaScript for Toasts and Modal -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toasts = document.querySelectorAll('.toast');
+    toasts.forEach(toast => {
+      setTimeout(() => toast.style.opacity = '1', 100);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 2500);
+    });
+  });
+
+  function openRemoveModal(itemId) {
+    const modal = document.getElementById("removeModal");
+    const form = document.getElementById("removeForm");
+    form.action = `/cart/remove/${itemId}/`;  // Update to match your URL pattern
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+  }
+
+  function closeRemoveModal() {
+    const modal = document.getElementById("removeModal");
+    modal.classList.remove("flex");
+    modal.classList.add("hidden");
+  }
+</script>
 {% endblock %}

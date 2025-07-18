@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.shortcuts import render, redirect
 from django.contrib.auth import get_user_model, authenticate, login, logout
 from django.contrib.auth.hashers import make_password
@@ -187,6 +188,7 @@ def user_login(request):
             messages.error(request, "Your account is currently suspended.")
         else:
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+            request.session.set_expiry(300)
             return redirect('user_home')
 
     return render(request, 'user_login.html')
@@ -299,10 +301,15 @@ def product_detail(request, product_id):
         is_deleted=False
     ).exclude(id=product.id)[:4]
 
+    savings = 0
+    if product.discount_price and product.discount_price < product.price:
+        savings = product.price - product.discount_price
+
     return render(request, 'product_detail.html', {
         'product': product,
         'color': color,
         'related_products': related_products,
+        'savings':savings
     })
 
 
@@ -475,21 +482,29 @@ def add_to_cart(request, product_id):
 
     # Remove from wishlist if exists
     Wishlist.objects.filter(user=request.user, product=product).delete()
-    return redirect('cart_view')
+    return redirect('product_detail',product_id=product_id)
 
-@login_required
+@login_required(login_url='user_login')
 def cart_view(request):
     cart = Cart.objects.filter(user=request.user).first()
     cart_items = cart.items.select_related('product') if cart else []
-    total = 0
+
+    total_subtotal = 0
+    total_discount = 0
     has_unavailable_items = False
+    taxes = 0
+    discount = 0  # Will be calculated as total_discount
 
     for item in cart_items:
+        # Calculate subtotal for each item
         item.subtotal = item.quantity * item.product.price
-        total += item.subtotal
+        total_subtotal += item.subtotal
+
         try:
-            item.stock = ProductSizeStock.objects.get(product=item.product, size=item.size).quantity
+            stock_record = ProductSizeStock.objects.get(product=item.product, size=item.size)
+            item.stock = stock_record.quantity
             item.max_quantity = min(item.stock, 5)  # Max 5 items
+            # Check availability
             if (item.product.is_deleted or not item.product.is_active or 
                 not item.product.category.is_active or item.quantity > item.stock):
                 has_unavailable_items = True
@@ -498,9 +513,25 @@ def cart_view(request):
             item.stock = 0
             item.max_quantity = 0
 
+        # Calculate savings (discount) for each item
+        if hasattr(item.product, 'discount_price') and item.product.discount_price is not None:
+            item_savings = item.product.price - item.product.discount_price if item.product.discount_price < item.product.price else 0
+            item.savings = item_savings * item.quantity  # Total savings for this item's quantity
+            total_discount += item.savings
+        else:
+            item.savings = 0
+
+    # Calculate taxes (5% of subtotal as per example ₹190 on ₹4000)
+    taxes = total_subtotal * Decimal('0.05')  # Convert 0.05 to Decimal
+    # Calculate total (subtotal + taxes - total_discount)
+    final_total = total_subtotal + taxes - total_discount
+
     return render(request, 'cart.html', {
         'cart_items': cart_items,
-        'cart_total': total,
+        'cart_total': total_subtotal,  # Subtotal
+        'total_discount': total_discount,  # Total savings across all items
+        'taxes': taxes,
+        'total': final_total,
         'has_unavailable_items': has_unavailable_items,
     })
 
@@ -567,7 +598,7 @@ def add_to_wishlist(request, product_id):
         messages.success(request, f"{product.name} added to wishlist.")
     else:
         messages.info(request, f"{product.name} is already in your wishlist.")
-    return redirect('wishlist_view')
+    return redirect('product_detail',product_id=product_id)
 
 @login_required
 def remove_from_wishlist(request, wishlist_id):
