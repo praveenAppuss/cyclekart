@@ -1,0 +1,240 @@
+{% extends 'header.html' %}
+{% load static %}
+
+{% block content %}
+<div class="bg-slate-50 py-12 px-4 sm:px-10">
+    <div class="max-w-6xl mx-auto">
+
+        <!-- Breadcrumb -->
+        <div class="text-sm text-gray-500 mb-6">
+            <span class="text-black font-medium">Checkout</span> &nbsp;/&nbsp;
+            <span>cyclekart</span> &gt; <span class="text-gray-700 font-semibold">Checkout</span>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-8">
+
+            <!-- LEFT: Address + Payment -->
+            <div class="md:col-span-2 bg-white rounded-xl p-6 shadow">
+
+                <!-- Address -->
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold text-slate-800">Shipping address</h2>
+                    <button onclick="toggleModal()"
+                        class="px-4 py-1.5 bg-black text-white text-sm rounded hover:bg-gray-800">+ Add new</button>
+                </div>
+
+                <!-- Dropdown -->
+                {% if addresses %}
+                <div class="mb-6">
+                    <select id="addressDropdown" onchange="fillAddressForm()"
+                        class="px-3 py-2 border rounded-md text-sm text-gray-700 w-auto">
+                        {% for address in addresses %}
+                        <option value="{{ address.id }}" data-full_name="{{ address.full_name }}"
+                            data-mobile="{{ address.mobile }}" data-address_line="{{ address.address_line }}"
+                            data-district="{{ address.district }}" data-state="{{ address.state }}"
+                            data-pin_code="{{ address.pin_code }}" data-country="{{ address.country }}" 
+                            {% if forloop.first %}selected{% endif %}>
+                            {{ address.full_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Selected Address -->
+                <form id="addressForm" method="post" action="{% url 'update_address' addresses.0.id %}">
+                    {% csrf_token %}
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <input type="text" id="address_line" name="address_line" placeholder="Street Address"
+                            class="bg-slate-100 p-2 rounded" readonly>
+                        <input type="text" id="district" name="district" placeholder="District"
+                            class="bg-slate-100 p-2 rounded" readonly>
+                        <input type="text" id="full_name" name="full_name" placeholder="Full Name"
+                            class="bg-slate-100 p-2 rounded" readonly>
+                        <input type="text" id="pin_code" name="pin_code" placeholder="Pin Code"
+                            class="bg-slate-100 p-2 rounded" readonly>
+                        <input type="text" id="state" name="state" placeholder="State" class="bg-slate-100 p-2 rounded"
+                            readonly>
+                        <input type="text" id="mobile" name="mobile" placeholder="Mobile"
+                            class="bg-slate-100 p-2 rounded" readonly>
+                        <input type="text" id="country" name="country" placeholder="Country"
+                            class="bg-slate-100 p-2 rounded" readonly>
+                    </div>
+
+                    <div class="mt-4 flex gap-2">
+                        <button type="button" onclick="makeEditable()"
+                            class="bg-black text-white px-4 py-2 rounded">Edit</button>
+                        <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded hidden"
+                            id="saveBtn">Save</button>
+                        <a id="deleteLink" href="{% url 'delete_address' addresses.0.id %}"
+                            class="text-red-600 text-xl ml-auto">Delete</a>
+                    </div>
+                </form>
+                {% else %}
+                <p class="text-red-500 text-sm">No address found. Add a new one to continue.</p>
+                {% endif %}
+
+                <!-- Payment Methods -->
+                <div class="mt-9 border-0 shadow rounded p-4">
+                    <h2 class="text-base font-semibold mb-2">Payment Methods</h2>
+                    <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
+
+                    <div class="space-y-3 text-sm">
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="radio" name="payment_method" value="card" class="accent-blue-600" required>
+                            <i data-lucide="credit-card" class="w-4 h-4 text-gray-600"></i>
+                            <span>Debit Card / Credit Card</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="radio" name="payment_method" value="net_banking" class="accent-blue-600">
+                            <i data-lucide="landmark" class="w-4 h-4 text-gray-600"></i>
+                            <span>Net Banking</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 text-sm">
+                            <input type="radio" name="payment_method" value="wallet" class="accent-blue-600">
+                            <i data-lucide="wallet" class="w-4 h-4 text-gray-600"></i>
+                            <span>Wallet</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 text-sm">
+                            {% if final_total > 10000 %}
+                            <input type="radio" disabled class="accent-blue-600">
+                            <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
+                            <span class="line-through text-gray-400">Cash on Delivery</span>
+                            <span class="text-red-500 text-xs ml-2">(COD not available for orders above ₹10000)</span>
+                            {% else %}
+                            <input type="radio" name="payment_method" value="cod" class="accent-blue-600">
+                            <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
+                            <span>Cash on Delivery</span>
+                            {% endif %}
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: Order Summary -->
+            <div class="bg-white rounded-xl p-6 shadow h-fit sticky top-20">
+                <h3 class="text-lg font-semibold text-slate-800 mb-4">Your Order</h3>
+
+                <!-- Cart items thumbnails -->
+                <div class="flex items-center space-x-3 mb-4">
+                    {% for item in cart_items %}
+                    <img src="{{ item.product.thumbnail.url }}" class="w-10 h-10 object-cover rounded-full border"
+                        alt="{{ item.product.name }}">
+                    {% endfor %}
+                    <a href="{% url 'cart_view' %}"
+                        class="ml-auto text-sm text-slate-600 border px-2 py-1 rounded hover:bg-slate-100">Edit Cart</a>
+                </div>
+
+                <!-- Totals -->
+                <div class="space-y-2 text-sm text-slate-700">
+                    <div class="flex justify-between">
+                        <span>Subtotal:</span>
+                        <span>₹{{ subtotal|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex justify-between text-green-600">
+                        <span>Total discount:</span>
+                        <span>-₹{{ total_discount|floatformat:0 }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Shipping:</span>
+                        <span>Free</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Tax:</span>
+                        <span>₹{{ taxes|floatformat:2 }}</span>
+                    </div>
+                    <hr class="my-2">
+                    <div class="flex justify-between font-bold text-base text-slate-900">
+                        <span>Total</span>
+                        <span>₹{{ final_total|floatformat:2 }}</span>
+                    </div>
+                </div>
+
+                <!-- Place Order -->
+                <form method="POST" action="{% url 'place_order' %}" class="mt-6">
+                    {% csrf_token %}
+                    <button type="submit"
+                        class="w-full bg-gray-900 text-white py-2 rounded-lg font-semibold hover:bg-gray-800">
+                        Place Order
+                    </button>
+                </form>
+
+                <!-- Coupon -->
+                <div class="mt-6 text-sm">
+                    <p class="mb-2 text-slate-600">(Have a Coupon?) <a href="#" class="text-blue-500 underline">View
+                            Coupons</a></p>
+                    <div class="flex">
+                        <input type="text" name="coupon_code" placeholder="Enter Code"
+                            class="w-full px-3 py-2 border rounded-l">
+                        <button class="bg-black text-white px-4 rounded-r">Apply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div id="addModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
+    <div class="bg-white rounded p-6 w-full max-w-xl relative">
+        <button onclick="toggleModal()" class="absolute top-2 right-4 text-xl">✖</button>
+        <h3 class="text-lg font-bold mb-4">Add New Address</h3>
+        <form method="post" action="{% url 'add_address' %}">
+            {% csrf_token %}
+            <div class="grid grid-cols-2 gap-4">
+                <input name="full_name" placeholder="Full Name" required class="border p-2 rounded">
+                <input name="mobile" placeholder="Mobile" required class="border p-2 rounded">
+                <input name="address_line" placeholder="Street/Area" required class="border p-2 rounded">
+                <input name="district" placeholder="District" required class="border p-2 rounded">
+                <input name="state" placeholder="State" required class="border p-2 rounded">
+                <input name="pin_code" placeholder="Pincode" required class="border p-2 rounded">
+                <input name="country" placeholder="Country" required class="border p-2 rounded">
+            </div>
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" onclick="toggleModal()" class="px-4 py-2 border rounded">Cancel</button>
+                <button type="submit" class="bg-black text-white px-4 py-2 rounded">Save Address</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script>
+    function toggleModal() {
+        document.getElementById("addModal").classList.toggle("hidden");
+    }
+
+    function makeEditable() {
+        document.querySelectorAll("#addressForm input").forEach(input => input.removeAttribute("readonly"));
+        document.getElementById("saveBtn").classList.remove("hidden");
+    }
+
+    function fillAddressForm() {
+        const select = document.getElementById("addressDropdown");
+        const option = select.selectedOptions[0];
+        if (!option) return;
+        const addressId = option.value;
+        document.getElementById("addressForm").action = `/addresses/update/${addressId}/`;
+        document.getElementById("deleteLink").href = `/addresses/delete/${addressId}/`;
+
+        document.getElementById("full_name").value = option.dataset.full_name;
+        document.getElementById("mobile").value = option.dataset.mobile;
+        document.getElementById("address_line").value = option.dataset.address_line;
+        document.getElementById("district").value = option.dataset.district;
+        document.getElementById("state").value = option.dataset.state;
+        document.getElementById("pin_code").value = option.dataset.pin_code;
+        document.getElementById("country").value = option.dataset.country;
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        if (document.getElementById("addressDropdown")) {
+            fillAddressForm();
+        }
+        lucide.createIcons();  // Icon init
+    });
+</script>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+{% endblock %}

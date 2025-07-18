@@ -16,7 +16,7 @@ from adminapp.models import Product,Category,Brand,ProductSizeStock
 from userapp.models import CustomUser,Address,Cart,CartItem,Wishlist,Order,OrderItem
 import re
 from django.views.decorators.cache import never_cache
-from .utils import no_cache_view
+from .utils import no_cache_view,calculate_cart_total
 
 from .forms import AddressForm
 import json
@@ -662,3 +662,108 @@ def add_to_cart_from_wishlist(request):
         return redirect('cart_view')
 
     return redirect('wishlist_view')
+
+
+# ------------checkout view---------------------------------------------------
+@login_required
+def checkout_view(request):
+    user = request.user
+
+    # Fetch all addresses for the user
+    addresses = Address.objects.filter(user=user)
+    default_address = addresses.filter(is_default=True).first()
+
+    # Fetch cart and cart items
+    try:
+        cart = Cart.objects.get(user=user)
+        cart_items = CartItem.objects.filter(cart=cart, product__is_active=True)
+    except Cart.DoesNotExist:
+        cart = None
+        cart_items = []
+
+    # Price calculations
+    subtotal = 0
+    total_discount = 0
+    total_quantity = 0
+
+    for item in cart_items:
+        product = item.product
+        original_price = product.price
+        discount_price = product.discount_price or original_price
+        quantity = item.quantity
+
+        item_total = original_price * quantity
+        item_discount = (original_price - discount_price) * quantity
+
+        subtotal += item_total
+        total_discount += item_discount
+        total_quantity += quantity
+
+    shipping_cost = 0  # Free shipping logic can be modified later
+    taxes = subtotal * Decimal('0.05')  # Convert 0.05 to Decimal
+    # Calculate total (subtotal + taxes - total_discount)
+    final_total = subtotal + taxes - total_discount
+    final_total = subtotal + shipping_cost+taxes
+
+    context = {
+        'addresses': addresses,
+        'default_address': default_address,
+        'cart_items': cart_items,
+        'subtotal': subtotal,
+        'total_discount': total_discount,
+        'shipping_cost': shipping_cost,
+        'final_total': final_total,
+        'total_quantity': total_quantity,
+        'taxes':taxes,
+    }
+
+    return render(request, 'checkout.html', context)
+
+
+
+@login_required
+def place_order(request):
+    if request.method == 'POST':
+        address_id = request.POST.get('address_id')
+        payment_method = request.POST.get('payment_method')
+
+        if not address_id or not payment_method:
+            messages.error(request, "Please select address and payment method.")
+            return redirect('checkout')
+
+        address = get_object_or_404(Address, id=address_id, user=request.user)
+        cart_items = CartItem.objects.filter(user=request.user)
+
+        if not cart_items.exists():
+            messages.error(request, "Your cart is empty.")
+            return redirect('cart')
+
+        # Create Order
+        order = Order.objects.create(
+            user=request.user,
+            address=address,
+            payment_method=payment_method,
+            total_amount=calculate_cart_total(cart_items),  # Create this helper if needed
+            status='Order Placed'
+        )
+
+        # Create OrderItems
+        for item in cart_items:
+            OrderItem.objects.create(
+                order=order,
+                product=item.product,
+                quantity=item.quantity,
+                price=item.product.price
+            )
+            # Optionally decrease stock
+
+        # Clear cart
+        cart_items.delete()
+
+        return redirect('order_success', order_id=order.id)
+    
+
+@login_required
+def order_success(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    return render(request, 'order_success.html', {'order': order})

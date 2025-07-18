@@ -53,9 +53,9 @@
       </div>
 
       <div class="mt-4 flex gap-2">
-        <button type="button" onclick="makeEditable()" class="bg-black text-white px-4 py-2 rounded">✏️ Edit</button>
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hidden" id="saveBtn">💾 Save</button>
-        <a id="deleteLink" href="{% url 'delete_address' addresses.0.id %}" class="text-red-600 text-xl ml-auto">🗑️</a>
+        <button type="button" onclick="makeEditable()" class="bg-black text-white px-4 py-2 rounded">Edit</button>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hidden" id="saveBtn">Save</button>
+        <a id="deleteLink" href="{% url 'delete_address' addresses.0.id %}" class="text-red-600 text-xl ml-auto">Delete</a>
       </div>
     </form>
     {% else %}

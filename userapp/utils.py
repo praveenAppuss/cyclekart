@@ -14,3 +14,10 @@ class NoCacheMiddleware(MiddlewareMixin):
         return response
 
 no_cache_view = decorator_from_middleware(NoCacheMiddleware)
+
+
+def calculate_cart_total(cart_items):
+    total = 0
+    for item in cart_items:
+        total += item.product.price * item.quantity
+    return total

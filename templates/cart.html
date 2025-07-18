@@ -22,11 +22,11 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
       <!-- Cart Items -->
-      <div class="lg:col-span-2 space-y-6">
+      <div class="lg:col-span-2 space-y-5">
         {% for item in cart_items %}
-        <div class="flex justify-between items-center bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md p-5 transition-shadow">
+        <div class="flex justify-between items-center bg-white rounded-xl border border-gray-100 hover:shadow-sm p-3 transition-shadow">
           <div class="flex items-center space-x-5">
-            <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-20 h-20 rounded-lg object-cover border border-gray-300" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
+            <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-20 h-20 rounded-sm object-contain border border-gray-100" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
             <div>
               <h3 class="text-lg font-semibold text-gray-900">{{ item.product.name }}</h3>
               <div class="flex items-center mt-1 text-sm space-x-6 text-gray-600">
@@ -62,12 +62,13 @@
           </div>
         </div>
         {% endfor %}
+        <hr class="border-gray-200">
       </div>
 
       <!-- Order Summary -->
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-md p-6 sticky top-20">
-        <h3 class="text-xl font-bold text-gray-800 mb-4">Order Summary</h3>
-        <div class="space-y-3 text-gray-700 text-sm">
+      <div class="bg-white rounded border border-gray-100 shadow p-4 sticky top-20">
+        <h2 class="text-xl font-medium text-gray-800 mb-4">Order Summary</h3>
+        <div class="space-y-2 text-gray-700 text-sm">
           <div class="flex justify-between">
             <span>Subtotal</span>
             <span class="font-medium">₹{{ cart_total|floatformat:0 }}</span>
@@ -84,7 +85,7 @@
             <span>Tax</span>
             <span class="font-medium">₹{{ taxes|floatformat:2 }}</span>
           </div>
-          <hr class="border-gray-200">
+          <hr class="border-gray-100">
           <div class="flex justify-between text-lg font-bold text-gray-900">
             <span>Total</span>
             <span>₹{{ total|floatformat:2 }}</span>
@@ -92,7 +93,9 @@
         </div>
 
         {% if cart_items and not has_unavailable_items %}
-          <a href="#" class="mt-6 block text-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">Proceed to Checkout</a>
+          <a href="{% url 'checkout' %}" class="mt-6 block text-center bg-gray-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">Proceed to Checkout</a>
+         <a href="{% url 'userproduct_list' %}" class="mt-5 block text-black-100 hover:underline text-xs text-center">Continue Shopping</a>
+
         {% else %}
           <button disabled class="mt-6 block text-center bg-gray-400 text-white px-4 py-2 rounded-lg font-medium cursor-not-allowed">Proceed to Checkout</button>
         {% endif %}
