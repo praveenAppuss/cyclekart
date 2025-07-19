@@ -28,8 +28,10 @@ urlpatterns = [
     path('checkout/', views.checkout_view, name='checkout'),
     path('place-order/', views.place_order, name='place_order'),
     path('order-success/<int:order_id>/', views.order_success, name='order_success'),
-
-
+    path('orders/',views.orders_list_view, name='orders_list'),
+    path('orders/invoice/<int:order_id>/',views.download_invoice, name='download_invoice'),
+    path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
+    path('orders/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
 
 
 ]

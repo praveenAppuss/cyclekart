@@ -1,0 +1,127 @@
+{% extends 'header.html' %}
+{% load static %}
+
+{% block content %}
+<div class="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <!-- Sidebar -->
+    {% include 'sidebar.html' %}
+
+    <!-- Orders Section -->
+    <div class="flex-1 px-4 py-10 sm:px-8">
+        <div class="max-w-5xl mx-auto flex flex-col h-full">
+            <!-- Header, Search and Sort -->
+            <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
+                <h2 class="text-2xl font-semibold text-gray-800">Orders</h2>
+                <div class="flex items-center gap-2">
+                    <!-- Search Form -->
+                    <form method="get" id="searchSortForm" class="flex gap-2">
+                        <input type="text" name="q" placeholder="Search orders..." value="{{ query }}"
+                               class="border border-gray-300 rounded-md px-3 py-1 text-sm w-48" />
+                        <input type="hidden" name="sort" id="sortInput" value="{{ sort|default:'newest' }}" />
+                        <button type="submit" class="bg-gray-800 text-white px-3 py-1 rounded hover:bg-black text-sm">
+                            Search
+                        </button>
+                        {% if query %}
+                        <a href="{% url 'orders_list' %}"
+                           class="bg-gray-200 text-gray-800 px-3 py-1 rounded hover:bg-gray-300 text-sm">
+                            Clear
+                        </a>
+                        {% endif %}
+                    </form>
+
+                    <!-- Sort Dropdown -->
+                    <select class="border rounded-md px-2 py-1 text-sm text-gray-600" onchange="submitSort(this)">
+                        <option value="newest" {% if sort == "newest" or not sort %}selected{% endif %}>Sort by newest</option>
+                        <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Sort by oldest</option>
+                    </select>
+                </div>
+            </div>
+
+            {% if query %}
+            <p class="text-sm text-gray-600 mb-2">Results for "<strong>{{ query }}</strong>"</p>
+            {% endif %}
+
+            <!-- Scrollable Orders Container -->
+            <div class="overflow-y-auto space-y-4 pr-2" style="max-height: 70vh;">
+                {% if orders %}
+                {% for order in orders %}
+                <div class="bg-white shadow rounded-lg p-4">
+                    <div class="flex flex-col sm:flex-row justify-between gap-4">
+                        <!-- Thumbnail and Info -->
+                        {% with first_item=order.items.first %}
+                        {% if first_item %}
+                        <div class="flex gap-4">
+                            <img src="{{ first_item.product.thumbnail.url }}" alt="Product Image"
+                                 class="w-20 h-20 rounded-md object-cover border" />
+                            <div>
+                                <h3 class="font-semibold text-lg text-gray-800">{{ first_item.product.name }}</h3>
+                                <p class="text-sm text-gray-600">
+                                    Ordered On: {{ order.created_at|date:"F d, Y" }}<br>
+                                    Delivering to: {{ order.address.district }}, {{ order.address.state }}, {{ order.address.pin_code }}
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+
+                        <!-- Right Side: Price, Status, Actions -->
+                        <div class="flex flex-col justify-between items-end">
+                            <span class="text-lg font-semibold text-gray-800">₹{{ order.total_amount|floatformat:2 }}</span>
+
+                            <!-- Status Badge -->
+                            {% if order.status == 'pending' %}
+                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">Pending</span>
+                            {% elif order.status == 'cancelled' %}
+                            <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Cancelled</span>
+                            {% elif order.status == 'delivered' %}
+                            <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">Delivered</span>
+                            {% else %}
+                            <span class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">{{ order.status|title }}</span>
+                            {% endif %}
+
+                            <!-- Buttons -->
+                            <div class="flex gap-2 mt-2">
+                                <a href="{% url 'download_invoice' order.id %}"
+                                   class="text-gray-700 text-sm flex items-center gap-1 hover:underline">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                         viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                    Invoice
+                                </a>
+                                <a href="{% url 'order_detail' order.id %}" class="bg-black text-white px-3 py-1 rounded hover:bg-gray-800 text-sm">View Order</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="text-gray-600 text-center">No orders found.</p>
+                {% endif %}
+            </div>
+
+            <!-- Continue Shopping -->
+            <div class="flex justify-center mt-6">
+                <a href="{% url 'userproduct_list' %}"
+                   class="text-sm text-gray-700 hover:underline flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                         viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Continue Shopping
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function submitSort(select) {
+        const form = document.getElementById('searchSortForm');
+        const sortInput = document.getElementById('sortInput');
+        sortInput.value = select.value;
+        form.submit();
+    }
+</script>
+{% endblock %}

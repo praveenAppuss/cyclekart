@@ -84,7 +84,7 @@
                         <h2 class="text-base font-semibold mb-2">Payment Methods</h2>
                         <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
                         <div class="space-y-3 text-sm">
-                            <label class="flex items-center gap-2 text-sm">
+                            <!-- <label class="flex items-center gap-2 text-sm">
                                 <input type="radio" name="payment_method" value="card" class="accent-blue-600" required>
                                 <i data-lucide="credit-card" class="w-4 h-4 text-gray-600"></i>
                                 <span>Debit Card / Credit Card</span>
@@ -98,9 +98,9 @@
                                 <input type="radio" name="payment_method" value="wallet" class="accent-blue-600">
                                 <i data-lucide="wallet" class="w-4 h-4 text-gray-600"></i>
                                 <span>Wallet</span>
-                            </label>
+                            </label> -->
                             <label class="flex items-center gap-2 text-sm">
-                                {% if final_total > 10000 %}
+                                {% if final_total > 100000 %}
                                 <input type="radio" disabled class="accent-blue-600">
                                 <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
                                 <span class="line-through text-gray-400">Cash on Delivery</span>

@@ -18,11 +18,13 @@ from userapp.models import CustomUser,Address,Cart,CartItem,Wishlist,Order,Order
 import re
 from django.views.decorators.cache import never_cache
 from .utils import no_cache_view,calculate_cart_total
-
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
 from .forms import AddressForm
 import json
 from django.utils.safestring import mark_safe
-
+from django.views.decorators.http import require_POST
 User = get_user_model()
 
 @no_cache_view
@@ -700,10 +702,9 @@ def checkout_view(request):
         total_discount += item_discount
         total_quantity += quantity
 
-    shipping_cost = 0  # Free shipping logic can be modified later
-    taxes = subtotal * Decimal('0.05')  # Convert 0.05 to Decimal
-    # Calculate total (subtotal + taxes - total_discount)
-    final_total = subtotal + taxes - total_discount
+    shipping_cost = 0  
+    taxes = subtotal * Decimal('0.05')  
+    
     final_total = subtotal + shipping_cost+taxes
 
     context = {
@@ -728,6 +729,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 @login_required
+@never_cache
+@no_cache_view
 def place_order(request):
     if request.method == 'POST':
         # Get form data
@@ -759,9 +762,9 @@ def place_order(request):
         # Validate COD for orders above ₹10000
         total = calculate_cart_total(cart_items)  # Assume this is defined
         logger.debug(f"Calculated total: {total}")
-        if payment_method == 'cod' and total > 10000:
-            messages.error(request, "Cash on Delivery not available for orders above ₹10000.")
-            logger.error("COD not allowed for total > ₹10000")
+        if payment_method == 'cod' and total > 100000:
+            messages.error(request, "Cash on Delivery not available for orders above ₹100000.")
+            logger.error("COD not allowed for total > ₹100000")
             return redirect('checkout')
 
         # Check stock availability for each item
@@ -825,12 +828,144 @@ def place_order(request):
             logger.error(f"Order creation failed: {str(e)}", exc_info=True)
             messages.error(request, f"An error occurred while placing the order: {str(e)}")
             return redirect('checkout')
-
     return redirect('checkout')
 
     
 
 @login_required
+@never_cache
+@no_cache_view
 def order_success(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     return render(request, 'order_success.html', {'order': order})
+
+
+@login_required
+def orders_list_view(request):
+    user = request.user
+    query = request.GET.get('q', '')
+    sort = request.GET.get('sort', 'latest')
+
+    # Filter orders belonging to the user
+    orders = Order.objects.filter(user=user)
+
+    # Search by product name
+    if query:
+        orders = orders.filter(items__product__name__icontains=query).distinct()
+
+    # Sort mapping
+    sort_options = {
+        'latest': '-created_at',
+        'oldest': 'created_at',
+        'amount_high': '-total_amount',
+        'amount_low': 'total_amount',
+    }
+    sort_by = sort_options.get(sort, '-created_at')
+    orders = orders.order_by(sort_by)
+
+    context = {
+        'orders': orders,
+        'query': query,
+        'sort': sort,
+    }
+    return render(request, 'orders_list.html', context)
+
+
+
+
+
+@login_required
+def download_invoice(request, order_id):
+    try:
+        order = Order.objects.get(id=order_id, user=request.user)
+    except Order.DoesNotExist:
+        return HttpResponse("Order not found", status=404)
+
+    template_path = 'invoice_template.html'
+    context = {'order': order}
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename=invoice_{order.order_id}.pdf'
+
+    template = get_template(template_path)
+    html = template.render(context)
+
+    pisa_status = pisa.CreatePDF(html, dest=response)
+
+    if pisa_status.err:
+        return HttpResponse('Error generating invoice PDF')
+    return response
+
+
+
+@login_required
+def order_detail(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    items = order.items.select_related('product').all()
+
+    # Price calculations
+    subtotal = Decimal('0.00')
+    total_discount = Decimal('0.00')
+    total_quantity = 0
+
+    for item in items:
+        product = item.product
+        original_price = product.price
+        discount_price = product.discount_price or original_price
+        quantity = item.quantity
+
+        item_total = original_price * quantity
+        item_discount = (original_price - discount_price) * quantity
+
+        subtotal += item_total
+        total_discount += item_discount
+        total_quantity += quantity
+
+    shipping_cost = Decimal('0.00')  # Update if needed
+    taxes = subtotal * Decimal('0.05')  # 5% tax
+
+    final_total = subtotal + shipping_cost + taxes
+
+    context = {
+        'order': order,
+        'items': items,
+        'subtotal': subtotal,
+        'discount': total_discount,
+        'tax': taxes,
+        'shipping': shipping_cost,
+        'grand_total': final_total,
+        'total_quantity': total_quantity,
+    }
+    return render(request, 'order_detail.html', context)
+
+@never_cache
+@require_POST
+@login_required
+def cancel_order(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    reason = request.POST.get('cancel_reason', '')
+
+    if order.status != 'cancelled':
+        order.status = 'cancelled'
+
+        if order.payment_method != 'cod':
+            order.payment_status = 'refunded'
+
+        order.save()
+
+        # Restore stock per size
+        for item in order.items.all():
+            product = item.product
+            size = item.size  # Assuming size is stored in the order item
+            quantity = item.quantity
+
+            try:
+                size_stock = ProductSizeStock.objects.get(product=product, size=size)
+                size_stock.quantity += quantity
+                size_stock.save()
+            except ProductSizeStock.DoesNotExist:
+                # Optional: create stock record if missing
+                ProductSizeStock.objects.create(product=product, size=size, quantity=quantity)
+
+    messages.success(request, "Order cancelled successfully and stock restored.")
+    return redirect('order_detail', order_id=order.id)
