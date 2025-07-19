@@ -206,7 +206,7 @@
               <div class="flex items-center justify-between">
                 {% if product.discount_price and product.discount_price < product.price %}
                   <p class="text-base font-semibold text-gray-900">₹{{ product.discount_price|floatformat:0 }}</p>
-                  <p class="text-xs text-gray-400 line-through">₹{{ product.price|floatformat:0 }}</p>
+                  <p class="text-xs text-red-400 line-through">₹{{ product.price|floatformat:0 }}</p>
                 {% else %}
                   <p class="text-base font-semibold text-gray-900">₹{{ product.price|floatformat:0 }}</p>
                 {% endif %}

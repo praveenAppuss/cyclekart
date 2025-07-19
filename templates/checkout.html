@@ -7,14 +7,14 @@
 
         <!-- Breadcrumb -->
         <div class="text-sm text-gray-500 mb-6">
-            <span class="text-black font-medium">Checkout</span> &nbsp;/&nbsp;
-            <span>cyclekart</span> &gt; <span class="text-gray-700 font-semibold">Checkout</span>
+            <span class="text-black font-medium">Checkout</span>  / 
+            <span>cyclekart</span> > <span class="text-gray-700 font-semibold">Checkout</span>
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
 
             <!-- LEFT: Address + Payment -->
-            <div class="md:col-span-2 bg-white rounded-xl p-6 shadow">
+            <div class="md:col-span-2 bg-white rounded-xl p-6 shadow h-fit sticky top-20">
 
                 <!-- Address -->
                 <div class="flex justify-between items-center mb-4">
@@ -32,7 +32,7 @@
                         <option value="{{ address.id }}" data-full_name="{{ address.full_name }}"
                             data-mobile="{{ address.mobile }}" data-address_line="{{ address.address_line }}"
                             data-district="{{ address.district }}" data-state="{{ address.state }}"
-                            data-pin_code="{{ address.pin_code }}" data-country="{{ address.country }}" 
+                            data-pin_code="{{ address.pin_code }}" data-country="{{ address.country }}"
                             {% if forloop.first %}selected{% endif %}>
                             {{ address.full_name }}
                         </option>
@@ -73,44 +73,52 @@
                 <p class="text-red-500 text-sm">No address found. Add a new one to continue.</p>
                 {% endif %}
 
-                <!-- Payment Methods -->
-                <div class="mt-9 border-0 shadow rounded p-4">
-                    <h2 class="text-base font-semibold mb-2">Payment Methods</h2>
-                    <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
+                <!-- Combined Form for Payment Methods and Place Order -->
+                <form id="checkoutForm" method="post" action="{% url 'place_order' %}">
+                    {% csrf_token %}
+                    <!-- Hidden input for selected address ID -->
+                    <input type="hidden" name="selected_address" id="hiddenAddressId" value="{{ addresses.0.id }}">
 
-                    <div class="space-y-3 text-sm">
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="radio" name="payment_method" value="card" class="accent-blue-600" required>
-                            <i data-lucide="credit-card" class="w-4 h-4 text-gray-600"></i>
-                            <span>Debit Card / Credit Card</span>
-                        </label>
-
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="radio" name="payment_method" value="net_banking" class="accent-blue-600">
-                            <i data-lucide="landmark" class="w-4 h-4 text-gray-600"></i>
-                            <span>Net Banking</span>
-                        </label>
-
-                        <label class="flex items-center gap-2 text-sm">
-                            <input type="radio" name="payment_method" value="wallet" class="accent-blue-600">
-                            <i data-lucide="wallet" class="w-4 h-4 text-gray-600"></i>
-                            <span>Wallet</span>
-                        </label>
-
-                        <label class="flex items-center gap-2 text-sm">
-                            {% if final_total > 10000 %}
-                            <input type="radio" disabled class="accent-blue-600">
-                            <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
-                            <span class="line-through text-gray-400">Cash on Delivery</span>
-                            <span class="text-red-500 text-xs ml-2">(COD not available for orders above ₹10000)</span>
-                            {% else %}
-                            <input type="radio" name="payment_method" value="cod" class="accent-blue-600">
-                            <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
-                            <span>Cash on Delivery</span>
-                            {% endif %}
-                        </label>
+                    <!-- Payment Methods -->
+                    <div class="mt-9 border-0 shadow rounded p-4">
+                        <h2 class="text-base font-semibold mb-2">Payment Methods</h2>
+                        <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
+                        <div class="space-y-3 text-sm">
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="radio" name="payment_method" value="card" class="accent-blue-600" required>
+                                <i data-lucide="credit-card" class="w-4 h-4 text-gray-600"></i>
+                                <span>Debit Card / Credit Card</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="radio" name="payment_method" value="net_banking" class="accent-blue-600">
+                                <i data-lucide="landmark" class="w-4 h-4 text-gray-600"></i>
+                                <span>Net Banking</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="radio" name="payment_method" value="wallet" class="accent-blue-600">
+                                <i data-lucide="wallet" class="w-4 h-4 text-gray-600"></i>
+                                <span>Wallet</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm">
+                                {% if final_total > 10000 %}
+                                <input type="radio" disabled class="accent-blue-600">
+                                <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
+                                <span class="line-through text-gray-400">Cash on Delivery</span>
+                                <span class="text-red-500 text-xs ml-2">(COD not available for orders above ₹10000)</span>
+                                {% else %}
+                                <input type="radio" name="payment_method" value="cod" class="accent-blue-600" checked>
+                                <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
+                                <span>Cash on Delivery</span>
+                                {% endif %}
+                            </label>
+                        </div>
                     </div>
-                </div>
+
+                    <!-- Place Order Button -->
+                    <button type="submit" class="w-full bg-gray-900 text-white py-2 rounded-lg font-semibold hover:bg-gray-800 mt-6">
+                        Place Order
+                    </button>
+                </form>
             </div>
 
             <!-- RIGHT: Order Summary -->
@@ -152,19 +160,9 @@
                     </div>
                 </div>
 
-                <!-- Place Order -->
-                <form method="POST" action="{% url 'place_order' %}" class="mt-6">
-                    {% csrf_token %}
-                    <button type="submit"
-                        class="w-full bg-gray-900 text-white py-2 rounded-lg font-semibold hover:bg-gray-800">
-                        Place Order
-                    </button>
-                </form>
-
                 <!-- Coupon -->
                 <div class="mt-6 text-sm">
-                    <p class="mb-2 text-slate-600">(Have a Coupon?) <a href="#" class="text-blue-500 underline">View
-                            Coupons</a></p>
+                    <p class="mb-2 text-slate-600">(Have a Coupon?) <a href="#" class="text-blue-500 underline">View Coupons</a></p>
                     <div class="flex">
                         <input type="text" name="coupon_code" placeholder="Enter Code"
                             class="w-full px-3 py-2 border rounded-l">
@@ -218,6 +216,7 @@
         const addressId = option.value;
         document.getElementById("addressForm").action = `/addresses/update/${addressId}/`;
         document.getElementById("deleteLink").href = `/addresses/delete/${addressId}/`;
+        document.getElementById("hiddenAddressId").value = addressId; // Update hidden input
 
         document.getElementById("full_name").value = option.dataset.full_name;
         document.getElementById("mobile").value = option.dataset.mobile;
@@ -233,6 +232,16 @@
             fillAddressForm();
         }
         lucide.createIcons();  // Icon init
+
+        // Client-side validation for Place Order form
+        document.getElementById('checkoutForm').addEventListener('submit', function (e) {
+            const addressId = document.getElementById('hiddenAddressId').value;
+            const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
+            if (!addressId || !paymentMethod) {
+                e.preventDefault();
+                alert('Please select an address and payment method');
+            }
+        });
     });
 </script>
 

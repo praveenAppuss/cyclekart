@@ -1,17 +1,25 @@
-{% extends 'header.html'%}
+```html
+{% extends 'header.html' %}
 {% load static %}
 
 {% block content %}
-
 <div class="min-h-screen flex flex-col justify-center items-center p-6 bg-gray-50">
-  <img src="{% static 'images/order_success.svg' %}" alt="Order Success" class="w-48 h-48 mb-6">
+  <div class="bg-white p-6 rounded-lg shadow-lg text-center w-full max-w-md">
+    <h2 class="text-2xl font-bold text-gray-600 mb-2">Thank you for your order!</h2>
+    <p class="text-gray-600 mb-4">Your order has been placed successfully.</p>
 
-  <h2 class="text-2xl font-bold text-green-600 mb-2">Thank you for your order!</h2>
-  <p class="text-gray-600 mb-6">Your order has been placed successfully. We'll send updates to your email.</p>
+    <!-- Order Summary -->
+    <div class="bg-gray-100 p-4 rounded mb-6">
+      <p class="text-sm text-gray-700">Order ID: <span class="font-semibold">{{ order.order_id }}</span></p>
+      <p class="text-sm text-gray-700">Order Date: <span class="font-semibold">{{ order.created_at|date:"d M Y, H:i A" }}</span></p>
+      <p class="text-sm text-gray-700">Email: <span class="font-semibold">{{ order.user.email }}</span></p>
+      <p class="text-sm text-gray-700">Total Amount: <span class="font-semibold">₹{{ order.total_amount|floatformat:2 }}</span></p>
+    </div>
 
-  <div class="flex gap-4">
-    <a href="#" class="px-4 py-2 bg-blue-600 text-white rounded">View Order Details</a>
-    <a href="{% url 'userproduct_list' %}" class="px-4 py-2 bg-gray-300 text-black rounded">Continue Shopping</a>
+    <div class="flex gap-4 justify-center">
+      <a href="#" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition">View Order Details</a>
+      <a href="{% url 'userproduct_list' %}" class="px-4 py-2 bg-gray-300 text-black rounded hover:bg-gray-400 transition">Continue Shopping</a>
+    </div>
   </div>
 </div>
 {% endblock %}

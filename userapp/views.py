@@ -1,4 +1,5 @@
 from decimal import Decimal
+import uuid
 from django.shortcuts import render, redirect
 from django.contrib.auth import get_user_model, authenticate, login, logout
 from django.contrib.auth.hashers import make_password
@@ -721,46 +722,112 @@ def checkout_view(request):
 
 
 
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
 @login_required
 def place_order(request):
     if request.method == 'POST':
-        address_id = request.POST.get('address_id')
+        # Get form data
+        address_id = request.POST.get('selected_address')
         payment_method = request.POST.get('payment_method')
+        logger.debug(f"Form data: selected_address={address_id}, payment_method={payment_method}")
 
+        # Validate address and payment method
         if not address_id or not payment_method:
             messages.error(request, "Please select address and payment method.")
+            logger.error("Missing address_id or payment_method")
             return redirect('checkout')
 
+        # Get the address
         address = get_object_or_404(Address, id=address_id, user=request.user)
-        cart_items = CartItem.objects.filter(user=request.user)
+        logger.debug(f"Address found: {address}")
 
+        # Get the user's cart
+        cart = get_object_or_404(Cart, user=request.user)
+        cart_items = CartItem.objects.filter(cart=cart)
+        logger.debug(f"Cart items: {[(item.product.name, item.size, item.quantity) for item in cart_items]}")
+
+        # Check if cart is empty
         if not cart_items.exists():
             messages.error(request, "Your cart is empty.")
-            return redirect('cart')
+            logger.error("Cart is empty")
+            return redirect('cart_view')
 
-        # Create Order
-        order = Order.objects.create(
-            user=request.user,
-            address=address,
-            payment_method=payment_method,
-            total_amount=calculate_cart_total(cart_items),  # Create this helper if needed
-            status='Order Placed'
-        )
+        # Validate COD for orders above ₹10000
+        total = calculate_cart_total(cart_items)  # Assume this is defined
+        logger.debug(f"Calculated total: {total}")
+        if payment_method == 'cod' and total > 10000:
+            messages.error(request, "Cash on Delivery not available for orders above ₹10000.")
+            logger.error("COD not allowed for total > ₹10000")
+            return redirect('checkout')
 
-        # Create OrderItems
+        # Check stock availability for each item
         for item in cart_items:
-            OrderItem.objects.create(
-                order=order,
-                product=item.product,
-                quantity=item.quantity,
-                price=item.product.price
-            )
-            # Optionally decrease stock
+            if not item.size:
+                messages.error(request, f"No size specified for {item.product.name}")
+                logger.error(f"No size specified for product: {item.product.name}")
+                return redirect('cart_view')
+            try:
+                size_stock = ProductSizeStock.objects.get(product=item.product, size=item.size)
+                logger.debug(f"Stock check for {item.product.name} (Size {item.size}): {size_stock.quantity}")
+                if size_stock.quantity < item.quantity:
+                    messages.error(request, f"Insufficient stock for {item.product.name} (Size {item.size}). Available: {size_stock.quantity}")
+                    logger.error(f"Insufficient stock for {item.product.name} (Size {item.size}): {size_stock.quantity} < {item.quantity}")
+                    return redirect('cart_view')
+            except ProductSizeStock.DoesNotExist:
+                messages.error(request, f"No stock record found for {item.product.name} (Size {item.size})")
+                logger.error(f"No ProductSizeStock for {item.product.name} (Size {item.size})")
+                return redirect('cart_view')
 
-        # Clear cart
-        cart_items.delete()
+        # Create order and update stock atomically
+        try:
+            with transaction.atomic():
+                # Generate unique order_id
+                unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
+                logger.debug(f"Generated order_id: {unique_order_id}")
 
-        return redirect('order_success', order_id=order.id)
+                # Create Order
+                order = Order.objects.create(
+                    user=request.user,
+                    address=address,
+                    payment_method=payment_method,
+                    order_id=unique_order_id,
+                    total_amount=total,
+                    status='pending'
+                )
+                logger.debug(f"Order created: {order.order_id}")
+
+                # Create OrderItems and reduce stock
+                for item in cart_items:
+                    size_stock = ProductSizeStock.objects.get(product=item.product, size=item.size)
+                    logger.debug(f"Reducing stock for {item.product.name} (Size {item.size}): {size_stock.quantity} -> {size_stock.quantity - item.quantity}")
+                    size_stock.quantity -= item.quantity
+                    size_stock.save()
+
+                    OrderItem.objects.create(
+                        order=order,
+                        product=item.product,
+                        quantity=item.quantity,
+                        price=item.product.price,
+                        size=item.size
+                    )
+                    logger.debug(f"OrderItem created for {item.product.name} (Size {item.size}, Qty: {item.quantity})")
+
+                # Clear cart
+                cart_items.delete()
+                logger.debug("Cart cleared")
+
+                return redirect('order_success', order_id=order.id)
+        except Exception as e:
+            logger.error(f"Order creation failed: {str(e)}", exc_info=True)
+            messages.error(request, f"An error occurred while placing the order: {str(e)}")
+            return redirect('checkout')
+
+    return redirect('checkout')
+
     
 
 @login_required
