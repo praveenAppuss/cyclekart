@@ -8,11 +8,13 @@ from django.db.models import Q,Sum
 from django.core.paginator import Paginator
 from userapp.models import CustomUser
 from django.utils.text import slugify
-from adminapp.models import Product, Category, Brand, ProductColor, ProductImage,ProductSizeStock
+from adminapp.models import Product, Category, Brand, ProductColorVariant, ProductImage,ProductSizeStock
 import base64
 import uuid
 from django.core.files.base import ContentFile
-
+import logging
+from django.db import transaction
+from django.http import HttpResponseServerError
 
 def superuser_required(view_func):
     return user_passes_test(lambda u: u.is_authenticated and u.is_superuser, login_url='admin_login')(view_func)
@@ -265,25 +267,40 @@ def toggle_brand_status(request, brand_id):
 @never_cache
 def product_list(request):
     query = request.GET.get('q', '')
-    products = Product.objects.filter(is_deleted=False).prefetch_related('size_stocks', 'images')
+    products = Product.objects.filter(is_deleted=False).prefetch_related(
+    'color_variants__size_stocks',
+    'color_variants__images'
+)
+
     if query:
         products = products.filter(
             Q(name__icontains=query) | Q(category__name__icontains=query)
         )
     products = products.order_by('-created_at')
+    
     for product in products:
-        product.stock_summary = ', '.join([
-            f"{stock.size}={stock.quantity}"
-            for stock in product.size_stocks.all()
-        ])
+        all_stocks = []
+        for variant in product.color_variants.all():
+            for stock in variant.size_stocks.all():
+                all_stocks.append(f"{variant.name}-{stock.size}={stock.quantity}")
+        product.stock_summary = ', '.join(all_stocks)
+
     paginator = Paginator(products, 5)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
+    
     return render(request, 'product_list.html', {
         'products': page_obj,
         'query': query,
         'page_obj': page_obj,
     })
+
+
+
+
+
+
+logger = logging.getLogger(__name__)
 
 @superuser_required
 @never_cache
@@ -304,35 +321,35 @@ def add_product(request):
 
     errors = {}
     old = {}
-    zipped_stocks = []
 
     if request.method == 'POST':
+        logger.info("Processing POST request for add_product")
         name = request.POST.get('name', '').strip()
         category_id = request.POST.get('category')
         brand_id = request.POST.get('brand')
         description = request.POST.get('description', '').strip()
-        color = request.POST.get('color')
         price = request.POST.get('price', '0.00')
-        discount_price = request.POST.get('discount_price', None)  # New field
+        discount_price = request.POST.get('discount_price', None)
+
+        # Variant inputs (multiple variants)
+        colors = request.POST.getlist('colors[]')
         sizes = request.POST.getlist('sizes[]')
         stocks = request.POST.getlist('stocks[]')
-        cropped_images = request.POST.getlist('cropped_images')
+        cropped_images = request.POST.getlist('cropped_images[]')
 
         old = {
             'name': name,
             'category': category_id,
             'brand': brand_id,
             'description': description,
-            'color': str(color),
             'price': price,
-            'discount_price': discount_price,  # New field
+            'discount_price': discount_price,
+            'colors': colors,
             'stocks': stocks,
         }
 
-        # 👇 create zipped list for template rendering
-        zipped_stocks = list(zip(size_choices, stocks))
-
         # Validation
+        logger.debug(f"Validation: name={name}, category_id={category_id}, colors={colors}, images={len(cropped_images)}")
         if Product.objects.filter(name__iexact=name).exists():
             errors['name'] = "Product with this name already exists."
         if not name:
@@ -341,12 +358,12 @@ def add_product(request):
             errors['category'] = "Please select a category."
         if not brand_id:
             errors['brand'] = "Please select a brand."
-        if not color:
-            errors['color'] = "Please select a color."
-        if not sizes or not stocks:
-            errors['stocks'] = "Please provide size and stock."
-        if len(cropped_images) < 3:
-            errors['images'] = "Please upload at least 3 cropped images."
+        if not colors:
+            errors['colors'] = "Please add at least one color variant."
+        if len(sizes) != len(stocks) or len(sizes) % len(size_choices) != 0:
+            errors['stocks'] = "Size and stock data are inconsistent with the number of variants."
+        if len(cropped_images) < 3 * len(colors):  # At least 3 images per variant
+            errors['images'] = f"Please upload at least 3 images per color variant (got {len(cropped_images)}, need {3 * len(colors)})."
         try:
             price = float(price)
             if discount_price:
@@ -357,73 +374,104 @@ def add_product(request):
             errors['price'] = "Price must be a valid number."
 
         if errors:
+            logger.warning(f"Validation failed with errors: {errors}")
             return render(request, 'product_form.html', {
                 'categories': categories,
                 'brands': brands,
                 'colors': color_choices,
                 'sizes': size_choices,
-                'product': {},
                 'errors': errors,
                 'old': old,
-                'zipped_stocks': zipped_stocks,
+                'zipped_stocks': list(zip(size_choices, [''] * len(size_choices))),
                 'existing_images': [],
             })
 
-        # ✅ Create product
-        product = Product.objects.create(
-            name=name,
-            slug=slugify(name),
-            category_id=category_id,
-            brand_id=brand_id,
-            price=price,
-            discount_price=discount_price,  # New field
-            description=description
-        )
+        # Create Product within transaction
+        logger.info(f"Creating product: {name}")
+        try:
+            with transaction.atomic():
+                product = Product.objects.create(
+                    name=name,
+                    slug=slugify(name),
+                    category_id=category_id,
+                    brand_id=brand_id,
+                    price=price,
+                    discount_price=discount_price,
+                    description=description
+                )
 
-        # ✅ Save color
-        ProductColor.objects.create(
-            product=product,
-            name=color,
-            hex_code=color_hex_map.get(color, '#000000')
-        )
+                # Process each variant
+                image_index = 0
+                size_stock_index = 0
+                variants_per_size = len(sizes) // len(size_choices)  # Number of variants
 
-        # ✅ Save size and stock
-        for size, stock in zip(sizes, stocks):
-            if size and stock:
-                ProductSizeStock.objects.create(product=product, size=size, quantity=int(stock))
+                for i, color in enumerate(colors):
+                    color_variant = ProductColorVariant.objects.create(
+                        product=product,
+                        name=color,
+                        hex_code=color_hex_map.get(color, '#000000')
+                    )
 
-        # ✅ Save images
-        for i, img_str in enumerate(cropped_images):
-            try:
-                format, img_data = img_str.split(';base64,')
-                ext = format.split('/')[-1]
-                file_name = f"{uuid.uuid4()}.{ext}"
-                image_file = ContentFile(base64.b64decode(img_data), name=file_name)
-                new_img = ProductImage.objects.create(product=product, image=image_file)
+                    # Associate sizes and stocks for this variant
+                    start_idx = i * len(size_choices)
+                    end_idx = start_idx + len(size_choices)
+                    variant_sizes = sizes[start_idx:end_idx] if start_idx < len(sizes) else []
+                    variant_stocks = stocks[start_idx:end_idx] if start_idx < len(stocks) else []
 
-                if i == 0:
-                    product.thumbnail = new_img.image
-                    product.save()
+                    for size, stock in zip(variant_sizes, variant_stocks):
+                        if size and stock:
+                            ProductSizeStock.objects.create(
+                                color_variant=color_variant,
+                                size=size,
+                                quantity=int(stock)
+                            )
 
-            except Exception as e:
-                print("Image saving error:", e)
-                messages.warning(request, "Some images could not be saved.")
+                    # Associate images for this variant
+                    image_count = min(3, len(cropped_images) - image_index)  # Ensure we don't exceed available images
+                    for _ in range(image_count):
+                        if image_index < len(cropped_images):
+                            img_str = cropped_images[image_index]
+                            try:
+                                format, img_data = img_str.split(';base64,')
+                                ext = format.split('/')[-1]
+                                file_name = f"{uuid.uuid4()}.{ext}"
+                                image_file = ContentFile(base64.b64decode(img_data), name=file_name)
+                                new_img = ProductImage.objects.create(color_variant=color_variant, image=image_file)
+                                if i == 0 and _ == 0:  # First image of first variant as thumbnail
+                                    product.thumbnail = new_img.image
+                                    product.save()
+                            except Exception as e:
+                                logger.error(f"Image saving error for variant {color}, image {_}: {str(e)}")
+                                raise
+                        image_index += 1
 
-        messages.success(request, 'Product added successfully.')
-        return redirect('product_list')
+            logger.info(f"Product {name} created successfully")
+            messages.success(request, 'Product added successfully.')
+            print(f"Redirecting to product_list for product {name}")
+            return redirect('product_list')
 
-    # For GET request: use blank values
-    zipped_stocks = list(zip(size_choices, [''] * len(size_choices)))
+        except Exception as e:
+            logger.error(f"Transaction failed: {str(e)}")
+            messages.error(request, f"Failed to add product: {str(e)}")
+            return render(request, 'product_form.html', {
+                'categories': categories,
+                'brands': brands,
+                'colors': color_choices,
+                'sizes': size_choices,
+                'errors': {'general': f"Error: {str(e)}"},
+                'old': old,
+                'zipped_stocks': list(zip(size_choices, [''] * len(size_choices))),
+                'existing_images': [],
+            })
 
     return render(request, 'product_form.html', {
         'categories': categories,
         'brands': brands,
         'colors': color_choices,
         'sizes': size_choices,
-        'product': {},
         'errors': {},
         'old': {},
-        'zipped_stocks': zipped_stocks,
+        'zipped_stocks': list(zip(size_choices, [''] * len(size_choices))),
         'existing_images': [],
     })
 
@@ -435,13 +483,11 @@ def edit_product(request, product_id):
     brands = Brand.objects.filter(is_active=True, is_deleted=False)
     color_choices = ['Red', 'Blue', 'Green', 'Black', 'White', 'Yellow']
     size_choices = ['S', 'M', 'L']
-    existing_images = ProductImage.objects.filter(product=product)
-    existing_color = ''
-    if product.colors.exists():
-        existing_color = product.colors.first().name
 
-    # Default stocks mapping (e.g., {'S': 10, 'M': 0, 'L': 5})
-    stock_map = {stock.size: stock.quantity for stock in ProductSizeStock.objects.filter(product=product)}
+    color_variant = product.color_variants.first()  # Assuming single variant
+    existing_images = ProductImage.objects.filter(color_variant=color_variant) if color_variant else []
+    existing_color = color_variant.name if color_variant else ''
+    stock_map = {stock.size: stock.quantity for stock in color_variant.size_stocks.all()} if color_variant else {}
     zipped_stocks = [(size, stock_map.get(size, '')) for size in size_choices]
 
     if request.method == 'POST':
@@ -451,14 +497,10 @@ def edit_product(request, product_id):
         description = request.POST.get('description', '').strip()
         color = request.POST.get('color')
         price = request.POST.get('price', '0.00')
-        discount_price = request.POST.get('discount_price', None)  # New field
+        discount_price = request.POST.get('discount_price', None)
         sizes = request.POST.getlist('sizes[]')
         stocks = request.POST.getlist('stocks[]')
-        cropped_images = request.POST.getlist('cropped_images')
-
-        if not name or not category_id or not brand_id or not color or not sizes or not stocks:
-            messages.error(request, "Please fill all required fields.")
-            return redirect('edit_product', product_id=product_id)
+        cropped_images = request.POST.getlist('cropped_images[]')
 
         product.name = name
         product.slug = slugify(name)
@@ -466,35 +508,38 @@ def edit_product(request, product_id):
         product.brand_id = brand_id
         product.description = description
         product.price = price
-        product.discount_price = discount_price  # New field
+        product.discount_price = discount_price
         product.save()
 
-        # Update color
-        ProductColor.objects.filter(product=product).delete()
-        ProductColor.objects.create(product=product, name=color)
+        # Update or create color variant
+        if color_variant:
+            color_variant.name = color
+            color_variant.save()
+        else:
+            color_variant = ProductColorVariant.objects.create(product=product, name=color)
 
-        # Replace stocks
-        ProductSizeStock.objects.filter(product=product).delete()
+        # Update size stocks
+        ProductSizeStock.objects.filter(color_variant=color_variant).delete()
         for size, stock in zip(sizes, stocks):
             if size and stock:
-                ProductSizeStock.objects.create(product=product, size=size, quantity=int(stock))
+                ProductSizeStock.objects.create(color_variant=color_variant, size=size, quantity=int(stock))
 
         # Replace images if new ones uploaded
         if cropped_images:
-            ProductImage.objects.filter(product=product).delete()
+            ProductImage.objects.filter(color_variant=color_variant).delete()
             for i, img_str in enumerate(cropped_images):
                 try:
                     format, img_data = img_str.split(';base64,')
                     ext = format.split('/')[-1]
                     file_name = f"{uuid.uuid4()}.{ext}"
                     image_file = ContentFile(base64.b64decode(img_data), name=file_name)
-                    new_img = ProductImage.objects.create(product=product, image=image_file)
+                    new_img = ProductImage.objects.create(color_variant=color_variant, image=image_file)
                     if i == 0:
                         product.thumbnail = new_img.image
                         product.save()
                 except Exception as e:
-                    print("Error saving cropped image:", e)
-                    messages.warning(request, "Some images couldn't be saved.")
+                    messages.error(request, f"Image saving error: {str(e)}")
+                    raise  # Rollback transaction on error
 
         messages.success(request, "Product updated successfully.")
         return redirect('product_list')
@@ -516,10 +561,11 @@ def edit_product(request, product_id):
             'description': product.description,
             'color': existing_color,
             'price': product.price,
-            'discount_price': product.discount_price,  # New field
+            'discount_price': product.discount_price,
             'stocks': [stock_map.get(size, '') for size in size_choices],
         }
     })
+
 
 @superuser_required
 @never_cache

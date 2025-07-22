@@ -1,7 +1,6 @@
 from django.db import models
 from django.utils.text import slugify
 
-
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     is_active = models.BooleanField(default=True)
@@ -29,8 +28,8 @@ class Product(models.Model):
     slug = models.SlugField(unique=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='products')
     brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name='products')
-    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Original price")
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Discounted price (leave blank if no discount)")
+    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Original price (same for all sizes)")
+    discount_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, help_text="Discounted price (same for all sizes)")
     description = models.TextField(blank=True)
     thumbnail = models.ImageField(upload_to='thumbnails/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
@@ -48,23 +47,22 @@ class Product(models.Model):
         return self.name
 
 
+class ProductColorVariant(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='color_variants')
+    name = models.CharField(max_length=50)
+    hex_code = models.CharField(max_length=7, blank=True, null=True)  # e.g. "#000000"
+    
+    def __str__(self):
+        return f"{self.product.name} - {self.name}"
+
 
 class ProductImage(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
+    color_variant = models.ForeignKey(ProductColorVariant, on_delete=models.CASCADE, related_name='images',null=True,blank=True)
     image = models.ImageField(upload_to='product_images/')
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Image of {self.product.name}"
-
-
-class ProductColor(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='colors')
-    name = models.CharField(max_length=50)
-    hex_code = models.CharField(max_length=7, blank=True, null=True)  # Optional for styling
-
-    def __str__(self):
-        return f"{self.name} - {self.product.name}"
+        return f"Image for {self.color_variant}"
 
 
 class ProductSizeStock(models.Model):
@@ -74,12 +72,12 @@ class ProductSizeStock(models.Model):
         ('L', 'Large'),
     ]
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='size_stocks')
+    color_variant = models.ForeignKey(ProductColorVariant, on_delete=models.CASCADE, related_name='size_stocks',null=True, blank=True)
     size = models.CharField(max_length=1, choices=SIZE_CHOICES)
     quantity = models.PositiveIntegerField(default=0)
 
     class Meta:
-        unique_together = ('product', 'size')
+        unique_together = ('color_variant', 'size')
 
     def __str__(self):
-        return f"{self.product.name} - {self.size} - Qty: {self.quantity}"
+        return f"{self.color_variant} - {self.size} - Qty: {self.quantity}"

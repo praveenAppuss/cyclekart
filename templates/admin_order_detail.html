@@ -1,0 +1,75 @@
+{% extends 'admin_base.html' %}
+{% load static %}
+{% block content %}
+{% load custom_filters %}
+
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-4">Order #{{ order.id }} Details</h1>
+
+    <div class="bg-white p-6 rounded-lg shadow mb-6">
+        <h2 class="text-lg font-semibold mb-2">Customer Info</h2>
+        <p><strong>Name:</strong> {{ order.user.first_name }} {{ order.user.last_name }}</p>
+        <p><strong>Email:</strong> {{ order.user.email }}</p>
+        <p><strong>Ordered At:</strong> {{ order.created_at }}</p>
+        <p><strong>Payment Method:</strong> {{ order.payment_method }}</p>
+        <p><strong>Shipping Address:</strong> {{ order.address.address_line }}</p>
+        <p><strong>Current Status:</strong> <span class="text-blue-600">{{ order.status }}</span></p>
+    </div>
+
+    <form method="POST" class="mb-6">
+        {% csrf_token %}
+        <label class="block mb-2 font-semibold">Update Order Status:</label>
+        <select name="status" class="border rounded p-2 mb-4">
+            <option value="Pending" {% if order.status == "Pending" %}selected{% endif %}>Pending</option>
+            <option value="Confirmed" {% if order.status == "Confirmed" %}selected{% endif %}>Confirmed</option>
+            <option value="Shipped" {% if order.status == "Shipped" %}selected{% endif %}>Shipped</option>
+            <option value="Delivered" {% if order.status == "Delivered" %}selected{% endif %}>Delivered</option>
+            <option value="Cancelled" {% if order.status == "Cancelled" %}selected{% endif %}>Cancelled</option>
+        </select>
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            Update Status
+        </button>
+    </form>
+
+    <div class="bg-white p-6 rounded-lg shadow">
+        <h2 class="text-lg font-semibold mb-4">Ordered Items</h2>
+        <table class="min-w-full text-sm text-left">
+            <thead class="bg-gray-200">
+                <tr>
+                    <th class="px-4 py-2">Product</th>
+                    <th class="px-4 py-2">Size</th>
+                    <th class="px-4 py-2">Quantity</th>
+                    <th class="px-4 py-2">Price</th>
+                    <th class="px-4 py-2">Total</th>
+                    <th class="px-4 py-2">Delivery Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order_items %}
+                <tr class="border-t">
+                    <td class="px-4 py-2">
+                        <div class="flex items-center gap-2">
+                            {% if item.product.images.first %}
+                                <img src="{{ item.product.images.first.image.url }}" class="h-10 w-10 object-cover rounded">
+                            {% endif %}
+                            {{ item.product.name }}
+                        </div>
+                    </td>
+                    <td class="px-4 py-2">{{ item.size }}</td>
+                    <td class="px-4 py-2">{{ item.quantity }}</td>
+                    <td class="px-4 py-2">₹{{ item.price }}</td>
+                    <td class="px-4 py-2">₹{{ item.quantity|mul:item.price }}</td>
+                    <td class="px-4 py-2">
+                        {% if item.request %}
+                            <span class="text-red-600 font-medium">{{ item.request.status }}</span>
+                        {% else %}
+                            <span class="text-gray-500 italic">No Request</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

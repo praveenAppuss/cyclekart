@@ -1,55 +1,49 @@
 {% extends 'admin_base.html' %}
 {% load static %}
-
 {% block content %}
 <div class="p-6 max-w-5xl mx-auto bg-white rounded shadow">
   <h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
-    {% if product.id %} Edit Product {% else %} Add Product {% endif %}
+    {% if product %} Edit Product {% else %} Add Product {% endif %}
   </h2>
-
   <form method="post" enctype="multipart/form-data" id="product-form">
     {% csrf_token %}
-
     <!-- Product Info -->
     <div class="grid grid-cols-2 gap-4 mb-4">
       <div>
         <label class="block text-sm font-medium mb-1">Product Name</label>
-        <input type="text" name="name" value="{{ old.name|default:'' }}" class="w-full border px-3 py-2 rounded" />
+        <input type="text" name="name" value="{{ old.name|default:'' }}" class="w-full border px-3 py-2 rounded" >
         {% if errors.name %}<p class="text-red-600 text-sm mt-1">{{ errors.name }}</p>{% endif %}
       </div>
-
       <div>
         <label class="block text-sm font-medium mb-1">Price</label>
         <input type="number" name="price" step="0.01" value="{{ old.price|default:'' }}"
-          class="w-full border px-3 py-2 rounded" />
+          class="w-full border px-3 py-2 rounded" >
+        {% if errors.price %}<p class="text-red-600 text-sm mt-1">{{ errors.price }}</p>{% endif %}
       </div>
-
       <div>
         <label class="block text-sm font-medium mb-1">Discount Price (Optional)</label>
         <input type="number" name="discount_price" step="0.01" value="{{ old.discount_price|default:'' }}"
           class="w-full border px-3 py-2 rounded" placeholder="Enter discounted price" />
         {% if errors.discount_price %}<p class="text-red-600 text-sm mt-1">{{ errors.discount_price }}</p>{% endif %}
       </div>
-
       <div>
         <label class="block text-sm font-medium mb-1">Category</label>
-        <select name="category" class="w-full border px-3 py-2 rounded">
+        <select name="category" class="w-full border px-3 py-2 rounded" >
           <option value="">Select</option>
           {% for cat in categories %}
-          <option value="{{ cat.id }}" {% if old.category|default_if_none:''|stringformat:"s" == cat.id|stringformat:"s" %}selected{% endif %}>
+          <option value="{{ cat.id }}" {% if old.category|stringformat:"s" == cat.id|stringformat:"s" %}selected{% endif %}>
             {{ cat.name }}
           </option>
           {% endfor %}
         </select>
         {% if errors.category %}<p class="text-red-600 text-sm mt-1">{{ errors.category }}</p>{% endif %}
       </div>
-
       <div>
         <label class="block text-sm font-medium mb-1">Brand</label>
-        <select name="brand" class="w-full border px-3 py-2 rounded">
+        <select name="brand" class="w-full border px-3 py-2 rounded" >
           <option value="">Select</option>
           {% for brand in brands %}
-          <option value="{{ brand.id }}" {% if old.brand|default_if_none:''|stringformat:"s" == brand.id|stringformat:"s" %}selected{% endif %}>
+          <option value="{{ brand.id }}" {% if old.brand|stringformat:"s" == brand.id|stringformat:"s" %}selected{% endif %}>
             {{ brand.name }}
           </option>
           {% endfor %}
@@ -57,156 +51,228 @@
         {% if errors.brand %}<p class="text-red-600 text-sm mt-1">{{ errors.brand }}</p>{% endif %}
       </div>
     </div>
-
     <!-- Description -->
     <div class="mb-4">
       <label class="block text-sm font-medium mb-1">Description</label>
       <textarea name="description" rows="3" class="w-full border px-3 py-2 rounded">{{ old.description|default:'' }}</textarea>
     </div>
-
-    <!-- Colors -->
+    <!-- Color Variants -->
     <div class="mb-6">
-      <label class="block text-sm font-medium mb-1">Color</label>
-      <div class="flex flex-wrap gap-3">
-        {% for color in colors %}
-        <label class="inline-flex items-center gap-2">
-          <input type="radio" name="color" value="{{ color }}" {% if old.color == color or selected_color == color %}checked{% endif %}>
-          <span class="w-5 h-5 inline-block rounded-full border" style="background-color: {{ color }}"></span>
-          {{ color }}
-        </label>
-        {% endfor %}
+      <label class="block text-sm font-medium mb-2">Color Variants</label>
+      <button type="button" id="add-variant-btn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Add New Variant</button>
+      <div id="variant-list" class="mt-4">
+        {% if product %}
+          {% for color_variant in product.color_variants.all %}
+          <div class="variant-item border rounded p-4 mb-4" data-variant-index="{{ forloop.counter0 }}">
+            <div class="flex justify-between items-center">
+              <h3 class="text-lg font-medium">{{ color_variant.name }}</h3>
+              <div>
+                <button type="button" class="edit-variant-btn text-blue-600 hover:underline mr-2">Edit</button>
+                <button type="button" class="remove-variant-btn text-red-600 hover:underline">Remove</button>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3 mt-2">
+              {% for img in color_variant.images.all %}
+              <div class="border rounded overflow-hidden">
+                <img src="{{ img.image.url }}" class="w-full h-28 object-cover" />
+              </div>
+              {% endfor %}
+            </div>
+            <div class="mt-2">
+              <p class="text-sm font-medium">Sizes:</p>
+              <div class="grid grid-cols-3 gap-2">
+                {% for size, stock in zipped_stocks|slice:forloop.counter0 %}
+                <p class="text-sm">{{ size }}: {{ stock|default:'0' }}</p>
+                {% endfor %}
+              </div>
+            </div>
+            <input type="hidden" name="colors[]" value="{{ color_variant.name }}">
+            {% for size, stock in zipped_stocks|slice:forloop.counter0 %}
+            <input type="hidden" name="stocks[{{ forloop.parentloop.counter0 }}][]" value="{{ stock|default:'0' }}">
+            <input type="hidden" name="sizes[{{ forloop.parentloop.counter0 }}][]" value="{{ size }}">
+            {% endfor %}
+          </div>
+          {% endfor %}
+        {% endif %}
       </div>
-      {% if errors.color %}<p class="text-red-600 text-sm mt-1">{{ errors.color }}</p>{% endif %}
+      {% if errors.colors %}<p class="text-red-600 text-sm mt-1">{{ errors.colors }}</p>{% endif %}
     </div>
-
-    <!-- Sizes & Stock -->
-    <div class="mb-6">
-      <label class="block text-sm font-medium mb-2">Size Stock</label>
-      <div class="grid grid-cols-3 gap-4">
-        {% for size, stock in zipped_stocks %}
-        <div>
-          <label class="block text-sm font-medium mb-1">{{ size }}</label>
-          <input type="hidden" name="sizes[]" value="{{ size }}">
-          <input type="number" name="stocks[]" value="{{ stock }}" placeholder="Qty" min="0"
-            class="w-full border px-3 py-2 rounded">
-        </div>
-        {% endfor %}
-      </div>
-      {% if errors.stocks %}<p class="text-red-600 text-sm mt-1">{{ errors.stocks }}</p>{% endif %}
-    </div>
-
-    <!-- Product Images -->
-    <div class="mb-6">
-      <label class="block text-sm font-medium mb-1">Product Images (Min 3)</label>
-      <input type="file" id="image-input" accept="image/*" multiple class="w-full border px-3 py-2 rounded mb-3">
-      {% if errors.images %}<p class="text-red-600 text-sm mt-1">{{ errors.images }}</p>{% endif %}
-
-      <div id="crop-container" class="mb-4 hidden">
-        <div id="croppie-box" class="mx-auto"></div>
-        <div class="flex justify-center gap-4 mt-4">
-          <button type="button" id="crop-btn" class="px-4 py-2 bg-green-600 text-white rounded">Crop</button>
-          <button type="button" id="skip-btn" class="px-4 py-2 bg-gray-600 text-white rounded">Skip</button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-3 gap-3 mt-4" id="image-preview"></div>
-
-      {% if existing_images %}
-      <div class="grid grid-cols-3 gap-3 mt-4" id="existing-image-preview">
-        {% for img in existing_images %}
-        <div class="border rounded overflow-hidden">
-          <img src="{{ img.image.url }}" class="w-full h-28 object-cover" />
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </div>
-
     <!-- Buttons -->
     <div class="flex justify-between">
-      <a href="{% url 'product_list' %}" class="px-5 py-2 bg-gray-700 text-white rounded flex items-center gap-1">
-        Cancel
-      </a>
-      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1">
-        Submit
-      </button>
+      <a href="{% url 'product_list' %}" class="px-5 py-2 bg-gray-700 text-white rounded flex items-center gap-1">Cancel</a>
+      <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded flex items-center gap-1">Submit</button>
     </div>
   </form>
 </div>
-
-<!-- Modal -->
-<div id="image-warning-modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-50">
+<!-- Variant Modal -->
+<div id="variant-modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-40">
+  <div class="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg">
+    <h2 class="text-lg font-semibold mb-4">Add/Edit Color Variant</h2>
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Color</label>
+      <select id="variant-color" class="w-full border px-3 py-2 rounded">
+        <option value="">Select Color</option>
+        {% for color in colors %}
+        <option value="{{ color }}">{{ color }}</option>
+        {% endfor %}
+      </select>
+      <p id="color-error" class="text-red-600 text-sm mt-1 hidden">Please select a color.</p>
+    </div>
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Size Stock</label>
+      <div class="grid grid-cols-3 gap-4">
+        {% for size in sizes %}
+        <div>
+          <label class="block text-sm font-medium mb-1">{{ size }}</label>
+          <input type="hidden" name="sizes[]" value="{{ size }}">
+          <input type="number" class="variant-size-stock w-full border px-3 py-2 rounded" data-size="{{ size }}" min="0" />
+        </div>
+        {% endfor %}
+      </div>
+      <p id="stock-error" class="text-red-600 text-sm mt-1 hidden">Please provide at least one size stock.</p>
+    </div>
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Images (Min 3)</label>
+      <input type="file" id="variant-image-input" accept="image/*" multiple class="w-full border px-3 py-2 rounded mb-3">
+      <div class="grid grid-cols-3 gap-3 mt-4" id="variant-image-preview"></div>
+      <p id="image-error" class="text-red-600 text-sm mt-1 hidden">Please upload and crop at least 3 images.</p>
+    </div>
+    <div class="flex justify-end gap-4">
+      <button type="button" id="cancel-variant-btn" class="px-4 py-2 bg-gray-600 text-white rounded">Cancel</button>
+      <button type="button" id="save-variant-btn" class="px-4 py-2 bg-blue-600 text-white rounded">Save Variant</button>
+    </div>
+  </div>
+</div>
+<!-- Crop Overlay -->
+<div id="crop-overlay" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
+  <div class="bg-white rounded-lg p-6 shadow-lg max-w-md w-full">
+    <h2 class="text-lg font-semibold mb-4">Crop Image</h2>
+    <div id="crop-croppie-box" class="mx-auto"></div>
+    <div class="flex justify-center gap-4 mt-4">
+      <button type="button" id="crop-btn" class="px-4 py-2 bg-green-600 text-white rounded">Crop</button>
+      <button type="button" id="skip-btn" class="px-4 py-2 bg-gray-600 text-white rounded">Skip</button>
+      <button type="button" id="cancel-crop-btn" class="px-4 py-2 bg-red-600 text-white rounded">Cancel</button>
+    </div>
+  </div>
+</div>
+<!-- Image Warning Modal -->
+<div id="image-warning-modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-40">
   <div class="bg-white rounded-lg p-6 w-96 shadow-lg">
     <h2 class="text-lg font-semibold mb-2 text-red-600">Upload Required</h2>
-    <p class="text-sm text-gray-700">Please upload and crop at least <strong>3 product images</strong> before
-      submitting.</p>
+    <p class="text-sm text-gray-700">Please add at least <strong>one color variant</strong> with images and sizes before submitting.</p>
     <div class="mt-4 flex justify-end">
       <button id="close-warning-modal" class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">OK</button>
     </div>
   </div>
 </div>
-
+<!-- Insufficient Images Modal -->
+<div id="insufficient-images-modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden z-40">
+  <div class="bg-white rounded-lg p-6 w-96 shadow-lg">
+    <h2 class="text-lg font-semibold mb-2 text-red-600">Image Requirement</h2>
+    <p class="text-sm text-gray-700">Minimum 3 images are required for each color variant.</p>
+    <div class="mt-4 flex justify-end">
+      <button id="close-insufficient-images-modal" class="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">OK</button>
+    </div>
+  </div>
+</div>
 <!-- Croppie CSS & JS -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
-
+<!-- Replace the existing <script> block with this -->
 <script>
-  const isEditMode = {% if product.id %}true{% else %}false{% endif %};
-
+  const isEditMode = {% if product %}true{% else %}false{% endif %};
+  let variantIndex = {{ product.color_variants.count|default:0 }};
   let files = [];
   let currentIndex = 0;
   let croppie = null;
-  const cropBox = document.getElementById('croppie-box');
-  const container = document.getElementById('crop-container');
-  const previewGrid = document.getElementById('image-preview');
   const form = document.getElementById('product-form');
-  const collectedImages = [];
+  const variantList = document.getElementById('variant-list');
+  const variantModal = document.getElementById('variant-modal');
+  const variantColor = document.getElementById('variant-color');
+  const variantImageInput = document.getElementById('variant-image-input');
+  const variantImagePreview = document.getElementById('variant-image-preview');
+  const colorError = document.getElementById('color-error');
+  const stockError = document.getElementById('stock-error');
+  const imageError = document.getElementById('image-error');
+  let collectedImages = [];
+  let editingIndex = null;
 
-  document.getElementById('image-input').addEventListener('change', function (e) {
-    files = Array.from(e.target.files);
-    currentIndex = 0;
-    previewGrid.innerHTML = '';
-    collectedImages.length = 0;
-    document.querySelectorAll('input[name="cropped_images"]').forEach(el => el.remove());
+  // Define sizes array to match server-side size_choices
+  const sizes = ['S', 'M', 'L'];
 
-    const existing = document.querySelector('#existing-image-preview');
-    if (existing) existing.innerHTML = '';
-
-    startCropping();
+  // Open Modal
+  document.getElementById('add-variant-btn').addEventListener('click', function () {
+    resetModal();
+    variantModal.classList.remove('hidden');
   });
 
+  // Cancel Modal
+  document.getElementById('cancel-variant-btn').addEventListener('click', function () {
+    variantModal.classList.add('hidden');
+    resetModal();
+  });
+
+  // Remove Variant
+  variantList.addEventListener('click', function (e) {
+    if (e.target.classList.contains('remove-variant-btn')) {
+      e.target.closest('.variant-item').remove();
+      const index = parseInt(e.target.closest('.variant-item').dataset.variantIndex);
+      document.querySelectorAll(`input[name="cropped_images[]"]`).forEach(input => {
+        if (input.value.startsWith(`[${index}]`)) input.remove();
+      });
+    }
+  });
+
+  // Edit Variant
+  variantList.addEventListener('click', function (e) {
+    if (e.target.classList.contains('edit-variant-btn')) {
+      editingIndex = parseInt(e.target.closest('.variant-item').dataset.variantIndex);
+      const variantItem = variantList.querySelector(`[data-variant-index="${editingIndex}"]`);
+      const color = variantItem.querySelector('input[name="colors[]"]').value;
+      const stocks = Array.from(variantItem.querySelectorAll(`input[name="stocks[]"]`)).map(input => input.value);
+      variantColor.value = color;
+      document.querySelectorAll('.variant-size-stock').forEach((input, i) => input.value = stocks[i] || '');
+      collectedImages = []; // Reset images for editing
+      variantImagePreview.innerHTML = '';
+      variantModal.classList.remove('hidden');
+    }
+  });
+
+  // Image Input Change
+  variantImageInput.addEventListener('change', function (e) {
+    files = Array.from(e.target.files);
+    currentIndex = 0;
+    collectedImages = [];
+    if (files.length > 0) {
+      document.getElementById('crop-overlay').classList.remove('hidden');
+      startCropping();
+    } else {
+      imageError.classList.remove('hidden');
+    }
+  });
+
+  // Cropping Logic
   function startCropping() {
     if (croppie) {
       croppie.destroy();
       croppie = null;
     }
-
     if (currentIndex >= files.length) {
-      container.classList.add('hidden');
-      collectedImages.forEach(base64 => {
-        const img = document.createElement('img');
-        img.src = base64;
-        img.className = 'rounded border w-full h-28 object-cover';
-        const wrapper = document.createElement('div');
-        wrapper.className = 'border rounded overflow-hidden';
-        wrapper.appendChild(img);
-        previewGrid.appendChild(wrapper);
-      });
+      document.getElementById('crop-overlay').classList.add('hidden');
+      updateImagePreview();
       return;
     }
-
     const reader = new FileReader();
     reader.onload = function (e) {
-      cropBox.innerHTML = '';
-      croppie = new Croppie(cropBox, {
-        viewport: { width: 400, height: 400 },
-        boundary: { width: 450, height: 450 },
+      const cropCroppieBox = document.getElementById('crop-croppie-box');
+      cropCroppieBox.innerHTML = '';
+      croppie = new Croppie(cropCroppieBox, {
+        viewport: { width: 200, height: 200 },
+        boundary: { width: 250, height: 250 },
         enableZoom: true,
         aspectRatio: 1
       });
-
       croppie.bind({ url: e.target.result });
-      container.classList.remove('hidden');
     };
     reader.readAsDataURL(files[currentIndex]);
   }
@@ -214,7 +280,7 @@
   document.getElementById('crop-btn').addEventListener('click', async function () {
     if (!croppie) return;
     const base64 = await croppie.result({ type: 'base64', format: 'jpeg', quality: 0.9 });
-    saveCroppedImage(base64);
+    collectedImages.push(base64);
     currentIndex++;
     startCropping();
   });
@@ -222,32 +288,177 @@
   document.getElementById('skip-btn').addEventListener('click', function () {
     const reader = new FileReader();
     reader.onload = function (e) {
-      saveCroppedImage(e.target.result);
+      collectedImages.push(e.target.result);
       currentIndex++;
       startCropping();
     };
     reader.readAsDataURL(files[currentIndex]);
   });
 
-  function saveCroppedImage(base64) {
-    const input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'cropped_images';
-    input.value = base64;
-    form.appendChild(input);
-    collectedImages.push(base64);
+  document.getElementById('cancel-crop-btn').addEventListener('click', function () {
+    document.getElementById('crop-overlay').classList.add('hidden');
+    files = [];
+    currentIndex = 0;
+    collectedImages = [];
+    if (croppie) {
+      croppie.destroy();
+      croppie = null;
+    }
+    variantImageInput.value = '';
+  });
+
+  // Update Image Preview
+  function updateImagePreview() {
+    variantImagePreview.innerHTML = '';
+    collectedImages.forEach(base64 => {
+      const img = document.createElement('img');
+      img.src = base64;
+      img.className = 'rounded border w-full h-28 object-cover';
+      const wrapper = document.createElement('div');
+      wrapper.className = 'border rounded overflow-hidden';
+      wrapper.appendChild(img);
+      variantImagePreview.appendChild(wrapper);
+    });
   }
 
+  // Save Variant
+  document.getElementById('save-variant-btn').addEventListener('click', function () {
+    const color = variantColor.value;
+    const stocks = Array.from(document.querySelectorAll('.variant-size-stock')).map(input => input.value || '0');
+    colorError.classList.add('hidden');
+    stockError.classList.add('hidden');
+    imageError.classList.add('hidden');
+
+    if (!color) {
+      colorError.classList.remove('hidden');
+      return;
+    }
+    if (!stocks.some(stock => stock && parseInt(stock) > 0)) {
+      stockError.classList.remove('hidden');
+      return;
+    }
+    if (collectedImages.length < 3 && !isEditMode) {
+      imageError.classList.remove('hidden');
+      return;
+    }
+
+    const index = editingIndex !== null ? editingIndex : variantIndex;
+    const variantItem = editingIndex !== null ? variantList.querySelector(`[data-variant-index="${editingIndex}"]`) : null;
+
+    if (variantItem) {
+      variantItem.querySelector('h3').textContent = color;
+      variantItem.querySelector('input[name="colors[]"]').value = color;
+      document.querySelectorAll(`input[name="stocks[]"]`).forEach((input, i) => {
+        if (input.dataset.variantIndex === String(index)) input.value = stocks[i] || '0';
+      });
+      variantItem.querySelector('.grid.grid-cols-3').innerHTML = collectedImages.map(base64 => `
+        <div class="border rounded overflow-hidden">
+          <img src="${base64}" class="w-full h-28 object-cover" />
+        </div>
+      `).join('');
+      variantItem.querySelector('.grid.grid-cols-3.gap-2').innerHTML = sizes.map((size, i) => `
+        <p class="text-sm">${size}: ${stocks[i] || '0'}</p>
+      `).join('');
+    } else {
+      const template = `
+        <div class="variant-item border rounded p-4 mb-4" data-variant-index="${variantIndex}">
+          <div class="flex justify-between items-center">
+            <h3 class="text-lg font-medium">${color}</h3>
+            <div>
+              <button type="button" class="edit-variant-btn text-blue-600 hover:underline mr-2">Edit</button>
+              <button type="button" class="remove-variant-btn text-red-600 hover:underline">Remove</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-3 mt-2">
+            ${collectedImages.map(base64 => `
+              <div class="border rounded overflow-hidden">
+                <img src="${base64}" class="w-full h-28 object-cover" />
+              </div>
+            `).join('')}
+          </div>
+          <div class="mt-2">
+            <p class="text-sm font-medium">Sizes:</p>
+            <div class="grid grid-cols-3 gap-2">
+              ${sizes.map((size, i) => `
+                <p class="text-sm">${size}: ${stocks[i] || '0'}</p>
+              `).join('')}
+            </div>
+          </div>
+          <input type="hidden" name="colors[]" value="${color}" data-variant-index="${variantIndex}">
+          ${sizes.map((size, i) => `
+            <input type="hidden" name="stocks[]" value="${stocks[i] || '0'}" data-variant-index="${variantIndex}">
+            <input type="hidden" name="sizes[]" value="${size}" data-variant-index="${variantIndex}">
+          `).join('')}
+        </div>`;
+      variantList.insertAdjacentHTML('beforeend', template);
+      variantIndex++;
+    }
+
+    document.querySelectorAll(`input[name="cropped_images[]"]`).forEach(input => {
+      if (input.dataset.variantIndex === String(index)) input.remove();
+    });
+    collectedImages.forEach((base64, i) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = `cropped_images[]`;
+      input.value = base64;
+      input.dataset.variantIndex = String(index);
+      form.appendChild(input);
+    });
+
+    variantModal.classList.add('hidden');
+    resetModal();
+    editingIndex = null;
+  });
+
+  // Reset Modal
+  function resetModal() {
+    variantColor.value = '';
+    document.querySelectorAll('.variant-size-stock').forEach(input => input.value = '');
+    variantImageInput.value = '';
+    variantImagePreview.innerHTML = '';
+    collectedImages = [];
+    colorError.classList.add('hidden');
+    stockError.classList.add('hidden');
+    imageError.classList.add('hidden');
+    if (croppie) {
+      croppie.destroy();
+      croppie = null;
+    }
+  }
+
+  // Form Submission Validation
   form.addEventListener('submit', function (e) {
-    const croppedCount = document.querySelectorAll('input[name="cropped_images"]').length;
-    if (!isEditMode && croppedCount < 3) {
+    const variants = document.querySelectorAll('.variant-item');
+    let hasInsufficientImages = false;
+    variants.forEach(variant => {
+      const images = variant.querySelectorAll('.grid.grid-cols-3 img').length;
+      if (images < 3) {
+        hasInsufficientImages = true;
+      }
+    });
+    if (!isEditMode && variants.length === 0) {
       e.preventDefault();
       document.getElementById('image-warning-modal').classList.remove('hidden');
+    } else if (hasInsufficientImages) {
+      e.preventDefault();
+      document.getElementById('insufficient-images-modal').classList.remove('hidden');
+    } else {
+      console.log('Form data submitted:', {
+        colors: Array.from(document.querySelectorAll('input[name="colors[]"]')).map(input => input.value),
+        stocks: Array.from(document.querySelectorAll('input[name="stocks[]"]')).map(input => input.value),
+        sizes: Array.from(document.querySelectorAll('input[name="sizes[]"]')).map(input => input.value),
+        cropped_images: Array.from(document.querySelectorAll('input[name="cropped_images[]"]')).map(input => input.value)
+      });
     }
   });
 
   document.getElementById('close-warning-modal').addEventListener('click', function () {
     document.getElementById('image-warning-modal').classList.add('hidden');
+  });
+
+  document.getElementById('close-insufficient-images-modal').addEventListener('click', function () {
+    document.getElementById('insufficient-images-modal').classList.add('hidden');
   });
 </script>
 {% endblock %}

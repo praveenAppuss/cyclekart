@@ -1,0 +1,78 @@
+{% extends 'admin_base.html' %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold text-gray-800 mb-6">🧾 Order Management</h1>
+
+    <form method="get" class="flex items-center gap-4 mb-6">
+        <input type="text" name="q" value="{{ query }}" placeholder=" Search by Order ID or User Email"
+            class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button type="submit"
+            class="bg-gray-900 hover:bg-gray-900 text-white px-5 py-2 rounded-lg shadow transition">Search</button>
+        {% if query %}
+        <a href="{% url 'admin_order_list' %}"
+            class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg shadow transition">Clear</a>
+        {% endif %}
+    </form>
+
+    <div class="overflow-x-auto bg-white rounded-xl shadow">
+        <table class="min-w-full table-auto border-collapse">
+            <thead class="bg-gray-100 text-gray-700 uppercase text-sm tracking-wider">
+                <tr>
+                    <th class="px-6 py-3 text-left">Order ID</th>
+                    <th class="px-6 py-3 text-left">Date</th>
+                    <th class="px-6 py-3 text-left">User</th>
+                    <th class="px-6 py-3 text-left">Status</th>
+                    <th class="px-6 py-3 text-left">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+                {% for order in orders %}
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="px-6 py-4 text-gray-900">{{ order.order_id }}</td>
+                    <td class="px-6 py-4 text-gray-600">{{ order.created_at|date:"M d, Y H:i" }}</td>
+                    <td class="px-6 py-4 text-gray-700">{{ order.user.email }}</td>
+                    <td class="px-6 py-4">
+                        <span
+                            class="inline-block px-3 py-1 rounded-full text-sm font-medium 
+                            {% if order.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                            {% elif order.status == 'Delivered' %}bg-green-100 text-green-800
+                            {% elif order.status == 'Cancelled' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-200 text-gray-700{% endif %}">
+                            {{ order.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <a href="{% url 'admin_order_detail' order.id %}"
+                            class="text-blue-600 hover:underline font-medium">View</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-gray-500 py-6">No orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex justify-between items-center mt-6 text-sm text-gray-600">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}"
+            class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-100 shadow-sm">Previous</a>
+        {% else %}
+        <span></span>
+        {% endif %}
+
+        <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}"
+            class="px-4 py-2 bg-white border border-gray-300 rounded hover:bg-gray-100 shadow-sm">Next</a>
+        {% else %}
+        <span></span>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
