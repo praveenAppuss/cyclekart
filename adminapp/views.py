@@ -14,7 +14,7 @@ import uuid
 from django.core.files.base import ContentFile
 import logging
 from django.db import transaction
-from django.http import HttpResponseServerError
+from django.http import HttpResponseBadRequest, HttpResponseServerError
 
 def superuser_required(view_func):
     return user_passes_test(lambda u: u.is_authenticated and u.is_superuser, login_url='admin_login')(view_func)
@@ -708,6 +708,8 @@ def edit_product(request, product_id):
 @superuser_required
 @never_cache
 def delete_product(request, product_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest("Invalid request method.")
     product = get_object_or_404(Product, id=product_id, is_deleted=False)
     product.is_deleted = True
     product.save()
@@ -718,9 +720,11 @@ def delete_product(request, product_id):
 @superuser_required
 @never_cache
 def toggle_product_status(request, product_id):
+    if request.method != 'POST':
+        return HttpResponseBadRequest("Invalid request method.")
     product = get_object_or_404(Product, id=product_id, is_deleted=False)
     product.is_active = not product.is_active
     product.save()
     status = "listed" if product.is_active else "unlisted"
     messages.success(request, f"Product has been {status}.")
-    return redirect('product_list') 
+    return redirect('product_list')
