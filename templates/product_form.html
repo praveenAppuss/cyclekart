@@ -11,13 +11,13 @@
     <div class="grid grid-cols-2 gap-4 mb-4">
       <div>
         <label class="block text-sm font-medium mb-1">Product Name</label>
-        <input type="text" name="name" value="{{ old.name|default:'' }}" class="w-full border px-3 py-2 rounded" >
+        <input type="text" name="name" value="{{ old.name|default:'' }}" class="w-full border px-3 py-2 rounded">
         {% if errors.name %}<p class="text-red-600 text-sm mt-1">{{ errors.name }}</p>{% endif %}
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Price</label>
         <input type="number" name="price" step="0.01" value="{{ old.price|default:'' }}"
-          class="w-full border px-3 py-2 rounded" >
+          class="w-full border px-3 py-2 rounded">
         {% if errors.price %}<p class="text-red-600 text-sm mt-1">{{ errors.price }}</p>{% endif %}
       </div>
       <div>
@@ -28,7 +28,7 @@
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Category</label>
-        <select name="category" class="w-full border px-3 py-2 rounded" >
+        <select name="category" class="w-full border px-3 py-2 rounded">
           <option value="">Select</option>
           {% for cat in categories %}
           <option value="{{ cat.id }}" {% if old.category|stringformat:"s" == cat.id|stringformat:"s" %}selected{% endif %}>
@@ -40,7 +40,7 @@
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Brand</label>
-        <select name="brand" class="w-full border px-3 py-2 rounded" >
+        <select name="brand" class="w-full border px-3 py-2 rounded">
           <option value="">Select</option>
           {% for brand in brands %}
           <option value="{{ brand.id }}" {% if old.brand|stringformat:"s" == brand.id|stringformat:"s" %}selected{% endif %}>
@@ -81,15 +81,19 @@
             <div class="mt-2">
               <p class="text-sm font-medium">Sizes:</p>
               <div class="grid grid-cols-3 gap-2">
-                {% for size, stock in zipped_stocks|slice:forloop.counter0 %}
-                <p class="text-sm">{{ size }}: {{ stock|default:'0' }}</p>
+                {% for index, size, stock in zipped_stocks %}
+                  {% if index == forloop.counter0 %}
+                    <p class="text-sm">{{ size }}: {{ stock|default:'0' }}</p>
+                  {% endif %}
                 {% endfor %}
               </div>
             </div>
-            <input type="hidden" name="colors[]" value="{{ color_variant.name }}">
-            {% for size, stock in zipped_stocks|slice:forloop.counter0 %}
-            <input type="hidden" name="stocks[{{ forloop.parentloop.counter0 }}][]" value="{{ stock|default:'0' }}">
-            <input type="hidden" name="sizes[{{ forloop.parentloop.counter0 }}][]" value="{{ size }}">
+            <input type="hidden" name="colors[]" value="{{ color_variant.name }}" data-variant-index="{{ forloop.counter0 }}">
+            {% for index, size, stock in zipped_stocks %}
+              {% if index == forloop.counter0 %}
+                <input type="hidden" name="stocks[]" value="{{ stock|default:'0' }}" data-size="{{ size }}" data-variant-index="{{ index }}">
+                <input type="hidden" name="sizes[]" value="{{ size }}" data-variant-index="{{ index }}">
+              {% endif %}
             {% endfor %}
           </div>
           {% endfor %}
@@ -124,8 +128,7 @@
         {% for size in sizes %}
         <div>
           <label class="block text-sm font-medium mb-1">{{ size }}</label>
-          <input type="hidden" name="sizes[]" value="{{ size }}">
-          <input type="number" class="variant-size-stock w-full border px-3 py-2 rounded" data-size="{{ size }}" min="0" />
+          <input type="number" class="variant-size-stock w-full border px-3 py-2 rounded" data-size="{{ size }}" min="0" value="0">
         </div>
         {% endfor %}
       </div>
@@ -178,7 +181,6 @@
 <!-- Croppie CSS & JS -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/croppie/2.6.5/croppie.min.js"></script>
-<!-- Replace the existing <script> block with this -->
 <script>
   const isEditMode = {% if product %}true{% else %}false{% endif %};
   let variantIndex = {{ product.color_variants.count|default:0 }};
@@ -200,9 +202,26 @@
   // Define sizes array to match server-side size_choices
   const sizes = ['S', 'M', 'L'];
 
+  // Initialize modal with three size inputs
+  function initializeModalInputs() {
+    const container = document.querySelector('.modal-size-stock-container');
+    if (container) {
+      container.innerHTML = ''; // Clear existing inputs
+      sizes.forEach(size => {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = 'variant-size-stock w-full p-2 mb-2 border rounded';
+        input.placeholder = `${size} Stock`;
+        input.min = '0';
+        container.appendChild(input);
+      });
+    }
+  }
+
   // Open Modal
   document.getElementById('add-variant-btn').addEventListener('click', function () {
     resetModal();
+    initializeModalInputs();
     variantModal.classList.remove('hidden');
   });
 
@@ -218,7 +237,7 @@
       e.target.closest('.variant-item').remove();
       const index = parseInt(e.target.closest('.variant-item').dataset.variantIndex);
       document.querySelectorAll(`input[name="cropped_images[]"]`).forEach(input => {
-        if (input.value.startsWith(`[${index}]`)) input.remove();
+        if (input.dataset.variantIndex === String(index)) input.remove();
       });
     }
   });
@@ -229,11 +248,38 @@
       editingIndex = parseInt(e.target.closest('.variant-item').dataset.variantIndex);
       const variantItem = variantList.querySelector(`[data-variant-index="${editingIndex}"]`);
       const color = variantItem.querySelector('input[name="colors[]"]').value;
-      const stocks = Array.from(variantItem.querySelectorAll(`input[name="stocks[]"]`)).map(input => input.value);
       variantColor.value = color;
-      document.querySelectorAll('.variant-size-stock').forEach((input, i) => input.value = stocks[i] || '');
-      collectedImages = []; // Reset images for editing
+
+      // Initialize modal with three size inputs
+      initializeModalInputs();
+      // Pre-populate sizes and stocks
+      const stockInputs = document.querySelectorAll('.variant-size-stock');
+      stockInputs.forEach((input, i) => {
+        const size = sizes[i];
+        const stockInput = variantItem.querySelector(`input[name="stocks[${editingIndex}][${size}]"]`);
+        input.value = stockInput ? stockInput.value : '0';
+        console.log(`Pre-populating ${size} for variant ${editingIndex}: ${input.value}`);
+      });
+
+      // Pre-populate images
+      collectedImages = [];
       variantImagePreview.innerHTML = '';
+      const existingImages = variantItem.querySelectorAll('.grid.grid-cols-3 img');
+      existingImages.forEach(img => {
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        const image = new Image();
+        image.crossOrigin = "Anonymous";
+        image.src = img.src;
+        image.onload = () => {
+          canvas.width = image.width;
+          canvas.height = image.height;
+          context.drawImage(image, 0, 0);
+          collectedImages.push(canvas.toDataURL('image/jpeg'));
+          updateImagePreview();
+        };
+      });
+
       variantModal.classList.remove('hidden');
     }
   });
@@ -324,7 +370,8 @@
   // Save Variant
   document.getElementById('save-variant-btn').addEventListener('click', function () {
     const color = variantColor.value;
-    const stocks = Array.from(document.querySelectorAll('.variant-size-stock')).map(input => input.value || '0');
+    const stockInputs = document.querySelectorAll('.variant-size-stock');
+    const stocks = Array.from(stockInputs).map(input => input.value || '0');
     colorError.classList.add('hidden');
     stockError.classList.add('hidden');
     imageError.classList.add('hidden');
@@ -348,9 +395,25 @@
     if (variantItem) {
       variantItem.querySelector('h3').textContent = color;
       variantItem.querySelector('input[name="colors[]"]').value = color;
-      document.querySelectorAll(`input[name="stocks[]"]`).forEach((input, i) => {
-        if (input.dataset.variantIndex === String(index)) input.value = stocks[i] || '0';
-      });
+      // Update stocks with indexed names, ensuring all three sizes
+      if (stockInputs.length === sizes.length) {
+        stockInputs.forEach((input, i) => {
+          const size = sizes[i];
+          let stockInput = variantItem.querySelector(`input[name="stocks[${index}][${size}]"]`);
+          if (!stockInput) {
+            stockInput = document.createElement('input');
+            stockInput.type = 'hidden';
+            stockInput.name = `stocks[${index}][${size}]`;
+            stockInput.dataset.size = size;
+            stockInput.dataset.variantIndex = String(index);
+            variantItem.appendChild(stockInput);
+          }
+          stockInput.value = input.value || '0';
+          console.log(`Updating stock for ${size} at variant ${index}: ${stockInput.value}`);
+        });
+      } else {
+        console.error(`Mismatch: expected ${sizes.length} stock inputs, got ${stockInputs.length}`);
+      }
       variantItem.querySelector('.grid.grid-cols-3').innerHTML = collectedImages.map(base64 => `
         <div class="border rounded overflow-hidden">
           <img src="${base64}" class="w-full h-28 object-cover" />
@@ -386,8 +449,8 @@
           </div>
           <input type="hidden" name="colors[]" value="${color}" data-variant-index="${variantIndex}">
           ${sizes.map((size, i) => `
-            <input type="hidden" name="stocks[]" value="${stocks[i] || '0'}" data-variant-index="${variantIndex}">
-            <input type="hidden" name="sizes[]" value="${size}" data-variant-index="${variantIndex}">
+            <input type="hidden" name="stocks[${variantIndex}][${size}]" value="${stocks[i] || '0'}" data-size="${size}" data-variant-index="${variantIndex}">
+            <input type="hidden" name="sizes[${variantIndex}][${size}]" value="${size}" data-variant-index="${variantIndex}">
           `).join('')}
         </div>`;
       variantList.insertAdjacentHTML('beforeend', template);
@@ -414,7 +477,7 @@
   // Reset Modal
   function resetModal() {
     variantColor.value = '';
-    document.querySelectorAll('.variant-size-stock').forEach(input => input.value = '');
+    initializeModalInputs(); // Ensure three inputs are reset
     variantImageInput.value = '';
     variantImagePreview.innerHTML = '';
     collectedImages = [];
@@ -442,12 +505,19 @@
       document.getElementById('image-warning-modal').classList.remove('hidden');
     } else if (hasInsufficientImages) {
       e.preventDefault();
-      document.getElementById('insufficient-images-modal').classList.remove('hidden');
+      document.getElementById('insufficient-images-modal').classList.add('hidden');
     } else {
+      const stockInputs = document.querySelectorAll('input[name^="stocks["]');
+      console.log('Form data submitted - Stock inputs:', Array.from(stockInputs).map(input => ({
+        name: input.name,
+        value: input.value,
+        size: input.dataset.size,
+        index: input.dataset.variantIndex
+      })));
       console.log('Form data submitted:', {
         colors: Array.from(document.querySelectorAll('input[name="colors[]"]')).map(input => input.value),
-        stocks: Array.from(document.querySelectorAll('input[name="stocks[]"]')).map(input => input.value),
-        sizes: Array.from(document.querySelectorAll('input[name="sizes[]"]')).map(input => input.value),
+        stocks: Array.from(document.querySelectorAll('input[name^="stocks["]')).map(input => input.value),
+        sizes: Array.from(document.querySelectorAll('input[name^="sizes["]')).map(input => input.value),
         cropped_images: Array.from(document.querySelectorAll('input[name="cropped_images[]"]')).map(input => input.value)
       });
     }
