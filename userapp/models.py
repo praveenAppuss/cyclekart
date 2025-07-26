@@ -40,11 +40,12 @@ class Cart(models.Model):
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    size = models.CharField(max_length=2, blank=True, null=True)
+    size = models.CharField(max_length=2, blank=True, null=True)  # Keep as is, but ensure it’s required for validation
+    color = models.CharField(max_length=50, blank=True, null=True)  # Add color field for variant
     quantity = models.PositiveIntegerField(default=1)
 
     def __str__(self):
-        return f"{self.quantity} x {self.product.name}"
+        return f"{self.quantity} x {self.product.name} ({self.color or 'No Color'}, {self.size or 'No Size'})"
 
 
 class Wishlist(models.Model):

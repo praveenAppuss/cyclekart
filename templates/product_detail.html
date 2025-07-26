@@ -37,23 +37,25 @@
           <div class="relative w-full max-w-md mx-auto">
             <!-- Main image wrapper -->
             <div id="imageWrapper" class="relative aspect-square border rounded overflow-hidden bg-white">
-              <img id="mainImage" src="{{ product.thumbnail.url }}" alt="{{ product.name }}"
-                class="w-full h-full object-contain p-4">
+              {% with color_variants.first.images.first as initial_image %}
+                <img id="mainImage" src="{{ initial_image.image.url|default:product.thumbnail.url }}" alt="{{ product.name }}"
+                     class="w-full h-full object-contain p-4">
+              {% endwith %}
               <div id="lens" class="absolute hidden border border-gray-400 bg-white/30 pointer-events-none z-40"></div>
             </div>
 
             <!-- Zoom box -->
             <div id="zoomBox" style="width: 500px; height: 450px;"
-              class="hidden absolute top-0 left-full ml-6 z-50 border border-gray-200 shadow-lg rounded overflow-hidden bg-white">
-              <img id="zoomedImage" src="{{ product.thumbnail.url }}"
-                class="absolute object-cover max-w-none pointer-events-none" />
+                 class="hidden absolute top-0 left-full ml-6 z-50 border border-gray-200 shadow-lg rounded overflow-hidden bg-white">
+              <img id="zoomedImage" src="{{ initial_image.image.url|default:product.thumbnail.url }}"
+                   class="absolute object-cover max-w-none pointer-events-none" />
             </div>
 
             <!-- Thumbnails -->
-            <div class="flex justify-center space-x-4 mt-6">
-              {% for img in product.images.all %}
-              <img src="{{ img.image.url }}" onclick="changeImage('{{ img.image.url }}')"
-                class="w-16 h-16 object-contain border rounded cursor-pointer hover:ring-2 ring-gray-400">
+            <div id="thumbnailContainer" class="flex justify-center space-x-4 mt-6">
+              {% for image in color_variants.first.images.all %}
+                <img src="{{ image.image.url }}" onclick="changeImage('{{ image.image.url }}')"
+                     class="w-16 h-16 object-contain border rounded cursor-pointer hover:ring-2 ring-gray-400">
               {% endfor %}
             </div>
           </div>
@@ -63,61 +65,85 @@
         <div class="p-8">
           <h1 class="text-2xl font-semibold text-gray-900 mb-3">{{ product.name }}</h1>
 
-          <!-- Rating -->
+          <!-- Rating (Placeholder) -->
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-2">
               {% for i in "12345" %}
-              {% if forloop.counter <= 4 %} <svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
-                <path
-                  d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                </svg>
+                {% if forloop.counter <= 4 %} <!-- Placeholder rating of 4/5 -->
+                  <svg class="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                    <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                  </svg>
                 {% else %}
-                <svg class="w-4 h-4 text-gray-300 fill-current" viewBox="0 0 20 20">
-                  <path
-                    d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
-                </svg>
+                  <svg class="w-4 h-4 text-gray-300 fill-current" viewBox="0 0 20 20">
+                    <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                  </svg>
                 {% endif %}
-                {% endfor %}
-                <span class="text-sm text-blue-600 ml-1">(0 Reviews)</span>
+              {% endfor %}
+              <span class="text-sm text-blue-600 ml-1">(0 Reviews)</span>
             </div>
-            <span class="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded">IN STOCK</span>
+            <!-- Stock Status -->
+            {% with color_variants.first as first_variant %}
+              {% if first_variant.has_stock %}
+                <span class="text-sm font-medium text-green-600 bg-green-50 px-2 py-1 rounded">In Stock</span>
+              {% else %}
+                <span class="text-sm font-medium text-red-600 bg-red-50 px-2 py-1 rounded">Out of Stock</span>
+              {% endif %}
+            {% endwith %}
           </div>
 
           <!-- Price -->
           <div class="mb-6">
-            {% if product.discount_price and product.discount_price < product.price %} <span
-              class="text-2xl font-bold text-gray-900">₹{{ product.discount_price|floatformat:0 }}</span>
+            {% if product.discount_price and product.discount_price < product.price %}
+              <span class="text-2xl font-bold text-gray-900">₹{{ product.discount_price|floatformat:0 }}</span>
               <span class="text-lg text-gray-500 line-through ml-2">₹{{ product.price|floatformat:0 }}</span>
               {% if savings > 0 %}
-              <span class="text-sm text-green-600 ml-2">
-                You save ₹{{ savings|floatformat:0 }}
-              </span>
+                <span class="text-sm text-green-600 ml-2">You save ₹{{ savings|floatformat:0 }}</span>
               {% endif %}
-              {% else %}
+            {% else %}
               <span class="text-2xl font-bold text-gray-900">₹{{ product.price|floatformat:0 }}</span>
+            {% endif %}
+          </div>
+
+          <!-- Available Colors -->
+          <div class="mb-4">
+            <h3 class="text-sm font-medium text-gray-900 mb-1">Available Colors</h3>
+            <div class="flex gap-2" id="colorOptions">
+              {% if color_variants.count == 1 %}
+                <!-- Single color: Display as static label -->
+                {% with color_variants.first as single_variant %}
+                  <div class="w-6 h-6 rounded-full border-2 border-gray-200"
+                       style="background-color: {{ single_variant.hex_code|default:'#000' }}"
+                       title="{{ single_variant.name }}">
+                  </div>
+                  <input type="hidden" id="singleColor" value="{{ single_variant.name }}">
+                {% endwith %}
+              {% else %}
+                <!-- Multiple colors: Interactive selection -->
+                {% for variant in color_variants %}
+                  <div class="w-6 h-6 rounded-full border-2 border-gray-200 cursor-pointer {% if variant.has_stock %}hover:ring-2 ring-gray-400{% else %}opacity-50 cursor-not-allowed{% endif %}"
+                       style="background-color: {{ variant.hex_code|default:'#000' }}"
+                       data-color="{{ variant.name }}"
+                       data-images="{% for image in variant.images.all %}{{ image.image.url }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                       onclick="selectColor(this)"
+                       title="{{ variant.name }}"></div>
+                {% endfor %}
               {% endif %}
+            </div>
           </div>
 
           <!-- Size -->
           <div class="mb-4">
             <h3 class="text-sm font-medium text-gray-900 mb-1">Select Size</h3>
             <div class="flex gap-2" id="sizeOptions">
-              <div class="w-10 h-10 border rounded flex items-center justify-center cursor-pointer size-option">S</div>
-              <div class="w-10 h-10 border rounded flex items-center justify-center cursor-pointer size-option">M</div>
-              <div class="w-10 h-10 border rounded flex items-center justify-center cursor-pointer size-option">L</div>
+              {% for variant in color_variants %}
+                {% for size_stock in variant.size_stocks.all %}
+                  <div class="w-10 h-10 border rounded flex items-center justify-center cursor-pointer size-option {% if size_stock.quantity > 0 %}hover:bg-gray-100{% else %}bg-gray-200 text-gray-400 cursor-not-allowed{% endif %}"
+                       data-size="{{ size_stock.size }}" data-stock="{{ size_stock.quantity }}">
+                    {{ size_stock.size }}
+                  </div>
+                {% endfor %}
+              {% endfor %}
             </div>
-          </div>
-
-          <!-- Color -->
-          <div class="mb-4">
-            <h3 class="text-sm font-medium text-gray-900 mb-1">Color</h3>
-            {% if product.colors.exists %}
-            <div class="w-6 h-6 rounded-full border-2 border-gray-900"
-              style="background-color: {{ product.colors.first.hex_code|default:'#000' }};"
-              title="{{ product.colors.first.name }}"></div>
-            {% else %}
-            <span class="text-gray-500 text-sm">No color available</span>
-            {% endif %}
           </div>
 
           <!-- Quantity Selector -->
@@ -125,11 +151,10 @@
             <h3 class="text-sm font-medium text-gray-900 mb-1">Quantity</h3>
             <div class="flex items-center gap-3">
               <button id="decreaseQty" disabled class="bg-gray-200 text-gray-500 px-2 rounded"
-                aria-label="Decrease quantity">-</button>
+                      aria-label="Decrease quantity">-</button>
               <input type="text" id="quantity" class="w-12 border text-center rounded" value="1" readonly>
               <button id="increaseQty" disabled class="bg-gray-200 text-gray-500 px-2 rounded"
-                aria-label="Increase quantity">+</button>
-              <span id="stockMessage" class="text-sm text-slate-500 ml-2"></span>
+                      aria-label="Increase quantity">+</button>
             </div>
           </div>
 
@@ -139,9 +164,10 @@
               {% csrf_token %}
               <input type="hidden" name="quantity" id="formQuantity" value="1">
               <input type="hidden" name="size" id="formSize" value="">
+              <input type="hidden" name="color" id="formColor" value="">
               <button id="addToCartBtn" disabled type="submit"
-                class="w-full bg-gray-400 cursor-not-allowed text-white py-3 px-6 rounded font-medium text-center"
-                aria-label="Add {{ product.name }} to cart">
+                      class="w-full bg-gray-400 cursor-not-allowed text-white py-3 px-6 rounded font-medium text-center"
+                      aria-label="Add {{ product.name }} to cart">
                 ADD TO CART
               </button>
             </form>
@@ -150,7 +176,7 @@
               <button type="submit" class="p-3 border rounded" aria-label="Add {{ product.name }} to wishlist">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                 </svg>
               </button>
             </form>
@@ -158,33 +184,43 @@
 
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Description -->
-  <div class="mt-6 pt-6 border-t ml-10">
-    <h3 class="text-sm font-medium text-gray-900 mb-2">Details</h3>
-    <p class="text-sm text-gray-600">{{ product.description }}</p>
-  </div>
+      <!-- Highlights/Specs -->
+      <div class="mt-6 pt-6 border-t ml-10">
+        <h3 class="text-sm font-medium text-gray-900 mb-2">Specifications</h3>
+        <ul class="text-sm text-gray-600 list-disc pl-5">
+          <li>Material: {{ product.material|default:'Not specified' }}</li>
+          <li>Weight: {{ product.weight|default:'Not specified' }} kg</li>
+          <li>Dimensions: {{ product.dimensions|default:'Not specified' }}</li>
+          <li>Color Options: {% if color_variants.count > 1 %}{% for variant in color_variants %}{{ variant.name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% else %}Single Color{% endif %}</li>
+        </ul>
+      </div>
 
-  <!-- Related Products Section -->
-  <div class="mt-16 border-t pt-10">
-    <h2 class="text-2xl font-semibold text-gray-800 mb-6">You May Also Like</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-      {% for item in related_products %}
-      <a href="{% url 'product_detail' item.id %}"
-        class="bg-white border rounded-lg shadow hover:shadow-md transition p-4">
-        <img src="{{ item.thumbnail.url }}" alt="{{ item.name }}" class="w-full h-40 object-contain mb-3">
-        <h4 class="text-sm font-semibold text-gray-900 truncate">{{ item.name }}</h4>
-        <p class="text-sm text-gray-600">₹{{ item.price|floatformat:0 }}</p>
-      </a>
-      {% empty %}
-      <p class="text-gray-500">No related products found.</p>
-      {% endfor %}
+      <!-- Description -->
+      <div class="mt-6 pt-6 border-t ml-10">
+        <h3 class="text-sm font-medium text-gray-900 mb-2">Details</h3>
+        <p class="text-sm text-gray-600">{{ product.description|default:'No description available' }}</p>
+      </div>
+
+      <!-- Related Products Section -->
+      <div class="mt-16 border-t pt-10">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6">You May Also Like</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+          {% for item in related_products %}
+          <a href="{% url 'product_detail' item.id %}"
+             class="bg-white border rounded-lg shadow hover:shadow-md transition p-4">
+            <img src="{{ item.thumbnail.url }}" alt="{{ item.name }}" class="w-full h-40 object-contain mb-3">
+            <h4 class="text-sm font-semibold text-gray-900 truncate">{{ item.name }}</h4>
+            <p class="text-sm text-gray-600">₹{{ item.price|floatformat:0 }}</p>
+          </a>
+          {% empty %}
+          <p class="text-gray-500">No related products found.</p>
+          {% endfor %}
+        </div>
+      </div>
     </div>
   </div>
 </div>
-
 
 <!-- CSS for lens & zoom -->
 <style>
@@ -214,19 +250,58 @@
     const zoomBox = document.getElementById("zoomBox");
     const zoomLevel = 2.5;
     const sizeOptions = document.querySelectorAll('.size-option');
+    const colorOptions = document.querySelectorAll('#colorOptions div');
+    const thumbnailContainer = document.getElementById('thumbnailContainer');
     const addToCartBtn = document.getElementById('addToCartBtn');
     const formSize = document.getElementById('formSize');
+    const formColor = document.getElementById('formColor');
     const formQty = document.getElementById('formQuantity');
     const qtyInput = document.getElementById('quantity');
     const incBtn = document.getElementById('increaseQty');
     const decBtn = document.getElementById('decreaseQty');
-    const stockMessage = document.getElementById('stockMessage');
+    const singleColorInput = document.getElementById('singleColor');
 
-    // Initialize stock and max quantity from template context
-    const stockData = JSON.parse(document.getElementById('stock').textContent);
-    let stock = stockData.quantity || 5;
-    let maxQuantity = Math.min(5, stock); // Limit to 5 or stock
-    stockMessage.textContent = stock > 0 ? `Stock: ${stock} left` : 'Out of stock';
+    let selectedVariant = null;
+    let maxQuantity = 0;
+
+    function updateThumbnails(images) {
+      thumbnailContainer.innerHTML = '';
+      images.forEach(image => {
+        const img = document.createElement('img');
+        img.src = image;
+        img.onclick = () => changeImage(image);
+        img.className = 'w-16 h-16 object-contain border rounded cursor-pointer hover:ring-2 ring-gray-400';
+        thumbnailContainer.appendChild(img);
+      });
+    }
+
+    function selectColor(element) {
+      if (element.classList.contains('opacity-50')) return;
+      colorOptions.forEach(o => o.classList.remove('selected'));
+      element.classList.add('selected');
+      formColor.value = element.dataset.color;
+      const images = element.dataset.images.split(',').filter(Boolean);
+      changeImage(images[0]); // Set first image as main
+      updateThumbnails(images);
+      selectedVariant = color_variants.find(v => v.name === element.dataset.color); // Assuming color_variants is a global variable from context
+      sizeOptions.forEach(opt => {
+        const stock = selectedVariant.size_stocks.find(s => s.size === opt.dataset.size)?.quantity || 0;
+        opt.dataset.stock = stock;
+        opt.classList.toggle('bg-gray-200', stock === 0);
+        opt.classList.toggle('text-gray-400', stock === 0);
+        opt.classList.toggle('cursor-not-allowed', stock === 0);
+        opt.classList.toggle('hover:bg-gray-100', stock > 0);
+      });
+      updateStockAndButtons();
+    }
+
+    function updateStockAndButtons() {
+      if (selectedVariant || singleColorInput) {
+        const stock = (selectedVariant ? selectedVariant.size_stocks.find(s => s.size === formSize.value) : color_variants.first.size_stocks.find(s => s.size === formSize.value))?.quantity || 0;
+        maxQuantity = Math.min(5, stock); // Limit to 5 or stock
+        updateQuantityButtons();
+      }
+    }
 
     const moveLens = (e) => {
       const rect = mainImage.getBoundingClientRect();
@@ -265,32 +340,54 @@
 
     sizeOptions.forEach(option => {
       option.addEventListener('click', () => {
-        sizeOptions.forEach(o => o.classList.remove('selected'));
-        option.classList.add('selected');
-        formSize.value = option.textContent;
-        addToCartBtn.disabled = false;
-        addToCartBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-        addToCartBtn.classList.add('bg-gray-800', 'cursor-pointer');
-        incBtn.disabled = false;
-        decBtn.disabled = false;
-        updateQuantityButtons(); // Update quantity buttons after size selection
+        if (option.dataset.stock > 0) {
+          sizeOptions.forEach(o => o.classList.remove('selected'));
+          option.classList.add('selected');
+          formSize.value = option.dataset.size;
+          updateStockAndButtons();
+        }
       });
+    });
+
+    colorOptions.forEach(option => {
+      option.addEventListener('click', () => selectColor(option));
     });
 
     function updateQuantityButtons() {
       const quantity = parseInt(qtyInput.value);
-      incBtn.disabled = quantity >= maxQuantity || stock === 0;
-      decBtn.disabled = quantity <= 1 || stock === 0;
-      addToCartBtn.disabled = quantity > stock || stock === 0 || !formSize.value;
-      addToCartBtn.classList.toggle('bg-gray-400', quantity > stock || stock === 0 || !formSize.value);
-      addToCartBtn.classList.toggle('bg-gray-800', quantity <= stock && stock > 0 && formSize.value);
-      addToCartBtn.classList.toggle('cursor-not-allowed', quantity > stock || stock === 0 || !formSize.value);
-      addToCartBtn.classList.toggle('cursor-pointer', quantity <= stock && stock > 0 && formSize.value);
+      const hasSize = !!formSize.value;
+      const hasColor = !!formColor.value || !!singleColorInput?.value;
+      const isStockAvailable = maxQuantity > 0;
+
+      incBtn.disabled = !hasSize || !isStockAvailable || quantity >= maxQuantity;
+      decBtn.disabled = !hasSize || !isStockAvailable || quantity <= 1;
+      addToCartBtn.disabled = !hasSize || !hasColor || !isStockAvailable || quantity > maxQuantity;
+
+      incBtn.classList.toggle('bg-gray-200', !hasSize || !isStockAvailable || quantity >= maxQuantity);
+      incBtn.classList.toggle('bg-gray-800', hasSize && isStockAvailable && quantity < maxQuantity);
+      incBtn.classList.toggle('text-gray-500', !hasSize || !isStockAvailable || quantity >= maxQuantity);
+      incBtn.classList.toggle('text-white', hasSize && isStockAvailable && quantity < maxQuantity);
+      incBtn.classList.toggle('cursor-not-allowed', !hasSize || !isStockAvailable || quantity >= maxQuantity);
+      incBtn.classList.toggle('cursor-pointer', hasSize && isStockAvailable && quantity < maxQuantity);
+
+      decBtn.classList.toggle('bg-gray-200', !hasSize || !isStockAvailable || quantity <= 1);
+      decBtn.classList.toggle('bg-gray-800', hasSize && isStockAvailable && quantity > 1);
+      decBtn.classList.toggle('text-gray-500', !hasSize || !isStockAvailable || quantity <= 1);
+      decBtn.classList.toggle('text-white', hasSize && isStockAvailable && quantity > 1);
+      decBtn.classList.toggle('cursor-not-allowed', !hasSize || !isStockAvailable || quantity <= 1);
+      decBtn.classList.toggle('cursor-pointer', hasSize && isStockAvailable && quantity > 1);
+
+      addToCartBtn.classList.toggle('bg-gray-400', !hasSize || !hasColor || !isStockAvailable || quantity > maxQuantity);
+      addToCartBtn.classList.toggle('bg-gray-800', hasSize && hasColor && isStockAvailable && quantity <= maxQuantity);
+      addToCartBtn.classList.toggle('cursor-not-allowed', !hasSize || !hasColor || !isStockAvailable || quantity > maxQuantity);
+      addToCartBtn.classList.toggle('cursor-pointer', hasSize && hasColor && isStockAvailable && quantity <= maxQuantity);
+
+      formQty.value = qtyInput.value;
     }
 
     incBtn.addEventListener('click', () => {
       let current = parseInt(qtyInput.value);
-      if (current < maxQuantity && stock > 0) {
+      if (current < maxQuantity) {
         qtyInput.value = current + 1;
         formQty.value = qtyInput.value;
       }
@@ -299,7 +396,7 @@
 
     decBtn.addEventListener('click', () => {
       let current = parseInt(qtyInput.value);
-      if (current > 1 && stock > 0) {
+      if (current > 1) {
         qtyInput.value = current - 1;
         formQty.value = qtyInput.value;
       }
@@ -307,19 +404,21 @@
     });
 
     // Initial state
+    if (colorOptions.length) {
+      colorOptions[0].click(); // Select first color by default for multiple variants
+    } else if (singleColorInput) {
+      formColor.value = singleColorInput.value; // Set color for single variant
+      selectedVariant = color_variants.first; // Set default variant for single color
+      updateStockAndButtons();
+    }
     updateQuantityButtons();
   });
 
-  
-</script>
-<script>
+  // Auto-hide toast messages
   setTimeout(() => {
     const toasts = document.querySelectorAll('.toast');
     toasts.forEach(toast => toast.remove());
   }, 3000);
 </script>
 
-
-<!-- Hidden element for json_script -->
-{{ stock_data|json_script:"stock" }}
 {% endblock %}
