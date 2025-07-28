@@ -432,8 +432,6 @@ def update_profile(request):
 
 # Address management section---------------------------------
 
-
-
 @login_required
 def address_list(request):
     addresses = Address.objects.filter(user=request.user)
@@ -497,33 +495,30 @@ def delete_address(request, pk):
 def add_to_cart(request, product_id):
     product = get_object_or_404(Product, id=product_id)
 
-    # Check if product or category is unavailable
     if not product.is_active or product.is_deleted or not product.category.is_active or product.category.is_deleted:
         messages.error(request, "This product is unavailable.")
         return redirect('product_detail', product_id=product.id)
 
     size = request.POST.get('size')
-    color = request.POST.get('color')  # Get selected color variant
-    quantity = request.POST.get('quantity', 1)  # Default to 1 if not provided
+    color = request.POST.get('color')
+    quantity = request.POST.get('quantity', 1)
+    
     try:
         quantity = int(quantity)
     except (ValueError, TypeError):
-        messages.error(request, "Invalid quantity.")
+        messages.error(request, "Invalid quantity provided.")
         return redirect('product_detail', product_id=product.id)
 
-    # Validate size is selected
-    if not size:
-        messages.error(request, "Please select a size.")
+    if not size or not color:
+        messages.error(request, "Please select both a color and size.")
         return redirect('product_detail', product_id=product.id)
 
-    # Find the color variant
     try:
-        color_variant = product.color_variants.get(name=color)
+        color_variant = ProductColorVariant.objects.get(product=product, name=color)
     except ProductColorVariant.DoesNotExist:
         messages.error(request, "Invalid color selected.")
         return redirect('product_detail', product_id=product.id)
 
-    # Validate stock for the specific color and size
     try:
         stock_entry = ProductSizeStock.objects.get(color_variant=color_variant, size=size)
     except ProductSizeStock.DoesNotExist:
@@ -531,110 +526,151 @@ def add_to_cart(request, product_id):
         return redirect('product_detail', product_id=product.id)
 
     if stock_entry.quantity < 1:
-        messages.warning(request, f"Size {size} in color {color} is out of stock.")
+        messages.warning(request, f"Size {stock_entry.get_size_display()} in color {color} is out of stock.")
         return redirect('product_detail', product_id=product.id)
 
-    max_quantity = min(stock_entry.quantity, 5)  # Limit to 5 or stock, whichever is lower
+    max_quantity = min(stock_entry.quantity, 5)
     if quantity < 1 or quantity > max_quantity:
         messages.warning(request, f"Quantity must be between 1 and {max_quantity}.")
         return redirect('product_detail', product_id=product.id)
 
     cart, _ = Cart.objects.get_or_create(user=request.user)
 
+    # Use get_or_create with unique constraint to ensure new item for different color
     cart_item, created = CartItem.objects.get_or_create(
         cart=cart,
         product=product,
+        color=color,
         size=size,
-        color=color,  # Store the selected color variant name
         defaults={'quantity': quantity}
     )
 
     if not created:
-        new_quantity = min(cart_item.quantity + quantity, max_quantity)
+        # If item exists, update quantity only if it doesn't exceed max_quantity
+        new_quantity = cart_item.quantity + quantity
         if new_quantity > max_quantity:
-            messages.warning(request, f"Cannot add more. Max limit is {max_quantity} for {color} {size}.")
+            messages.warning(request, f"Cannot add more. Max limit is {max_quantity} for {color} {stock_entry.get_size_display()}.")
         else:
             cart_item.quantity = new_quantity
             cart_item.save()
-            messages.success(request, f"{product.name} ({color}, {size}) quantity updated in cart.")
+            messages.success(request, f"{product.name} ({color}, {stock_entry.get_size_display()}) quantity updated in cart.")
     else:
         cart_item.quantity = quantity
         cart_item.save()
-        messages.success(request, f"{product.name} ({color}, {size}) added to cart.")
+        messages.success(request, f"{product.name} ({color}, {stock_entry.get_size_display()}) added to cart.")
 
-    # Remove from wishlist if exists
     Wishlist.objects.filter(user=request.user, product=product).delete()
-    return redirect('product_detail', product_id=product_id)
+    return redirect('cart_view')
+
 
 @login_required(login_url='user_login')
 def cart_view(request):
     cart = Cart.objects.filter(user=request.user).first()
-    cart_items = cart.items.select_related('product').all() if cart else []
+    cart_items = cart.items.select_related('product').prefetch_related('product__color_variants__size_stocks', 'product__color_variants__images').all() if cart else []
 
-    total_subtotal = 0
-    total_discount = 0
+    total_subtotal = Decimal('0')
+    total_discount = Decimal('0')
     has_unavailable_items = False
-    taxes = 0
+    taxes = Decimal('0')
+    TAX_RATE = Decimal('0.05')  # Configurable tax rate
+
+    # Size display mapping
+    size_mapping = {
+        'Small': 'S',
+        'Medium': 'M',
+        'Large': 'L',
+        # Add more mappings if needed (e.g., 'Extra Large': 'XL')
+    }
 
     for item in cart_items:
-        # Calculate subtotal for each item
-        item.subtotal = item.quantity * item.product.price
+        # Calculate subtotal (use discount_price if available)
+        item_price = item.product.discount_price if item.product.discount_price and item.product.discount_price < item.product.price else item.product.price
+        item.subtotal = item.quantity * item_price
         total_subtotal += item.subtotal
 
+        # Get product image and correct color variant
         try:
-            stock_record = ProductSizeStock.objects.get(product=item.product, color_variant__name=item.color, size=item.size)
-            item.stock = stock_record.quantity
-            item.max_quantity = min(item.stock, 5)  # Max 5 items
-            # Check availability
-            if (item.product.is_deleted or not item.product.is_active or 
-                not item.product.category.is_active or item.quantity > item.stock):
-                has_unavailable_items = True
-        except ProductSizeStock.DoesNotExist:
+            color_variant = item.product.color_variants.get(name=item.color)
+            item.image = color_variant.images.first().image.url if color_variant.images.exists() else item.product.thumbnail.url if item.product.thumbnail else ''
+            item.color_variant = color_variant  # Add color_variant to item context
+        except ProductColorVariant.DoesNotExist:
+            item.image = item.product.thumbnail.url if item.product.thumbnail else ''
             has_unavailable_items = True
+            item.is_available = False
             item.stock = 0
             item.max_quantity = 0
+            item.color_variant = None  # Fallback
+            continue
+
+        # Check stock and availability
+        try:
+            stock_record = ProductSizeStock.objects.get(
+                color_variant=color_variant,
+                size=item.size
+            )
+            item.stock = stock_record.quantity
+            item.max_quantity = min(item.stock, 5)  # Max 5 items
+            # Check if item is unavailable (out of stock, product/category blocked or deleted)
+            if (item.product.is_deleted or not item.product.is_active or 
+                item.product.category.is_deleted or not item.product.category.is_active or 
+                item.quantity > item.stock):
+                has_unavailable_items = True
+                item.is_available = False
+            else:
+                item.is_available = True
+            # Assign size_display with abbreviation
+            display_size = stock_record.get_size_display()
+            item.size_display = size_mapping.get(display_size, display_size)  # Use mapping or fallback to original
+        except ProductSizeStock.DoesNotExist:
+            has_unavailable_items = True
+            item.is_available = False
+            item.stock = 0
+            item.max_quantity = 0
+            item.size_display = "N/A"  # Fallback if size data is missing
 
         # Calculate savings (discount) for each item
-        if hasattr(item.product, 'discount_price') and item.product.discount_price is not None:
-            item_savings = item.product.price - item.product.discount_price if item.product.discount_price < item.product.price else 0
-            item.savings = item_savings * item.quantity  # Total savings for this item's quantity
+        if item.product.discount_price and item.product.discount_price < item.product.price:
+            item_savings = item.product.price - item.product.discount_price
+            item.savings = item_savings * item.quantity
             total_discount += item.savings
         else:
-            item.savings = 0
+            item.savings = Decimal('0')
 
-    # Calculate taxes (5% of subtotal)
-    taxes = total_subtotal * Decimal('0.05')
-    # Calculate total (subtotal + taxes - total_discount)
+    # Calculate taxes (optional, 5% of subtotal)
+    taxes = total_subtotal * TAX_RATE
+    # Calculate final total (subtotal + taxes - total_discount)
     final_total = total_subtotal + taxes - total_discount
 
     return render(request, 'cart.html', {
         'cart_items': cart_items,
-        'cart_total': total_subtotal,  # Subtotal
-        'total_discount': total_discount,  # Total savings across all items
+        'cart_total': total_subtotal,
+        'total_discount': total_discount,
         'taxes': taxes,
         'total': final_total,
         'has_unavailable_items': has_unavailable_items,
     })
 
-@login_required
+
+@login_required(login_url='user_login')
 def update_cart_quantity(request, cart_item_id):
     cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
     
     if request.method == 'POST':
         action = request.POST.get('action')
         try:
-            stock_entry = ProductSizeStock.objects.get(product=cart_item.product, color_variant__name=cart_item.color, size=cart_item.size)
+            color_variant = ProductColorVariant.objects.get(product=cart_item.product, name=cart_item.color)
+            stock_entry = ProductSizeStock.objects.get(color_variant=color_variant, size=cart_item.size)
             max_quantity = min(stock_entry.quantity, 5)  # Max 5 items
-        except ProductSizeStock.DoesNotExist:
+        except (ProductColorVariant.DoesNotExist, ProductSizeStock.DoesNotExist):
             messages.error(request, "Selected size or color stock not found.")
             return redirect('cart_view')
 
         if action == 'increment' and cart_item.quantity < max_quantity:
             cart_item.quantity += 1
-            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color}, {cart_item.size}).")
+            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color}, {stock_entry.get_size_display()}).")
         elif action == 'decrement' and cart_item.quantity > 1:
             cart_item.quantity -= 1
-            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color}, {cart_item.size}).")
+            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color}, {stock_entry.get_size_display()}).")
         else:
             messages.warning(request, f"Cannot update quantity. Max limit: {max_quantity} or minimum reached.")
 

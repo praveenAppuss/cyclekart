@@ -24,36 +24,48 @@
       <!-- Cart Items -->
       <div class="lg:col-span-2 space-y-5">
         {% for item in cart_items %}
-        <div class="flex justify-between items-center bg-white rounded-xl border border-gray-100 hover:shadow-sm p-3 transition-shadow">
+        <div class="flex justify-between items-center bg-white rounded-xl border border-gray-100 hover:shadow-sm p-3 transition-shadow {% if not item.is_available %}opacity-50{% endif %}">
           <div class="flex items-center space-x-5">
-            <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}" class="w-20 h-20 rounded-sm object-contain border border-gray-100" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
+            <img src="{{ item.image }}" alt="{{ item.product.name }}" class="w-20 h-20 rounded-sm object-contain border border-gray-100" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
             <div>
               <h3 class="text-lg font-semibold text-gray-900">{{ item.product.name }}</h3>
               <div class="flex items-center mt-1 text-sm space-x-6 text-gray-600">
                 <div class="flex items-center gap-1">
                   Color:
-                  {% if item.product.colors.exists %}
-                    <span class="inline-block w-4 h-4 rounded-full border ml-1" style="background-color: {{ item.product.colors.first.hex_code|default:'#000000' }}"></span>
+                  {% if item.color_variant and item.color_variant.hex_code %}
+                    <span class="inline-block w-4 h-4 rounded-full border ml-1" style="background-color: {{ item.color_variant.hex_code }}"></span>
                   {% else %}
                     <span class="text-gray-400">N/A</span>
                   {% endif %}
                 </div>
-                <div>Size: <span class="font-medium">{{ item.size|default:"N/A" }}</span></div>
-                <div class="text-green-600 font-medium">(In Stock)</div>
+                <div>Size: <span class="font-medium">{{ item.size_display }}</span></div>
+                {% if item.is_available %}
+                  <div class="text-green-600 font-medium">In Stock</div>
+                {% else %}
+                  <div class="text-red-600 font-medium">Unavailable{% if item.stock == 0 %} (Out of Stock){% endif %}</div>
+                {% endif %}
               </div>
             </div>
           </div>
           <div class="flex items-center space-x-5">
-            <span class="text-md font-semibold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
-            <form method="POST" action="{% url 'update_cart_quantity' item.id %}" class="flex items-center space-x-2">
-              {% csrf_token %}
-              <button name="action" value="decrement" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300">−</button>
-              <span class="px-2 font-semibold">{{ item.quantity }}</span>
-              <button name="action" value="increment"
-                class="{% if item.quantity >= item.max_quantity %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %} px-2 py-1 rounded"
-                {% if item.quantity >= item.max_quantity %}disabled{% endif %}>+</button>
-            </form>
-            <!-- Remove Button triggers Modal -->
+            <span class="text-md font-semibold text-gray-900">₹{{ item.subtotal|floatformat:0 }}</span>
+            <div class="flex items-center space-x-2">
+              {% if item.is_available %}
+                <form method="POST" action="{% url 'update_cart_quantity' item.id %}">
+                  {% csrf_token %}
+                  <button name="action" value="decrement" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300" {% if item.quantity <= 1 %}disabled{% endif %}>−</button>
+                </form>
+                <span class="px-2 font-semibold">{{ item.quantity }}</span>
+                <form method="POST" action="{% url 'update_cart_quantity' item.id %}">
+                  {% csrf_token %}
+                  <button name="action" value="increment"
+                          class="{% if item.quantity >= item.max_quantity %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %} px-2 py-1 rounded"
+                          {% if item.quantity >= item.max_quantity %}disabled{% endif %}>+</button>
+                </form>
+              {% else %}
+                <span class="px-2 font-semibold">{{ item.quantity }}</span>
+              {% endif %}
+            </div>
             <button onclick="openRemoveModal('{{ item.id }}')" class="text-red-600 hover:text-red-800">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -67,7 +79,7 @@
 
       <!-- Order Summary -->
       <div class="bg-white rounded border border-gray-100 shadow p-4 sticky top-20">
-        <h2 class="text-xl font-medium text-gray-800 mb-4">Order Summary</h3>
+        <h2 class="text-xl font-medium text-gray-800 mb-4">Order Summary</h2>
         <div class="space-y-2 text-gray-700 text-sm">
           <div class="flex justify-between">
             <span>Subtotal</span>
@@ -91,11 +103,9 @@
             <span>₹{{ total|floatformat:2 }}</span>
           </div>
         </div>
-
         {% if cart_items and not has_unavailable_items %}
           <a href="{% url 'checkout' %}" class="mt-6 block text-center bg-gray-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">Proceed to Checkout</a>
-         <a href="{% url 'userproduct_list' %}" class="mt-5 block text-black-100 hover:underline text-xs text-center">Continue Shopping</a>
-
+          <a href="{% url 'userproduct_list' %}" class="mt-5 block text-black-100 hover:underline text-xs text-center">Continue Shopping</a>
         {% else %}
           <button disabled class="mt-6 block text-center bg-gray-400 text-white px-4 py-2 rounded-lg font-medium cursor-not-allowed">Proceed to Checkout</button>
         {% endif %}
@@ -141,7 +151,7 @@
   function openRemoveModal(itemId) {
     const modal = document.getElementById("removeModal");
     const form = document.getElementById("removeForm");
-    form.action = `/cart/remove/${itemId}/`;  // Update to match your URL pattern
+    form.action = `/cart/remove/${itemId}/`;
     modal.classList.remove("hidden");
     modal.classList.add("flex");
   }

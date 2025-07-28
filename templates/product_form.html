@@ -82,7 +82,7 @@
               <p class="text-sm font-medium">Sizes:</p>
               <div class="grid grid-cols-3 gap-2">
                 {% for index, size, stock in zipped_stocks %}
-                  {% if index == forloop.counter0 %}
+                  {% if index == forloop.parentloop.counter0 %}
                     <p class="text-sm">{{ size }}: {{ stock|default:'0' }}</p>
                   {% endif %}
                 {% endfor %}
@@ -90,9 +90,8 @@
             </div>
             <input type="hidden" name="colors[]" value="{{ color_variant.name }}" data-variant-index="{{ forloop.counter0 }}">
             {% for index, size, stock in zipped_stocks %}
-              {% if index == forloop.counter0 %}
+              {% if index == forloop.parentloop.counter0 %}
                 <input type="hidden" name="stocks[]" value="{{ stock|default:'0' }}" data-size="{{ size }}" data-variant-index="{{ index }}">
-                <input type="hidden" name="sizes[]" value="{{ size }}" data-variant-index="{{ index }}">
               {% endif %}
             {% endfor %}
           </div>
@@ -204,16 +203,16 @@
 
   // Initialize modal with three size inputs
   function initializeModalInputs() {
-    const container = document.querySelector('.modal-size-stock-container');
+    const container = document.querySelector('.grid.grid-cols-3.gap-4');
     if (container) {
-      container.innerHTML = ''; // Clear existing inputs
+      container.innerHTML = '';
       sizes.forEach(size => {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.className = 'variant-size-stock w-full p-2 mb-2 border rounded';
-        input.placeholder = `${size} Stock`;
-        input.min = '0';
-        container.appendChild(input);
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <label class="block text-sm font-medium mb-1">${size}</label>
+          <input type="number" class="variant-size-stock w-full border px-3 py-2 rounded" data-size="${size}" min="0" value="0">
+        `;
+        container.appendChild(div);
       });
     }
   }
@@ -254,11 +253,10 @@
       initializeModalInputs();
       // Pre-populate sizes and stocks
       const stockInputs = document.querySelectorAll('.variant-size-stock');
+      const stockValues = Array.from(variantItem.querySelectorAll('input[name="stocks[]"]')).map(input => input.value);
       stockInputs.forEach((input, i) => {
-        const size = sizes[i];
-        const stockInput = variantItem.querySelector(`input[name="stocks[${editingIndex}][${size}]"]`);
-        input.value = stockInput ? stockInput.value : '0';
-        console.log(`Pre-populating ${size} for variant ${editingIndex}: ${input.value}`);
+        input.value = stockValues[i] || '0';
+        console.log(`Pre-populating ${sizes[i]} for variant ${editingIndex}: ${input.value}`);
       });
 
       // Pre-populate images
@@ -395,32 +393,25 @@
     if (variantItem) {
       variantItem.querySelector('h3').textContent = color;
       variantItem.querySelector('input[name="colors[]"]').value = color;
-      // Update stocks with indexed names, ensuring all three sizes
-      if (stockInputs.length === sizes.length) {
-        stockInputs.forEach((input, i) => {
-          const size = sizes[i];
-          let stockInput = variantItem.querySelector(`input[name="stocks[${index}][${size}]"]`);
-          if (!stockInput) {
-            stockInput = document.createElement('input');
-            stockInput.type = 'hidden';
-            stockInput.name = `stocks[${index}][${size}]`;
-            stockInput.dataset.size = size;
-            stockInput.dataset.variantIndex = String(index);
-            variantItem.appendChild(stockInput);
-          }
-          stockInput.value = input.value || '0';
-          console.log(`Updating stock for ${size} at variant ${index}: ${stockInput.value}`);
-        });
-      } else {
-        console.error(`Mismatch: expected ${sizes.length} stock inputs, got ${stockInputs.length}`);
-      }
-      variantItem.querySelector('.grid.grid-cols-3').innerHTML = collectedImages.map(base64 => `
+      const stockContainer = variantItem.querySelector('.grid.grid-cols-3.gap-2');
+      stockContainer.innerHTML = sizes.map((size, i) => `
+        <p class="text-sm">${size}: ${stocks[i] || '0'}</p>
+      `).join('');
+      const existingStockInputs = variantItem.querySelectorAll('input[name="stocks[]"]');
+      existingStockInputs.forEach(input => input.remove());
+      sizes.forEach((size, i) => {
+        const stockInput = document.createElement('input');
+        stockInput.type = 'hidden';
+        stockInput.name = 'stocks[]';
+        stockInput.value = stocks[i] || '0';
+        stockInput.dataset.size = size;
+        stockInput.dataset.variantIndex = String(index);
+        variantItem.appendChild(stockInput);
+      });
+      variantItem.querySelector('.grid.grid-cols-3.gap-3').innerHTML = collectedImages.map(base64 => `
         <div class="border rounded overflow-hidden">
           <img src="${base64}" class="w-full h-28 object-cover" />
         </div>
-      `).join('');
-      variantItem.querySelector('.grid.grid-cols-3.gap-2').innerHTML = sizes.map((size, i) => `
-        <p class="text-sm">${size}: ${stocks[i] || '0'}</p>
       `).join('');
     } else {
       const template = `
@@ -449,8 +440,7 @@
           </div>
           <input type="hidden" name="colors[]" value="${color}" data-variant-index="${variantIndex}">
           ${sizes.map((size, i) => `
-            <input type="hidden" name="stocks[${variantIndex}][${size}]" value="${stocks[i] || '0'}" data-size="${size}" data-variant-index="${variantIndex}">
-            <input type="hidden" name="sizes[${variantIndex}][${size}]" value="${size}" data-variant-index="${variantIndex}">
+            <input type="hidden" name="stocks[]" value="${stocks[i] || '0'}" data-size="${size}" data-variant-index="${variantIndex}">
           `).join('')}
         </div>`;
       variantList.insertAdjacentHTML('beforeend', template);
@@ -477,7 +467,7 @@
   // Reset Modal
   function resetModal() {
     variantColor.value = '';
-    initializeModalInputs(); // Ensure three inputs are reset
+    initializeModalInputs();
     variantImageInput.value = '';
     variantImagePreview.innerHTML = '';
     collectedImages = [];
@@ -505,9 +495,9 @@
       document.getElementById('image-warning-modal').classList.remove('hidden');
     } else if (hasInsufficientImages) {
       e.preventDefault();
-      document.getElementById('insufficient-images-modal').classList.add('hidden');
+      document.getElementById('insufficient-images-modal').classList.remove('hidden');
     } else {
-      const stockInputs = document.querySelectorAll('input[name^="stocks["]');
+      const stockInputs = document.querySelectorAll('input[name="stocks[]"]');
       console.log('Form data submitted - Stock inputs:', Array.from(stockInputs).map(input => ({
         name: input.name,
         value: input.value,
@@ -516,8 +506,7 @@
       })));
       console.log('Form data submitted:', {
         colors: Array.from(document.querySelectorAll('input[name="colors[]"]')).map(input => input.value),
-        stocks: Array.from(document.querySelectorAll('input[name^="stocks["]')).map(input => input.value),
-        sizes: Array.from(document.querySelectorAll('input[name^="sizes["]')).map(input => input.value),
+        stocks: Array.from(document.querySelectorAll('input[name="stocks[]"]')).map(input => input.value),
         cropped_images: Array.from(document.querySelectorAll('input[name="cropped_images[]"]')).map(input => input.value)
       });
     }

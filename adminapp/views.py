@@ -330,10 +330,7 @@ def add_product(request):
         description = request.POST.get('description', '').strip()
         price = request.POST.get('price', '0.00')
         discount_price = request.POST.get('discount_price', None)
-
-        # Variant inputs (multiple variants)
         colors = request.POST.getlist('colors[]')
-        sizes = request.POST.getlist('sizes[]')
         stocks = request.POST.getlist('stocks[]')
         cropped_images = request.POST.getlist('cropped_images[]')
 
@@ -360,9 +357,10 @@ def add_product(request):
             errors['brand'] = "Please select a brand."
         if not colors:
             errors['colors'] = "Please add at least one color variant."
-        if len(stocks) != len(sizes) or len(sizes) % len(size_choices) != 0:
-            errors['stocks'] = "Size and stock data are inconsistent with the number of variants."
-        if len(cropped_images) < 3 * len(colors):  # At least 3 images per variant
+        expected_stock_count = len(colors) * len(size_choices)
+        if len(stocks) != expected_stock_count:
+            errors['stocks'] = f"Expected {expected_stock_count} stock entries (for {len(colors)} colors × {len(size_choices)} sizes), got {len(stocks)}."
+        if len(cropped_images) < 3 * len(colors):
             errors['images'] = f"Please upload at least 3 images per color variant (got {len(cropped_images)}, need {3 * len(colors)})."
         try:
             price = float(price)
@@ -382,7 +380,7 @@ def add_product(request):
                 'sizes': size_choices,
                 'errors': errors,
                 'old': old,
-                'zipped_stocks': list(zip(range(len(colors)), size_choices, [''] * len(size_choices))),
+                'zipped_stocks': list(zip(range(len(colors) if colors else 1), size_choices, [''] * len(size_choices))),
                 'existing_images': [],
             })
 
@@ -413,12 +411,12 @@ def add_product(request):
                     # Associate all sizes with stocks for this variant
                     for size in size_choices:
                         stock_value = int(stocks[stock_index]) if stock_index < len(stocks) and stocks[stock_index].isdigit() else 0
-                        ProductSizeStock.objects.update_or_create(
+                        logger.debug(f"Saving stock for {color} - {size}: {stock_value}")
+                        ProductSizeStock.objects.create(
                             color_variant=color_variant,
                             size=size,
-                            defaults={'quantity': stock_value}
+                            quantity=stock_value
                         )
-                        logger.info(f"Created stock: {color} - {size} = {stock_value}")
                         stock_index += 1
 
                     # Associate images for this variant
@@ -454,7 +452,7 @@ def add_product(request):
                 'sizes': size_choices,
                 'errors': {'general': f"Error: {str(e)}"},
                 'old': old,
-                'zipped_stocks': list(zip(range(len(colors)), size_choices, [''] * len(size_choices))),
+                'zipped_stocks': list(zip(range(len(colors) if colors else 1), size_choices, [''] * len(size_choices))),
                 'existing_images': [],
             })
 
@@ -468,6 +466,7 @@ def add_product(request):
         'zipped_stocks': list(zip(range(1), size_choices, [''] * len(size_choices))),
         'existing_images': [],
     })
+
 
 
 
@@ -513,39 +512,8 @@ def edit_product(request, product_id):
         description = request.POST.get('description', product.description).strip()
         price = request.POST.get('price', str(product.price))
         discount_price = request.POST.get('discount_price', str(product.discount_price) if product.discount_price else None)
-
-        # Variant inputs (multiple variants)
-        colors = request.POST.getlist('colors[]') or [variant.name for variant in color_variants]
-        # Collect nested stocks with error handling
-        stocks = {}
-        for key in request.POST.keys():
-            if key.startswith('stocks[') and key.endswith(']'):
-                try:
-                    parts = key.split('[')
-                    if len(parts) < 3:
-                        logger.warning(f"Invalid stock key format: {key}")
-                        continue
-                    variant_idx = parts[1].split(']')[0]
-                    size = parts[2].split(']')[0]
-                    if variant_idx not in stocks:
-                        stocks[variant_idx] = {}
-                    stocks[variant_idx][size] = request.POST.getlist(key)[0]
-                    logger.debug(f"Parsed stock key: {key} -> variant_idx={variant_idx}, size={size}, value={stocks[variant_idx][size]}")
-                except IndexError as e:
-                    logger.error(f"Failed to parse stock key {key}: {str(e)}")
-                    continue
-        # Flatten stocks into a list, using existing data as fallback
-        stocks_list = []
-        for i in range(len(colors)):
-            for size in size_choices:
-                value = stocks.get(str(i), {}).get(size)
-                if value is None:
-                    # Fallback to existing stock_map if no new data
-                    value = str(stock_map.get(f"{next((v.id for v in color_variants if v.name == colors[i]), 0)}_{size}", 0))
-                stocks_list.append(value)
-                logger.debug(f"Stock for variant {i}, size {size}: {value}")
-        logger.debug(f"Raw POST data: {dict(request.POST)}")
-
+        colors = request.POST.getlist('colors[]')
+        stocks = request.POST.getlist('stocks[]')
         cropped_images = request.POST.getlist('cropped_images[]')
 
         old = {
@@ -556,11 +524,11 @@ def edit_product(request, product_id):
             'price': price,
             'discount_price': discount_price,
             'colors': colors,
-            'stocks': stocks_list,
+            'stocks': stocks,
         }
 
         # Validation
-        logger.debug(f"Validation: name={name}, category_id={category_id}, colors={colors}, stocks={stocks_list}, images={len(cropped_images)}")
+        logger.debug(f"POST data: {dict(request.POST)}")
         if Product.objects.filter(name__iexact=name).exclude(id=product_id).exists() and name != product.name:
             errors['name'] = "Another product with this name already exists."
         if not name:
@@ -571,16 +539,20 @@ def edit_product(request, product_id):
             errors['brand'] = "Please select a brand."
         if not colors:
             errors['colors'] = "Please add at least one color variant."
-        if len(stocks_list) != len(colors) * len(size_choices):
-            errors['stocks'] = f"Stock data mismatch: expected {len(colors) * len(size_choices)}, got {len(stocks_list)}"
-            logger.warning(f"Stock mismatch details: colors={len(colors)}, size_choices={len(size_choices)}, stocks_list={stocks_list}")
-        num_variants = len(colors)
-        if cropped_images:
-            if len(cropped_images) < 3 * num_variants:
-                errors['images'] = f"Please upload at least 3 images per color variant (got {len(cropped_images)}, need {3 * num_variants})."
-        elif any(len(existing_images.get(variant.id, [])) < 3 for variant in color_variants):
-            errors['images'] = "Each color variant must have at least 3 images."
-
+        expected_stock_count = len(colors) * len(size_choices)
+        if len(stocks) != expected_stock_count:
+            errors['stocks'] = f"Expected {expected_stock_count} stock entries (for {len(colors)} colors × {len(size_choices)} sizes), got {len(stocks)}."
+        # Image validation: check existing + new images per variant
+        variant_image_counts = {}
+        variant_image_map = {}
+        for i, color in enumerate(colors):
+            variant_id = next((v.id for v in color_variants if v.name == color), None)
+            existing_count = len(existing_images.get(variant_id, [])) if variant_id else 0
+            new_images = [img for img in cropped_images if img and i * 3 <= cropped_images.index(img) < (i + 1) * 3]
+            variant_image_counts[color] = len(new_images) if new_images else existing_count
+            variant_image_map[color] = new_images
+            if variant_image_counts[color] < 3:
+                errors['images'] = f"Color {color} has only {variant_image_counts[color]} images; at least 3 required per variant."
         try:
             price = float(price)
             if discount_price:
@@ -617,50 +589,54 @@ def edit_product(request, product_id):
                 product.discount_price = discount_price
                 product.save()
 
-                # Process each variant
+                # Delete existing color variants and recreate
+                ProductColorVariant.objects.filter(product=product).delete()
                 image_index = 0
                 stock_index = 0
                 for i, color in enumerate(colors):
-                    color_variant, created = ProductColorVariant.objects.get_or_create(
+                    color_variant = ProductColorVariant.objects.create(
                         product=product,
                         name=color,
-                        defaults={'hex_code': color_hex_map.get(color, '#000000')}
+                        hex_code=color_hex_map.get(color, '#000000')
                     )
 
                     # Associate all sizes with stocks for this variant
                     for size in size_choices:
-                        stock_value = int(stocks_list[stock_index]) if stock_index < len(stocks_list) and stocks_list[stock_index].isdigit() else stock_map.get(f"{color_variant.id}_{size}", 0)
-                        ProductSizeStock.objects.update_or_create(
+                        stock_value = int(stocks[stock_index]) if stock_index < len(stocks) and stocks[stock_index].isdigit() else 0
+                        logger.debug(f"Saving stock for {color} - {size}: {stock_value}")
+                        ProductSizeStock.objects.create(
                             color_variant=color_variant,
                             size=size,
-                            defaults={'quantity': stock_value}
+                            quantity=stock_value
                         )
-                        logger.info(f"Updated stock: {color} - {size} = {stock_value}")
                         stock_index += 1
 
-                    # Associate new images or keep existing
-                    if cropped_images and image_index < len(cropped_images):
-                        image_count = min(3, len(cropped_images) - image_index)
+                    # Associate images for this variant
+                    new_images = variant_image_map.get(color, [])
+                    if new_images:
                         ProductImage.objects.filter(color_variant=color_variant).delete()
-                        for _ in range(image_count):
-                            if image_index < len(cropped_images):
-                                img_str = cropped_images[image_index]
-                                try:
-                                    format, img_data = img_str.split(';base64,')
-                                    ext = format.split('/')[-1]
-                                    file_name = f"{uuid.uuid4()}.{ext}"
-                                    image_file = ContentFile(base64.b64decode(img_data), name=file_name)
-                                    new_img = ProductImage.objects.create(color_variant=color_variant, image=image_file)
-                                    if i == 0 and _ == 0:  # First image of first variant as thumbnail
-                                        product.thumbnail = new_img.image
-                                        product.save()
-                                except Exception as e:
-                                    logger.error(f"Image saving error for variant {color}, image {_}: {str(e)}")
-                                    raise
-                            image_index += 1
+                        for img_str in new_images:
+                            try:
+                                format, img_data = img_str.split(';base64,')
+                                ext = format.split('/')[-1]
+                                file_name = f"{uuid.uuid4()}.{ext}"
+                                image_file = ContentFile(base64.b64decode(img_data), name=file_name)
+                                new_img = ProductImage.objects.create(color_variant=color_variant, image=image_file)
+                                if i == 0 and not product.thumbnail:
+                                    product.thumbnail = new_img.image
+                                    product.save()
+                            except Exception as e:
+                                logger.error(f"Image saving error for variant {color}: {str(e)}")
+                                raise
                     else:
-                        existing_imgs = existing_images.get(color_variant.id, [])
-                        if len(existing_imgs) > 0 and i == 0:
+                        # Retain existing images if no new ones uploaded
+                        existing_imgs = existing_images.get(next((v.id for v in color_variants if v.name == color), None), [])
+                        for img in existing_imgs:
+                            ProductImage.objects.create(
+                                color_variant=color_variant,
+                                image=img.image
+                            )
+                        if existing_imgs and i == 0 and not product.thumbnail:
                             product.thumbnail = existing_imgs[0].image
                             product.save()
 
@@ -703,7 +679,6 @@ def edit_product(request, product_id):
             'stocks': [stock_map.get(f"{variant.id}_{size}", '0') for variant in color_variants for size in size_choices],
         }
     })
-
 
 @superuser_required
 @never_cache
