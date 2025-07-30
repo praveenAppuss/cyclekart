@@ -357,26 +357,18 @@ def product_detail(request, product_id):
         is_deleted=False
     ).exclude(id=product_id).distinct()[:4]
 
-    # Get unique sizes across all color variants with stock data
-    size_stocks = {}
+    # Prepare size_stocks per variant and attach to color_variants
     for variant in color_variants:
-        for size_stock in variant.size_stocks.all():
-            if size_stock.size not in size_stocks or size_stocks[size_stock.size]['quantity'] < size_stock.quantity:
-                size_stocks[size_stock.size] = {
-                    'size': size_stock.size,
-                    'quantity': size_stock.quantity,
-                    'color_variant': variant.name  # Optional: Track which variant it belongs to
-                }
-
-    unique_size_stocks = list(size_stocks.values())
-
+        variant.size_stocks_data = [
+            {'size': stock.size, 'quantity': stock.quantity, 'display': stock.get_size_display().upper()[:1]}
+            for stock in variant.size_stocks.all()
+        ]
     # Prepare context
     context = {
         'product': product,
         'color_variants': color_variants,
         'related_products': related_products,
         'savings': savings,
-        'size_stocks': unique_size_stocks,  # Pass unique sizes with stock
     }
     
     return render(request, 'product_detail.html', context)

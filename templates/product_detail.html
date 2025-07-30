@@ -68,11 +68,11 @@
             <div class="flex items-center space-x-2">
               {% for i in "12345" %}
                 {% if forloop.counter <= 4 %}
-                  <svg class="w-5 h-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="w-4 h-3 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
                   </svg>
                 {% else %}
-                  <svg class="w-5 h-5 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                  <svg class="w-4 h-3 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
                   </svg>
                 {% endif %}
@@ -92,9 +92,9 @@
           <div class="text-2xl font-bold text-gray-900">
             {% if product.discount_price and product.discount_price < product.price %}
               <span>₹{{ product.discount_price|floatformat:0 }}</span>
-              <span class="text-lg text-gray-500 line-through ml-2">₹{{ product.price|floatformat:0 }}</span>
+              <span class="text-sm text-red-500 line-through ml-2">₹{{ product.price|floatformat:0 }}</span>
               {% if savings > 0 %}
-                <span class="text-green-600 text-sm ml-2">Save ₹{{ savings|floatformat:0 }}</span>
+                <span class="text-green-500 text-sm ml-2">You have save ₹{{ savings|floatformat:0 }}</span>
               {% endif %}
             {% else %}
               <span>₹{{ product.price|floatformat:0 }}</span>
@@ -109,7 +109,8 @@
                 {% with color_variants.first as single_variant %}
                   <div class="w-6 h-6 rounded-full border-2 border-gray-300"
                        style="background-color: {{ single_variant.hex_code|default:'#000' }}"
-                       title="{{ single_variant.name }}">
+                       title="{{ single_variant.name }}"
+                       data-color="{{ single_variant.name }}">
                   </div>
                   <input type="hidden" id="singleColor" name="color" value="{{ single_variant.name }}">
                 {% endwith %}
@@ -216,14 +217,14 @@
   }
 
   .size-option {
-    width: 2.5rem; /* 40px */
-    height: 2.5rem; /* 40px */
+    width: 2.5rem;
+    height: 2.5rem;
     border: 1px solid #e5e7eb;
-    border-radius: 4px; /* Slight rounding for a modern square */
+    border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.875rem; /* 14px */
+    font-size: 0.875rem;
     cursor: pointer;
     transition: all 0.3s ease;
     background-color: white;
@@ -262,14 +263,14 @@
         name: "{{ variant.name }}",
         images: [{% for image in variant.images.all %}"{{ image.image.url }}"{% if not forloop.last %},{% endif %}{% endfor %}],
         sizes: [
-          {% for size_stock in variant.size_stocks.all %}
-            { size: "{{ size_stock.size }}", quantity: {{ size_stock.quantity }}, display: "{{ size_stock.get_size_display|upper|slice:':1' }}" }{% if not forloop.last %},{% endif %}
+          {% for size_stock in variant.size_stocks_data %}
+            { size: "{{ size_stock.size }}", quantity: {{ size_stock.quantity }}, display: "{{ size_stock.display }}" }{% if not forloop.last %},{% endif %}
           {% endfor %}
         ]
       }{% if not forloop.last %},{% endif %}
     {% endfor %}
   ];
-  console.log("Color Variants Data:", JSON.stringify(colorVariants, null, 2)); // Detailed debug
+  console.log("Color Variants Data (on load):", JSON.stringify(colorVariants, null, 2)); // Detailed debug
 
   document.addEventListener("DOMContentLoaded", function () {
     const mainImage = document.getElementById("mainImage");
@@ -289,7 +290,7 @@
     const decBtn = document.getElementById("decreaseQty");
     const singleColorInput = document.getElementById("singleColor");
 
-    let selectedColor = singleColorInput ? singleColorInput.value : colorVariants[0]?.name;
+    let selectedColor = singleColorInput ? singleColorInput.value.trim() : (colorVariants.length > 0 ? colorVariants[0].name : null);
     let selectedSize = null;
     let maxQuantity = 0;
 
@@ -305,22 +306,26 @@
           thumbnailContainer.appendChild(img);
         });
       } else {
-        console.warn("No images available for thumbnails");
+        console.warn("No images available for thumbnails for color:", selectedColor);
       }
     }
 
     // Update size options for selected color
     function updateSizeOptions(colorName) {
-      const variant = colorVariants.find(v => v.name === colorName);
+      if (!colorVariants || colorVariants.length === 0) {
+        console.error("No color variants available");
+        return;
+      }
+      const variant = colorVariants.find(v => v && v.name && v.name.toLowerCase() === colorName.toLowerCase());
       sizeOptionsContainer.innerHTML = "";
-      console.log("Updating sizes for color:", colorName, "Variant:", JSON.stringify(variant, null, 2)); // Detailed debug
+      console.log("Updating sizes for color:", colorName, "Variant found:", JSON.stringify(variant, null, 2)); // Detailed debug
       if (variant && variant.sizes && variant.sizes.length > 0) {
         variant.sizes.forEach(size => {
           const div = document.createElement("div");
           div.className = `size-option ${size.quantity > 0 ? '' : 'out-of-stock'}`;
           div.dataset.size = size.size;
           div.dataset.stock = size.quantity;
-          div.textContent = size.display; // Use abbreviated display (e.g., "S", "M", "L")
+          div.textContent = size.display;
           div.onclick = function() { 
             console.log("Attaching onclick to size:", size.size); // Debug
             selectSize(this); 
@@ -338,12 +343,12 @@
 
     // Handle color selection
     function selectColor(element) {
-      if (element.classList.contains("opacity-50")) return;
+      if (!element || element.classList.contains("opacity-50") || !element.dataset.color) return;
       colorOptions.forEach(o => o.classList.remove("ring-2", "ring-indigo-500"));
       element.classList.add("ring-2", "ring-indigo-500");
-      selectedColor = element.dataset.color;
+      selectedColor = element.dataset.color.trim();
       formColor.value = selectedColor;
-      const variant = colorVariants.find(v => v.name === selectedColor);
+      const variant = colorVariants.find(v => v && v.name && v.name.toLowerCase() === selectedColor.toLowerCase());
       if (variant && variant.images && variant.images.length > 0) {
         updateThumbnails(variant.images);
         changeImage(variant.images[0]);
@@ -461,27 +466,28 @@
     });
 
     // Initial state
+    console.log("Initial state - colorOptions.length:", colorOptions.length, "singleColorInput:", singleColorInput ? singleColorInput.value : null, "colorVariants:", colorVariants);
     if (colorOptions.length > 0) {
-      colorOptions[0].click(); // Select first color by default for multiple colors
-    } else if (singleColorInput) {
-      selectedColor = singleColorInput.value;
+      selectedColor = colorOptions[0].dataset.color.trim();
+      formColor.value = selectedColor;
+      if (selectedColor) selectColor(colorOptions[0]); // Trigger selection for multiple colors only if data-color exists
+    } else if (singleColorInput && colorVariants.length > 0) {
+      selectedColor = singleColorInput.value.trim();
       formColor.value = selectedColor;
       console.log("Single Color Initial State - selectedColor:", selectedColor); // Debug
-      const variant = colorVariants.find(v => v.name === selectedColor);
+      const variant = colorVariants.find(v => v && v.name && v.name.toLowerCase() === selectedColor.toLowerCase());
       console.log("Found Variant:", JSON.stringify(variant, null, 2)); // Debug
       if (variant) {
         if (variant.images && variant.images.length > 0) {
           updateThumbnails(variant.images);
           changeImage(variant.images[0]);
         }
-        if (variant.sizes && variant.sizes.length > 0) {
-          updateSizeOptions(selectedColor); // Ensure sizes are populated
-        } else {
-          console.error("No sizes found for variant:", JSON.stringify(variant, null, 2));
-        }
+        updateSizeOptions(selectedColor); // Populate sizes for single color
       } else {
-        console.error("Variant not found for color:", selectedColor);
+        console.error("Variant not found for color:", selectedColor, "Available variants:", JSON.stringify(colorVariants, null, 2));
       }
+    } else {
+      console.error("No color options or variants available");
     }
     updateStockAndButtons();
 
