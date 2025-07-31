@@ -1,6 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from adminapp.models import Product, ProductSizeStock
+from adminapp.models import Product, ProductColorVariant, ProductSizeStock
 class CustomUser(AbstractUser):
     email = models.EmailField(unique=True)
     mobile = models.CharField(max_length=15, unique=True, blank=True, null=True)
@@ -52,14 +52,14 @@ class CartItem(models.Model):
 
 class Wishlist(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='wishlist_items')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    color_variant = models.ForeignKey(ProductColorVariant, on_delete=models.CASCADE, related_name='wishlist_items')
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'product')  # Prevent duplicate wishlist entries
+        unique_together = ('user', 'color_variant')
 
     def __str__(self):
-        return f"{self.user.username} - {self.product.name}"
+        return f"{self.user.username} - {self.color_variant.product.name} ({self.color_variant.name})"
 
 
 

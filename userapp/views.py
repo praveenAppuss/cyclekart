@@ -19,7 +19,7 @@ from userapp.models import CustomUser,Address,Cart,CartItem,Wishlist,Order,Order
 import re
 from django.views.decorators.cache import never_cache
 from .utils import no_cache_view,calculate_cart_total
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.db.models import Q, F, FloatField, ExpressionWrapper, Case, When, Value, IntegerField,Min,Max
@@ -330,10 +330,8 @@ def user_product_list(request):
 
 @login_required(login_url='user_login')
 def product_detail(request, product_id):
-    # Fetch product with error handling
     product = get_object_or_404(Product, id=product_id, is_deleted=False, is_active=True)
     
-    # Get all color variants and annotate with stock availability
     color_variants = product.color_variants.prefetch_related('size_stocks', 'images').annotate(
         has_stock=Exists(ProductSizeStock.objects.filter(
             color_variant=OuterRef('pk'),
@@ -345,30 +343,31 @@ def product_detail(request, product_id):
         messages.error(request, 'This product is currently unavailable.')
         return redirect('userproduct_list')
 
-    # Calculate savings
     savings = 0
     if product.discount_price and product.discount_price < product.price:
         savings = product.price - product.discount_price
 
-    # Related products
     related_products = Product.objects.filter(
         category=product.category,
         is_active=True,
         is_deleted=False
     ).exclude(id=product_id).distinct()[:4]
 
-    # Prepare size_stocks per variant and attach to color_variants
     for variant in color_variants:
         variant.size_stocks_data = [
             {'size': stock.size, 'quantity': stock.quantity, 'display': stock.get_size_display().upper()[:1]}
             for stock in variant.size_stocks.all()
         ]
-    # Prepare context
+
+    # Get wishlist items for this user and product
+    wishlist_items = Wishlist.objects.filter(user=request.user, color_variant__product=product)
+
     context = {
         'product': product,
         'color_variants': color_variants,
         'related_products': related_products,
         'savings': savings,
+        'wishlist_items': wishlist_items,
     }
     
     return render(request, 'product_detail.html', context)
@@ -678,100 +677,133 @@ def remove_from_cart(request, cart_item_id):
     return redirect('cart_view')
 
 # Wishlist Management
-@login_required
+@login_required(login_url='user_login')
 def wishlist_view(request):
-    wishlist_items = Wishlist.objects.filter(user=request.user).select_related('product')
-    sizes = ProductSizeStock.objects.filter(
-        product__in=[item.product for item in wishlist_items]
-    ).values('product_id', 'size', 'quantity')
+    wishlist_items = Wishlist.objects.filter(user=request.user).select_related('color_variant__product')
+    # Map sizes for each color variant
     size_map = {}
-    for item in sizes:
-        if item['quantity'] > 0:  # Only include sizes with stock
-            size_map.setdefault(item['product_id'], []).append(item['size'])
+    for item in wishlist_items:
+        sizes = ProductSizeStock.objects.filter(
+            color_variant=item.color_variant, quantity__gt=0
+        ).values('size', 'quantity')
+        size_map[item.color_variant.id] = [
+            {'size': s['size'], 'display': dict(ProductSizeStock.SIZE_CHOICES)[s['size']]}
+            for s in sizes
+        ]
 
     return render(request, 'wishlist.html', {
         'wishlist_items': wishlist_items,
-        'sizes': size_map,  # Ensure this is passed even if empty
+        'sizes': size_map,
     })
 
-@login_required
-def add_to_wishlist(request, product_id):
-    product = get_object_or_404(Product, id=product_id)
+@login_required(login_url='user_login')
+def add_to_wishlist(request, color_variant_id):
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-    if not product.is_active or not product.category.is_active or product.is_deleted or product.category.is_deleted:
-        messages.error(request, "This product is unavailable.")
-        return redirect('product_detail', product_id=product.id)
+    color_variant = get_object_or_404(ProductColorVariant, id=color_variant_id, product__is_active=True, product__is_deleted=False)
 
-    wishlist_item, created = Wishlist.objects.get_or_create(user=request.user, product=product)
-    if created:
-        messages.success(request, f"{product.name} added to wishlist.")
+    # Check product/category availability
+    if not color_variant.product.category.is_active or color_variant.product.category.is_deleted:
+        if is_ajax:
+            return JsonResponse({'success': False, 'message': 'This product is unavailable.'}, status=400)
+        messages.error(request, 'This product is unavailable.')
+        return redirect('product_detail', product_id=color_variant.product.id)
+
+    # Toggle wishlist item
+    wishlist_item = Wishlist.objects.filter(user=request.user, color_variant=color_variant).first()
+    if wishlist_item:
+        # Item exists, remove it
+        wishlist_item.delete()
+        message = f"{color_variant.product.name} ({color_variant.name}) removed from wishlist."
+        if is_ajax:
+            return JsonResponse({'success': True, 'added': False, 'message': message})
+        messages.success(request, message)
     else:
-        messages.info(request, f"{product.name} is already in your wishlist.")
-    return redirect('product_detail',product_id=product_id)
+        # Add new item
+        Wishlist.objects.create(user=request.user, color_variant=color_variant)
+        message = f"{color_variant.product.name} ({color_variant.name}) added to wishlist."
+        if is_ajax:
+            return JsonResponse({'success': True, 'added': True, 'message': message})
+        messages.success(request, message)
 
-@login_required
+    return redirect('product_detail', product_id=color_variant.product.id)
+
+
+
+@login_required(login_url='user_login')
 def remove_from_wishlist(request, wishlist_id):
     item = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
-    product_name = item.product.name
+    product_name = item.color_variant.product.name
+    color_name = item.color_variant.name
     item.delete()
-    messages.success(request, f"{product_name} removed from wishlist.")
+    messages.success(request, f"{product_name} ({color_name}) removed from wishlist.")
     return redirect('wishlist_view')
 
-@login_required
+@login_required(login_url='user_login')
 def add_to_cart_from_wishlist(request):
     if request.method == 'POST':
-        product_id = request.POST.get('product_id')
+        color_variant_id = request.POST.get('color_variant_id')
         size = request.POST.get('size')
-        product = get_object_or_404(Product, id=product_id)
+        quantity = request.POST.get('quantity', 1)
 
-        # Check product/category availability
-        if not product.is_active or not product.category.is_active or product.is_deleted or product.category.is_deleted:
-            messages.error(request, "This product is unavailable.")
-            return redirect('wishlist_view')
+        try:
+            quantity = int(quantity)
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid quantity provided.")
+            return redirect('wishlist')
 
-        # Validate size
         if not size:
             messages.error(request, "Please select a size.")
-            return redirect('wishlist_view')
+            return redirect('wishlist')
 
-        # Check stock availability
+        color_variant = get_object_or_404(ProductColorVariant, id=color_variant_id, product__is_active=True, product__is_deleted=False)
+        product = color_variant.product
+
+        if not product.category.is_active or product.category.is_deleted:
+            messages.error(request, "This product is unavailable.")
+            return redirect('wishlist')
+
         try:
-            stock_entry = ProductSizeStock.objects.get(product=product, size=size)
-            if stock_entry.quantity < 1:
-                messages.warning(request, f"Size {size} is out of stock.")
-                return redirect('wishlist_view')
+            stock_entry = ProductSizeStock.objects.get(color_variant=color_variant, size=size)
         except ProductSizeStock.DoesNotExist:
-            messages.error(request, "Invalid size selected.")
-            return redirect('wishlist_view')
+            messages.error(request, "Invalid size or color combination selected.")
+            return redirect('wishlist')
 
-        # Add to cart
+        if stock_entry.quantity < 1:
+            messages.warning(request, f"Size {stock_entry.get_size_display()} in color {color_variant.name} is out of stock.")
+            return redirect('wishlist')
+
+        max_quantity = min(stock_entry.quantity, 5)
+        if quantity < 1 or quantity > max_quantity:
+            messages.warning(request, f"Quantity must be between 1 and {max_quantity}.")
+            return redirect('wishlist')
+
         cart, _ = Cart.objects.get_or_create(user=request.user)
-        max_quantity = min(stock_entry.quantity, 5)  # Max 5 items per product
         cart_item, created = CartItem.objects.get_or_create(
             cart=cart,
             product=product,
+            color=color_variant.name,
             size=size,
-            defaults={'quantity': 1}
+            defaults={'quantity': quantity}
         )
 
         if not created:
-            if cart_item.quantity < max_quantity:
-                cart_item.quantity += 1
-                cart_item.save()
-                messages.success(request, f"{product.name} quantity updated in cart.")
+            new_quantity = cart_item.quantity + quantity
+            if new_quantity > max_quantity:
+                messages.warning(request, f"Cannot add more. Max limit is {max_quantity} for {color_variant.name} {stock_entry.get_size_display()}.")
             else:
-                messages.warning(request, f"Cannot add more. Only {stock_entry.quantity} left or max limit reached.")
-                return redirect('wishlist_view')
+                cart_item.quantity = new_quantity
+                cart_item.save()
+                messages.success(request, f"{product.name} ({color_variant.name}, {stock_entry.get_size_display()}) quantity updated in cart.")
         else:
+            cart_item.quantity = quantity
             cart_item.save()
-            messages.success(request, f"{product.name} added to cart.")
+            messages.success(request, f"{product.name} ({color_variant.name}, {stock_entry.get_size_display()}) added to cart.")
 
         # Remove from wishlist
-        Wishlist.objects.filter(user=request.user, product=product).delete()
+        Wishlist.objects.filter(user=request.user, color_variant=color_variant).delete()
         return redirect('cart_view')
-
-    return redirect('wishlist_view')
-
+    return redirect('wishlist')
 
 # ------------checkout view---------------------------------------------------
 @login_required

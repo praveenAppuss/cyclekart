@@ -4,49 +4,61 @@
 {% block content %}
 <div class="min-h-screen bg-slate-50 py-10 px-6">
   <div class="max-w-5xl mx-auto">
-    <!-- Messages -->
-    {% if messages %}
-      <div class="mb-4">
+    <!-- Toast Messages -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
+      {% if messages %}
         {% for message in messages %}
-          <div class="p-4 rounded-lg {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
+          <div class="toast px-4 py-2 rounded-lg shadow-md text-white text-sm
+                      {% if message.tags == 'success' %}bg-green-600
+                      {% elif message.tags == 'error' %}bg-red-600
+                      {% elif message.tags == 'warning' %}bg-yellow-500
+                      {% else %}bg-blue-600{% endif %} transition-opacity duration-300">
             {{ message }}
           </div>
         {% endfor %}
-      </div>
-    {% endif %}
+      {% endif %}
+    </div>
 
-    <h2 class="text-3xl font-bold text-slate-800 mb-6">Your Wishlist </h2>
+    <h2 class="text-3xl font-bold text-slate-800 mb-6">Your Wishlist</h2>
 
     {% if wishlist_items %}
       <div class="space-y-4">
         {% for item in wishlist_items %}
         <div class="bg-white border rounded-xl shadow-sm p-4 flex items-center justify-between">
           <div class="flex items-center space-x-4">
-            <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}"
-              class="w-16 h-16 object-contain border rounded">
+            {% with image=item.color_variant.images.first %}
+              <img src="{{ image.image.url|default:item.color_variant.product.thumbnail.url }}"
+                   alt="{{ item.color_variant.product.name }} ({{ item.color_variant.name }})"
+                   class="w-16 h-16 object-contain border rounded">
+            {% endwith %}
             <div>
-              <h3 class="text-base font-semibold text-gray-900">{{ item.product.name }}</h3>
+              <h3 class="text-base font-semibold text-gray-900">
+                {{ item.color_variant.product.name }} ({{ item.color_variant.name }})
+              </h3>
               <p class="text-sm text-gray-500 mt-1">Added On: {{ item.added_at|date:"n/j/Y" }}</p>
-              {% if item.product.is_deleted or not item.product.is_active or not item.product.category.is_active %}
+              {% if item.color_variant.product.is_deleted or not item.color_variant.product.is_active or not item.color_variant.product.category.is_active %}
                 <span class="text-red-500 text-sm font-medium">Unavailable</span>
               {% else %}
-                <button onclick="openSizeModal('{{ item.product.id }}', '{{ item.product.name }}')" class="text-sm text-blue-600 hover:underline mt-1" aria-label="Add {{ item.product.name }} to cart">
+                <button onclick="openSizeModal('{{ item.color_variant.id }}', '{{ item.color_variant.product.name }}', '{{ item.color_variant.name }}')"
+                        class="text-sm text-blue-600 hover:underline mt-1" aria-label="Add {{ item.color_variant.product.name }} ({{ item.color_variant.name }}) to cart">
                   Add to Cart
                 </button>
               {% endif %}
               <form method="POST" action="{% url 'remove_from_wishlist' item.id %}" class="inline ml-2">
                 {% csrf_token %}
-                <button type="submit" class="text-sm text-red-600 hover:underline" aria-label="Remove {{ item.product.name }} from wishlist">× Remove</button>
+                <button type="submit" class="text-sm text-red-600 hover:underline" aria-label="Remove {{ item.color_variant.product.name }} ({{ item.color_variant.name }}) from wishlist">
+                  × Remove
+                </button>
               </form>
             </div>
           </div>
           <div class="text-right">
-            {% if item.product.original_price and item.product.original_price != item.product.price %}
-              <p class="text-sm text-red-500 line-through">₹{{ item.product.original_price|floatformat:0 }}</p>
-              <p class="text-base font-semibold text-gray-800">₹{{ item.product.price|floatformat:0 }}</p>
-              <p class="text-sm text-green-600">(-{{ item.product.discount_percent }}%)</p>
+            {% if item.discount_percentage > 0 %}
+              <p class="text-sm text-red-500 line-through">₹{{ item.color_variant.product.price|floatformat:0 }}</p>
+              <p class="text-base font-semibold text-gray-800">₹{{ item.color_variant.product.discount_price|floatformat:0 }}</p>
+              <p class="text-sm text-green-600">(-{{ item.discount_percentage|floatformat:0 }}%)</p>
             {% else %}
-              <p class="text-base font-semibold text-gray-800">₹{{ item.product.price|floatformat:0 }}</p>
+              <p class="text-base font-semibold text-gray-800">₹{{ item.color_variant.product.price|floatformat:0 }}</p>
             {% endif %}
           </div>
         </div>
@@ -67,7 +79,7 @@
     <h3 class="text-lg font-semibold mb-4" id="modalTitle">Select Size</h3>
     <form method="POST" action="{% url 'add_to_cart_from_wishlist' %}">
       {% csrf_token %}
-      <input type="hidden" name="product_id" id="modalProductId">
+      <input type="hidden" name="color_variant_id" id="modalColorVariantId">
       <input type="hidden" name="size" id="selectedSize">
       <p class="mb-3 text-sm text-gray-600">Please select your size:</p>
       <div class="flex justify-center gap-3 mb-4" id="sizeOptions"></div>
@@ -82,21 +94,26 @@
 
 <!-- Modal JS -->
 <script>
-  function openSizeModal(productId, productName) {
-    document.getElementById("modalProductId").value = productId;
-    document.getElementById("modalTitle").textContent = "Select Size - " + productName;
+  function openSizeModal(colorVariantId, productName, colorName) {
+    document.getElementById("modalColorVariantId").value = colorVariantId;
+    document.getElementById("modalTitle").textContent = `Select Size - ${productName} (${colorName})`;
     
-    // Access sizes from the template context and filter by productId
+    // Access sizes from the template context and filter by colorVariantId
     const sizesData = {{ sizes|safe }};
-    const sizes = sizesData[productId] || [];
+    const sizes = sizesData[colorVariantId] || [];
     const sizeOptions = document.getElementById("sizeOptions");
     sizeOptions.innerHTML = '';
+    if (sizes.length === 0) {
+      sizeOptions.innerHTML = '<p class="text-sm text-red-600">No sizes available</p>';
+      return;
+    }
     sizes.forEach(size => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "size-btn w-10 h-10 border rounded hover:bg-slate-800 hover:text-white transition";
-      btn.textContent = size;
-      btn.onclick = () => selectSize(size);
+      btn.textContent = size.display;
+      btn.dataset.size = size.size;
+      btn.onclick = () => selectSize(size.size);
       sizeOptions.appendChild(btn);
     });
 
@@ -113,10 +130,19 @@
     document.getElementById("selectedSize").value = size;
     document.querySelectorAll(".size-btn").forEach(btn => {
       btn.classList.remove("bg-slate-800", "text-white");
-      if (btn.textContent.trim() === size) {
+      if (btn.dataset.size === size) {
         btn.classList.add("bg-slate-800", "text-white");
       }
     });
   }
+
+  // Auto-hide toast messages
+  document.addEventListener("DOMContentLoaded", function () {
+    setTimeout(() => {
+      const toasts = document.querySelectorAll(".toast");
+      toasts.forEach(toast => toast.classList.add("opacity-0"));
+      setTimeout(() => toasts.forEach(toast => toast.remove()), 300);
+    }, 3000);
+  });
 </script>
 {% endblock %}
