@@ -6,15 +6,15 @@
   <div class="max-w-6xl mx-auto">
 
     <!-- Toast Messages -->
-    {% if messages %}
-      <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
+      {% if messages %}
         {% for message in messages %}
           <div data-message="{{ message }}" class="toast p-4 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
             {{ message }}
           </div>
         {% endfor %}
-      </div>
-    {% endif %}
+      {% endif %}
+    </div>
 
     <h2 class="text-xl font-bold text-gray-800 mb-6">Your Cart</h2>
 
@@ -24,7 +24,7 @@
       <!-- Cart Items -->
       <div class="lg:col-span-2 space-y-5">
         {% for item in cart_items %}
-        <div class="flex justify-between items-center bg-white rounded-xl border border-gray-100 hover:shadow-sm p-3 transition-shadow {% if not item.is_available %}opacity-50{% endif %}">
+        <div class="flex justify-between items-center bg-white rounded-xl border border-gray-100 hover:shadow-sm p-3 transition-shadow {% if not item.is_available %}opacity-50{% endif %}" data-item-id="{{ item.id }}">
           <div class="flex items-center space-x-5">
             <img src="{{ item.image }}" alt="{{ item.product.name }}" class="w-20 h-20 rounded-sm object-contain border border-gray-100" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
             <div>
@@ -48,20 +48,18 @@
             </div>
           </div>
           <div class="flex items-center space-x-5">
-            <span class="text-md font-semibold text-gray-900">₹{{ item.subtotal|floatformat:0 }}</span>
+            <span class="text-md font-semibold text-gray-900" data-subtotal>₹{{ item.subtotal|floatformat:0 }}</span>
             <div class="flex items-center space-x-2">
               {% if item.is_available %}
-                <form method="POST" action="{% url 'update_cart_quantity' item.id %}">
-                  {% csrf_token %}
-                  <button name="action" value="decrement" class="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300" {% if item.quantity <= 1 %}disabled{% endif %}>−</button>
-                </form>
-                <span class="px-2 font-semibold">{{ item.quantity }}</span>
-                <form method="POST" action="{% url 'update_cart_quantity' item.id %}">
-                  {% csrf_token %}
-                  <button name="action" value="increment"
-                          class="{% if item.quantity >= item.max_quantity %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %} px-2 py-1 rounded"
-                          {% if item.quantity >= item.max_quantity %}disabled{% endif %}>+</button>
-                </form>
+                <button onclick="updateQuantity('{{ item.id }}', 'decrement')"
+                        class="decrement-btn px-2 py-1 rounded {% if item.quantity <= 1 %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %}"
+                        data-max-quantity="{{ item.max_quantity }}"
+                        {% if item.quantity <= 1 %}disabled{% endif %}>−</button>
+                <span class="px-2 font-semibold quantity-display">{{ item.quantity }}</span>
+                <button onclick="updateQuantity('{{ item.id }}', 'increment')"
+                        class="increment-btn px-2 py-1 rounded {% if item.quantity >= item.max_quantity %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %}"
+                        data-max-quantity="{{ item.max_quantity }}"
+                        {% if item.quantity >= item.max_quantity %}disabled{% endif %}>+</button>
               {% else %}
                 <span class="px-2 font-semibold">{{ item.quantity }}</span>
               {% endif %}
@@ -83,11 +81,11 @@
         <div class="space-y-2 text-gray-700 text-sm">
           <div class="flex justify-between">
             <span>Subtotal</span>
-            <span class="font-medium">₹{{ cart_total|floatformat:0 }}</span>
+            <span class="font-medium" data-cart-total>₹{{ cart_total|floatformat:0 }}</span>
           </div>
           <div class="flex justify-between">
             <span>Total Discount</span>
-            <span class="font-medium text-green-600">-₹{{ total_discount|floatformat:0 }}</span>
+            <span class="font-medium text-green-600" data-total-discount>-₹{{ total_discount|floatformat:0 }}</span>
           </div>
           <div class="flex justify-between">
             <span>Shipping</span>
@@ -95,12 +93,12 @@
           </div>
           <div class="flex justify-between">
             <span>Tax</span>
-            <span class="font-medium">₹{{ taxes|floatformat:2 }}</span>
+            <span class="font-medium" data-taxes>₹{{ taxes|floatformat:2 }}</span>
           </div>
           <hr class="border-gray-100">
           <div class="flex justify-between text-lg font-medium text-gray-900">
             <span>Total</span>
-            <span>₹{{ total|floatformat:2 }}</span>
+            <span data-final-total>₹{{ total|floatformat:2 }}</span>
           </div>
         </div>
         {% if cart_items and not has_unavailable_items %}
@@ -135,7 +133,7 @@
   </div>
 </div>
 
-<!-- JavaScript for Toasts and Modal -->
+<!-- JavaScript for Toasts, Modal, and AJAX Quantity Updates -->
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const toasts = document.querySelectorAll('.toast');
@@ -160,6 +158,73 @@
     const modal = document.getElementById("removeModal");
     modal.classList.remove("flex");
     modal.classList.add("hidden");
+  }
+
+  function showToast(message, type) {
+    const toastContainer = document.getElementById("toast-container");
+    const toast = document.createElement("div");
+    toast.className = `toast p-4 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 ${
+      type === "success" ? "bg-green-100 text-green-800" :
+      type === "error" ? "bg-red-100 text-red-800" :
+      "bg-yellow-100 text-yellow-800"
+    }`;
+    toast.textContent = message;
+    toastContainer.appendChild(toast);
+    setTimeout(() => toast.style.opacity = '1', 100);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 300);
+    }, 2500);
+  }
+
+  async function updateQuantity(itemId, action) {
+    const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
+    const quantityDisplay = itemElement.querySelector('.quantity-display');
+    const subtotalDisplay = itemElement.querySelector('[data-subtotal]');
+    const incrementBtn = itemElement.querySelector('.increment-btn');
+    const decrementBtn = itemElement.querySelector('.decrement-btn');
+    const maxQuantity = parseInt(incrementBtn.dataset.maxQuantity || 5);
+
+    // Prevent action if buttons are disabled
+    if ((action === 'increment' && incrementBtn.disabled) || (action === 'decrement' && decrementBtn.disabled)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/cart/update/${itemId}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': '{{ csrf_token }}'
+        },
+        body: `action=${action}`
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        quantityDisplay.textContent = data.quantity;
+        subtotalDisplay.textContent = `₹${data.subtotal.toFixed(0)}`;
+        showToast(data.message, 'success');
+
+        // Update button states
+        const newQuantity = data.quantity;
+        incrementBtn.disabled = newQuantity >= maxQuantity;
+        decrementBtn.disabled = newQuantity <= 1;
+        incrementBtn.classList.toggle('bg-gray-300', newQuantity >= maxQuantity);
+        incrementBtn.classList.toggle('cursor-not-allowed', newQuantity >= maxQuantity);
+        incrementBtn.classList.toggle('bg-gray-200', newQuantity < maxQuantity);
+        incrementBtn.classList.toggle('hover:bg-gray-300', newQuantity < maxQuantity);
+        decrementBtn.classList.toggle('bg-gray-300', newQuantity <= 1);
+        decrementBtn.classList.toggle('cursor-not-allowed', newQuantity <= 1);
+        decrementBtn.classList.toggle('bg-gray-200', newQuantity > 1);
+        decrementBtn.classList.toggle('hover:bg-gray-300', newQuantity > 1);
+      } else {
+        showToast(data.message, 'error');
+      }
+    } catch (error) {
+      showToast('An error occurred. Please try again.', 'error');
+    }
   }
 </script>
 {% endblock %}

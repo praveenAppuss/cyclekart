@@ -80,7 +80,7 @@
     <form method="POST" action="{% url 'add_to_cart_from_wishlist' %}">
       {% csrf_token %}
       <input type="hidden" name="color_variant_id" id="modalColorVariantId">
-      <input type="hidden" name="size" id="selectedSize">
+      <input type="hidden" name="size_stock_id" id="selectedSizeStockId">
       <p class="mb-3 text-sm text-gray-600">Please select your size:</p>
       <div class="flex justify-center gap-3 mb-4" id="sizeOptions"></div>
       <div class="flex justify-between">
@@ -112,8 +112,8 @@
       btn.type = "button";
       btn.className = "size-btn w-10 h-10 border rounded hover:bg-slate-800 hover:text-white transition";
       btn.textContent = size.display;
-      btn.dataset.size = size.size;
-      btn.onclick = () => selectSize(size.size);
+      btn.dataset.sizeStockId = size.id;  // Use size_stock ID
+      btn.onclick = () => selectSize(size.id);
       sizeOptions.appendChild(btn);
     });
 
@@ -122,15 +122,15 @@
 
   function closeModal() {
     document.getElementById("sizeModal").classList.add("hidden");
-    document.getElementById("selectedSize").value = "";
+    document.getElementById("selectedSizeStockId").value = "";
     document.querySelectorAll(".size-btn").forEach(btn => btn.classList.remove("bg-slate-800", "text-white"));
   }
 
-  function selectSize(size) {
-    document.getElementById("selectedSize").value = size;
+  function selectSize(sizeStockId) {
+    document.getElementById("selectedSizeStockId").value = sizeStockId;
     document.querySelectorAll(".size-btn").forEach(btn => {
       btn.classList.remove("bg-slate-800", "text-white");
-      if (btn.dataset.size === size) {
+      if (btn.dataset.sizeStockId === sizeStockId.toString()) {
         btn.classList.add("bg-slate-800", "text-white");
       }
     });

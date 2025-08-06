@@ -13,6 +13,7 @@ from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
+from django.contrib.messages import get_messages
 from django.contrib import messages
 from adminapp.models import Product,Category,Brand,ProductSizeStock,ProductColorVariant
 from userapp.models import CustomUser,Address,Cart,CartItem,Wishlist,Order,OrderItem
@@ -355,12 +356,16 @@ def product_detail(request, product_id):
 
     for variant in color_variants:
         variant.size_stocks_data = [
-            {'size': stock.size, 'quantity': stock.quantity, 'display': stock.get_size_display().upper()[:1]}
+            {
+                'id': stock.id,  # Added to match template's size_stock_id
+                'size': stock.size,
+                'quantity': stock.quantity,
+                'display': stock.get_size_display()  # Use full display name
+            }
             for stock in variant.size_stocks.all()
         ]
 
-    # Get wishlist items for this user and product
-    wishlist_items = Wishlist.objects.filter(user=request.user, color_variant__product=product)
+    wishlist_items = Wishlist.objects.filter(user=request.user, color_variant__product=product) if request.user.is_authenticated else []
 
     context = {
         'product': product,
@@ -371,7 +376,6 @@ def product_detail(request, product_id):
     }
     
     return render(request, 'product_detail.html', context)
-
 # user profile section ---------------------------------------------------
 
 @login_required
@@ -490,74 +494,85 @@ def add_to_cart(request, product_id):
         messages.error(request, "This product is unavailable.")
         return redirect('product_detail', product_id=product.id)
 
-    size = request.POST.get('size')
-    color = request.POST.get('color')
+    color_variant_id = request.POST.get('color_variant')
+    size_stock_id = request.POST.get('size_stock')
     quantity = request.POST.get('quantity', 1)
-    
+
     try:
         quantity = int(quantity)
     except (ValueError, TypeError):
         messages.error(request, "Invalid quantity provided.")
         return redirect('product_detail', product_id=product.id)
 
-    if not size or not color:
+    if not color_variant_id or not size_stock_id:
         messages.error(request, "Please select both a color and size.")
         return redirect('product_detail', product_id=product.id)
 
     try:
-        color_variant = ProductColorVariant.objects.get(product=product, name=color)
+        color_variant = ProductColorVariant.objects.get(id=color_variant_id, product=product)
     except ProductColorVariant.DoesNotExist:
         messages.error(request, "Invalid color selected.")
         return redirect('product_detail', product_id=product.id)
 
     try:
-        stock_entry = ProductSizeStock.objects.get(color_variant=color_variant, size=size)
+        size_stock = ProductSizeStock.objects.get(id=size_stock_id, color_variant=color_variant)
     except ProductSizeStock.DoesNotExist:
         messages.error(request, "Invalid size or color combination selected.")
         return redirect('product_detail', product_id=product.id)
 
-    if stock_entry.quantity < 1:
-        messages.warning(request, f"Size {stock_entry.get_size_display()} in color {color} is out of stock.")
+    if size_stock.quantity < 1:
+        messages.warning(request, f"Size {size_stock.get_size_display()} in color {color_variant.name} is out of stock.")
         return redirect('product_detail', product_id=product.id)
 
-    max_quantity = min(stock_entry.quantity, 5)
+    max_quantity = min(size_stock.quantity, 5)
     if quantity < 1 or quantity > max_quantity:
         messages.warning(request, f"Quantity must be between 1 and {max_quantity}.")
         return redirect('product_detail', product_id=product.id)
 
     cart, _ = Cart.objects.get_or_create(user=request.user)
 
-    # Use get_or_create with unique constraint to ensure new item for different color
     cart_item, created = CartItem.objects.get_or_create(
         cart=cart,
         product=product,
-        color=color,
-        size=size,
+        color_variant=color_variant,
+        size_stock=size_stock,
         defaults={'quantity': quantity}
     )
 
     if not created:
-        # If item exists, update quantity only if it doesn't exceed max_quantity
         new_quantity = cart_item.quantity + quantity
         if new_quantity > max_quantity:
-            messages.warning(request, f"Cannot add more. Max limit is {max_quantity} for {color} {stock_entry.get_size_display()}.")
+            messages.warning(request, f"Cannot add more. Max limit is {max_quantity} for {color_variant.name} {size_stock.get_size_display()}.")
         else:
             cart_item.quantity = new_quantity
             cart_item.save()
-            messages.success(request, f"{product.name} ({color}, {stock_entry.get_size_display()}) quantity updated in cart.")
+            messages.success(request, f"{product.name} ({color_variant.name}, {size_stock.get_size_display()}) quantity updated in cart.")
     else:
         cart_item.quantity = quantity
         cart_item.save()
-        messages.success(request, f"{product.name} ({color}, {stock_entry.get_size_display()}) added to cart.")
+        messages.success(request, f"{product.name} ({color_variant.name}, {size_stock.get_size_display()}) added to cart.")
 
-    Wishlist.objects.filter(user=request.user, product=product).delete()
+    Wishlist.objects.filter(
+        user=request.user,
+        color_variant__product=product,
+        color_variant__name=color_variant.name
+    ).delete()
+
     return redirect('cart_view')
+
+def get_sizes(request, color_variant_id):
+    size_stocks = ProductSizeStock.objects.filter(color_variant_id=color_variant_id).values('id', 'size')
+    sizes = [{'id': ss['id'], 'size_display': dict(ProductSizeStock.SIZE_CHOICES).get(ss['size'], ss['size'])} for ss in size_stocks]
+    return JsonResponse({'sizes': sizes})
 
 
 @login_required(login_url='user_login')
 def cart_view(request):
     cart = Cart.objects.filter(user=request.user).first()
-    cart_items = cart.items.select_related('product').prefetch_related('product__color_variants__size_stocks', 'product__color_variants__images').all() if cart else []
+    cart_items = cart.items.select_related('product', 'color_variant', 'size_stock').prefetch_related(
+        'product__color_variants__images',
+        'product__color_variants__size_stocks'
+    ).all() if cart else []
 
     total_subtotal = Decimal('0')
     total_discount = Decimal('0')
@@ -565,59 +580,30 @@ def cart_view(request):
     taxes = Decimal('0')
     TAX_RATE = Decimal('0.05')  # Configurable tax rate
 
-    # Size display mapping
-    size_mapping = {
-        'Small': 'S',
-        'Medium': 'M',
-        'Large': 'L',
-        # Add more mappings if needed (e.g., 'Extra Large': 'XL')
-    }
-
     for item in cart_items:
         # Calculate subtotal (use discount_price if available)
         item_price = item.product.discount_price if item.product.discount_price and item.product.discount_price < item.product.price else item.product.price
         item.subtotal = item.quantity * item_price
         total_subtotal += item.subtotal
 
-        # Get product image and correct color variant
-        try:
-            color_variant = item.product.color_variants.get(name=item.color)
-            item.image = color_variant.images.first().image.url if color_variant.images.exists() else item.product.thumbnail.url if item.product.thumbnail else ''
-            item.color_variant = color_variant  # Add color_variant to item context
-        except ProductColorVariant.DoesNotExist:
-            item.image = item.product.thumbnail.url if item.product.thumbnail else ''
-            has_unavailable_items = True
-            item.is_available = False
-            item.stock = 0
-            item.max_quantity = 0
-            item.color_variant = None  # Fallback
-            continue
-
+        # Get product image and color variant
+        item.color_variant = item.color_variant  # Already fetched via select_related
+        item.image = item.color_variant.images.first().image.url if item.color_variant.images.exists() else item.product.thumbnail.url if item.product.thumbnail else ''
+        
         # Check stock and availability
-        try:
-            stock_record = ProductSizeStock.objects.get(
-                color_variant=color_variant,
-                size=item.size
-            )
-            item.stock = stock_record.quantity
-            item.max_quantity = min(item.stock, 5)  # Max 5 items
-            # Check if item is unavailable (out of stock, product/category blocked or deleted)
-            if (item.product.is_deleted or not item.product.is_active or 
-                item.product.category.is_deleted or not item.product.category.is_active or 
-                item.quantity > item.stock):
-                has_unavailable_items = True
-                item.is_available = False
-            else:
-                item.is_available = True
-            # Assign size_display with abbreviation
-            display_size = stock_record.get_size_display()
-            item.size_display = size_mapping.get(display_size, display_size)  # Use mapping or fallback to original
-        except ProductSizeStock.DoesNotExist:
+        item.size_stock = item.size_stock  # Already fetched via select_related
+        item.stock = item.size_stock.quantity
+        item.max_quantity = min(item.stock, 5)  # Max 5 items
+        item.size_display = item.size_stock.get_size_display()  # Use get_size_display for size label
+
+        # Check if item is unavailable (out of stock, product/category blocked or deleted)
+        if (item.product.is_deleted or not item.product.is_active or 
+            item.product.category.is_deleted or not item.product.category.is_active or 
+            item.quantity > item.stock):
             has_unavailable_items = True
             item.is_available = False
-            item.stock = 0
-            item.max_quantity = 0
-            item.size_display = "N/A"  # Fallback if size data is missing
+        else:
+            item.is_available = True
 
         # Calculate savings (discount) for each item
         if item.product.discount_price and item.product.discount_price < item.product.price:
@@ -627,7 +613,7 @@ def cart_view(request):
         else:
             item.savings = Decimal('0')
 
-    # Calculate taxes (optional, 5% of subtotal)
+    # Calculate taxes (5% of subtotal)
     taxes = total_subtotal * TAX_RATE
     # Calculate final total (subtotal + taxes - total_discount)
     final_total = total_subtotal + taxes - total_discount
@@ -642,6 +628,7 @@ def cart_view(request):
     })
 
 
+
 @login_required(login_url='user_login')
 def update_cart_quantity(request, cart_item_id):
     cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
@@ -649,45 +636,67 @@ def update_cart_quantity(request, cart_item_id):
     if request.method == 'POST':
         action = request.POST.get('action')
         try:
-            color_variant = ProductColorVariant.objects.get(product=cart_item.product, name=cart_item.color)
-            stock_entry = ProductSizeStock.objects.get(color_variant=color_variant, size=cart_item.size)
-            max_quantity = min(stock_entry.quantity, 5)  # Max 5 items
-        except (ProductColorVariant.DoesNotExist, ProductSizeStock.DoesNotExist):
-            messages.error(request, "Selected size or color stock not found.")
+            stock_entry = cart_item.size_stock
+            max_quantity = min(stock_entry.quantity, 5)
+        except ProductSizeStock.DoesNotExist:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'message': 'Selected size stock not found.'}, status=400)
+            messages.error(request, "Selected size stock not found.")
             return redirect('cart_view')
 
+        new_quantity = cart_item.quantity
         if action == 'increment' and cart_item.quantity < max_quantity:
-            cart_item.quantity += 1
-            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color}, {stock_entry.get_size_display()}).")
+            new_quantity = cart_item.quantity + 1
+            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color_variant.name}, {stock_entry.get_size_display()}).")
         elif action == 'decrement' and cart_item.quantity > 1:
-            cart_item.quantity -= 1
-            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color}, {stock_entry.get_size_display()}).")
+            new_quantity = cart_item.quantity - 1
+            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color_variant.name}, {stock_entry.get_size_display()}).")
         else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'message': f"Cannot update quantity. Max limit: {max_quantity} or minimum reached."}, status=400)
             messages.warning(request, f"Cannot update quantity. Max limit: {max_quantity} or minimum reached.")
+            return redirect('cart_view')
 
+        cart_item.quantity = new_quantity
         cart_item.save()
-    return redirect('cart_view')
 
-@login_required
+        item_price = cart_item.product.discount_price if cart_item.product.discount_price and cart_item.product.discount_price < cart_item.product.price else cart_item.product.price
+        subtotal = new_quantity * item_price
+
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            storage = get_messages(request)
+            message = storage._queued_messages[-1].message if storage._queued_messages else ''
+            return JsonResponse({
+                'success': True,
+                'quantity': new_quantity,
+                'subtotal': float(subtotal),
+                'message': message
+            })
+        return redirect('cart_view')
+    
+
+@login_required(login_url='user_login')
 def remove_from_cart(request, cart_item_id):
     cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
     product_name = cart_item.product.name
+    color_name = cart_item.color_variant.name
+    size_display = cart_item.size_stock.get_size_display()
     cart_item.delete()
-    messages.success(request, f"{product_name} ({cart_item.color}, {cart_item.size}) removed from cart.")
+    messages.success(request, f"{product_name} ({color_name}, {size_display}) removed from cart.")
     return redirect('cart_view')
+
 
 # Wishlist Management
 @login_required(login_url='user_login')
 def wishlist_view(request):
     wishlist_items = Wishlist.objects.filter(user=request.user).select_related('color_variant__product')
-    # Map sizes for each color variant
     size_map = {}
     for item in wishlist_items:
         sizes = ProductSizeStock.objects.filter(
             color_variant=item.color_variant, quantity__gt=0
-        ).values('size', 'quantity')
+        ).values('id', 'size', 'quantity')
         size_map[item.color_variant.id] = [
-            {'size': s['size'], 'display': dict(ProductSizeStock.SIZE_CHOICES)[s['size']]}
+            {'id': s['id'], 'size': s['size'], 'display': dict(ProductSizeStock.SIZE_CHOICES)[s['size']]}
             for s in sizes
         ]
 
@@ -695,6 +704,7 @@ def wishlist_view(request):
         'wishlist_items': wishlist_items,
         'sizes': size_map,
     })
+
 
 @login_required(login_url='user_login')
 def add_to_wishlist(request, color_variant_id):
@@ -737,13 +747,13 @@ def remove_from_wishlist(request, wishlist_id):
     color_name = item.color_variant.name
     item.delete()
     messages.success(request, f"{product_name} ({color_name}) removed from wishlist.")
-    return redirect('wishlist_view')
+    return redirect('wishlist')
 
 @login_required(login_url='user_login')
 def add_to_cart_from_wishlist(request):
     if request.method == 'POST':
         color_variant_id = request.POST.get('color_variant_id')
-        size = request.POST.get('size')
+        size_stock_id = request.POST.get('size_stock_id')
         quantity = request.POST.get('quantity', 1)
 
         try:
@@ -752,7 +762,7 @@ def add_to_cart_from_wishlist(request):
             messages.error(request, "Invalid quantity provided.")
             return redirect('wishlist')
 
-        if not size:
+        if not size_stock_id:
             messages.error(request, "Please select a size.")
             return redirect('wishlist')
 
@@ -764,7 +774,7 @@ def add_to_cart_from_wishlist(request):
             return redirect('wishlist')
 
         try:
-            stock_entry = ProductSizeStock.objects.get(color_variant=color_variant, size=size)
+            stock_entry = ProductSizeStock.objects.get(id=size_stock_id, color_variant=color_variant)
         except ProductSizeStock.DoesNotExist:
             messages.error(request, "Invalid size or color combination selected.")
             return redirect('wishlist')
@@ -782,8 +792,8 @@ def add_to_cart_from_wishlist(request):
         cart_item, created = CartItem.objects.get_or_create(
             cart=cart,
             product=product,
-            color=color_variant.name,
-            size=size,
+            color_variant=color_variant,
+            size_stock=stock_entry,
             defaults={'quantity': quantity}
         )
 
@@ -800,10 +810,10 @@ def add_to_cart_from_wishlist(request):
             cart_item.save()
             messages.success(request, f"{product.name} ({color_variant.name}, {stock_entry.get_size_display()}) added to cart.")
 
-        # Remove from wishlist
         Wishlist.objects.filter(user=request.user, color_variant=color_variant).delete()
         return redirect('cart_view')
     return redirect('wishlist')
+
 
 # ------------checkout view---------------------------------------------------
 @login_required

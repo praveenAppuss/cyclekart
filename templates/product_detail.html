@@ -113,7 +113,7 @@
                        data-color="{{ single_variant.name }}"
                        data-variant-id="{{ single_variant.id }}">
                   </div>
-                  <input type="hidden" id="singleColor" name="color" value="{{ single_variant.name }}">
+                  <input type="hidden" id="singleColorVariant" name="color_variant" value="{{ single_variant.id }}">
                 {% endwith %}
               {% else %}
                 {% for variant in color_variants %}
@@ -123,8 +123,6 @@
                        style="background-color: {{ variant.hex_code|default:'#000' }}"
                        data-color="{{ variant.name }}"
                        data-variant-id="{{ variant.id }}"
-                       data-images="{% for image in variant.images.all %}{{ image.image.url }}{% if not forloop.last %},{% endif %}{% endfor %}"
-                       data-sizes="{% for size_stock in variant.size_stocks.all %}{{ size_stock.size }}:{{ size_stock.quantity }}{% if not forloop.last %},{% endif %}{% endfor %}"
                        onclick="selectColor(this)">
                   </div>
                 {% endfor %}
@@ -158,8 +156,12 @@
             <form method="post" action="{% url 'add_to_cart' product.id %}" class="flex-1">
               {% csrf_token %}
               <input type="hidden" name="quantity" id="formQuantity" value="1">
-              <input type="hidden" name="size" id="formSize" value="">
-              <input type="hidden" name="color" id="formColor" value="{% if color_variants.count == 1 %}{{ color_variants.first.name }}{% endif %}">
+              <input type="hidden" name="size_stock" id="formSizeStock" value="">
+              {% if color_variants.count == 1 %}
+                <input type="hidden" name="color_variant" id="formColorVariant" value="{{ color_variants.first.id }}">
+              {% else %}
+                <input type="hidden" name="color_variant" id="formColorVariant" value="{% if color_variants.count > 0 %}{{ color_variants.first.id }}{% endif %}">
+              {% endif %}
               <button id="addToCartBtn" disabled type="submit"
                       class="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                       aria-label="Add {{ product.name }} to cart">
@@ -272,8 +274,8 @@
         name: "{{ variant.name }}",
         images: [{% for image in variant.images.all %}"{{ image.image.url }}"{% if not forloop.last %},{% endif %}{% endfor %}],
         sizes: [
-          {% for size_stock in variant.size_stocks_data %}
-            { size: "{{ size_stock.size }}", quantity: {{ size_stock.quantity }}, display: "{{ size_stock.display }}" }{% if not forloop.last %},{% endif %}
+          {% for size_stock in variant.size_stocks.all %}
+            { id: {{ size_stock.id }}, size: "{{ size_stock.size }}", quantity: {{ size_stock.quantity }}, display: "{{ size_stock.get_size_display }}" }{% if not forloop.last %},{% endif %}
           {% endfor %}
         ]
       }{% if not forloop.last %},{% endif %}
@@ -295,20 +297,19 @@
     const colorOptions = document.querySelectorAll("#colorOptions div");
     const thumbnailContainer = document.getElementById("thumbnailContainer");
     const addToCartBtn = document.getElementById("addToCartBtn");
-    const formSize = document.getElementById("formSize");
-    const formColor = document.getElementById("formColor");
+    const formSizeStock = document.getElementById("formSizeStock");
+    const formColorVariant = document.getElementById("formColorVariant");
     const formQty = document.getElementById("formQuantity");
     const qtyInput = document.getElementById("quantity");
     const incBtn = document.getElementById("increaseQty");
     const decBtn = document.getElementById("decreaseQty");
-    const singleColorInput = document.getElementById("singleColor");
+    const singleColorVariantInput = document.getElementById("singleColorVariant");
     const wishlistForm = document.getElementById("wishlistForm");
     const wishlistBtn = document.getElementById("wishlistBtn");
     const wishlistIcon = document.getElementById("wishlistIcon");
 
-    let selectedColor = singleColorInput ? singleColorInput.value.trim() : (colorVariants.length > 0 ? colorVariants[0].name : null);
-    let selectedVariantId = singleColorInput ? colorVariants.find(v => v.name === selectedColor)?.id : (colorVariants.length > 0 ? colorVariants[0].id : null);
-    let selectedSize = null;
+    let selectedColorVariantId = singleColorVariantInput ? parseInt(singleColorVariantInput.value) : (colorVariants.length > 0 ? colorVariants[0].id : null);
+    let selectedSizeStockId = null;
     let maxQuantity = 0;
 
     // Update thumbnails for selected color
@@ -325,22 +326,22 @@
       }
     }
 
-    // Update size options for selected color
-    function updateSizeOptions(colorName) {
-      const variant = colorVariants.find(v => v && v.name && v.name.toLowerCase() === colorName.toLowerCase());
+    // Update size options for selected color variant
+    function updateSizeOptions(colorVariantId) {
+      const variant = colorVariants.find(v => v.id === colorVariantId);
       sizeOptionsContainer.innerHTML = "";
       if (variant && variant.sizes && variant.sizes.length > 0) {
         variant.sizes.forEach(size => {
           const div = document.createElement("div");
           div.className = `size-option ${size.quantity > 0 ? '' : 'out-of-stock'}`;
-          div.dataset.size = size.size;
+          div.dataset.sizeStockId = size.id;
           div.dataset.stock = size.quantity;
           div.textContent = size.display;
           div.onclick = function() { selectSize(this); };
           sizeOptionsContainer.appendChild(div);
         });
-        selectedSize = null;
-        formSize.value = "";
+        selectedSizeStockId = null;
+        formSizeStock.value = "";
         updateStockAndButtons();
       } else {
         sizeOptionsContainer.innerHTML = '<p class="text-sm text-red-600">No sizes available</p>';
@@ -349,20 +350,19 @@
 
     // Handle color selection
     function selectColor(element) {
-      if (!element || element.classList.contains("opacity-50") || !element.dataset.color) return;
+      if (!element || element.classList.contains("opacity-50") || !element.dataset.variantId) return;
       colorOptions.forEach(o => o.classList.remove("ring-2", "ring-indigo-500"));
       element.classList.add("ring-2", "ring-indigo-500");
-      selectedColor = element.dataset.color.trim();
-      selectedVariantId = parseInt(element.dataset.variantId);
-      formColor.value = selectedColor;
-      wishlistForm.action = `/wishlist/add/${selectedVariantId}/`;
-      wishlistBtn.dataset.variantId = selectedVariantId;
-      const variant = colorVariants.find(v => v && v.name && v.name.toLowerCase() === selectedColor.toLowerCase());
+      selectedColorVariantId = parseInt(element.dataset.variantId);
+      formColorVariant.value = selectedColorVariantId;
+      wishlistForm.action = `/wishlist/add/${selectedColorVariantId}/`;
+      wishlistBtn.dataset.variantId = selectedColorVariantId;
+      const variant = colorVariants.find(v => v.id === selectedColorVariantId);
       if (variant && variant.images && variant.images.length > 0) {
         updateThumbnails(variant.images);
         changeImage(variant.images[0]);
       }
-      updateSizeOptions(selectedColor);
+      updateSizeOptions(selectedColorVariantId);
       updateWishlistButton();
       updateStockAndButtons();
     }
@@ -372,8 +372,8 @@
       if (element.classList.contains("out-of-stock")) return;
       sizeOptionsContainer.querySelectorAll(".size-option").forEach(o => o.classList.remove("selected"));
       element.classList.add("selected");
-      selectedSize = element.dataset.size;
-      formSize.value = selectedSize;
+      selectedSizeStockId = parseInt(element.dataset.sizeStockId);
+      formSizeStock.value = selectedSizeStockId;
       maxQuantity = Math.min(parseInt(element.dataset.stock), 5);
       qtyInput.value = 1;
       formQty.value = 1;
@@ -382,8 +382,8 @@
 
     // Update button states
     function updateStockAndButtons() {
-      const hasColor = !!selectedColor;
-      const hasSize = !!selectedSize;
+      const hasColor = !!selectedColorVariantId;
+      const hasSize = !!selectedSizeStockId;
       const quantity = parseInt(qtyInput.value);
 
       incBtn.disabled = !hasSize || quantity >= maxQuantity;
@@ -406,19 +406,19 @@
 
     // Update wishlist button state
     function updateWishlistButton() {
-      const isWishlisted = wishlistedVariants.includes(selectedVariantId);
+      const isWishlisted = wishlistedVariants.includes(selectedColorVariantId);
       wishlistBtn.classList.toggle("wishlisted", isWishlisted);
-      wishlistBtn.setAttribute("aria-label", isWishlisted ? `Remove ${selectedColor} from wishlist` : `Add ${selectedColor} to wishlist`);
+      wishlistBtn.setAttribute("aria-label", isWishlisted ? `Remove ${selectedColorVariantId} from wishlist` : `Add ${selectedColorVariantId} to wishlist`);
     }
 
     // Handle wishlist toggle
     wishlistBtn.addEventListener("click", async function (e) {
       e.preventDefault();
-      if (!selectedVariantId) return;
+      if (!selectedColorVariantId) return;
 
       const formData = new FormData(wishlistForm);
       try {
-        const response = await fetch(`/wishlist/add/${selectedVariantId}/`, {
+        const response = await fetch(`/wishlist/add/${selectedColorVariantId}/`, {
           method: "POST",
           headers: {
             'X-Requested-With': 'XMLHttpRequest'
@@ -428,9 +428,9 @@
         const data = await response.json();
         if (data.success) {
           if (data.added) {
-            wishlistedVariants.push(selectedVariantId);
+            wishlistedVariants.push(selectedColorVariantId);
           } else {
-            wishlistedVariants.splice(wishlistedVariants.indexOf(selectedVariantId), 1);
+            wishlistedVariants.splice(wishlistedVariants.indexOf(selectedColorVariantId), 1);
           }
           updateWishlistButton();
           showToast(data.message, data.added ? "success" : "info");
@@ -517,23 +517,21 @@
 
     // Initial state
     if (colorOptions.length > 0) {
-      selectedColor = colorOptions[0].dataset.color.trim();
-      selectedVariantId = parseInt(colorOptions[0].dataset.variantId);
-      formColor.value = selectedColor;
-      wishlistForm.action = `/wishlist/add/${selectedVariantId}/`;
+      selectedColorVariantId = parseInt(colorOptions[0].dataset.variantId);
+      formColorVariant.value = selectedColorVariantId;
+      wishlistForm.action = `/wishlist/add/${selectedColorVariantId}/`;
       selectColor(colorOptions[0]);
-    } else if (singleColorInput && colorVariants.length > 0) {
-      selectedColor = singleColorInput.value.trim();
-      selectedVariantId = colorVariants.find(v => v.name === selectedColor)?.id;
-      formColor.value = selectedColor;
-      wishlistForm.action = `/wishlist/add/${selectedVariantId}/`;
-      const variant = colorVariants.find(v => v && v.name && v.name.toLowerCase() === selectedColor.toLowerCase());
+    } else if (singleColorVariantInput && colorVariants.length > 0) {
+      selectedColorVariantId = parseInt(singleColorVariantInput.value);
+      formColorVariant.value = selectedColorVariantId;
+      wishlistForm.action = `/wishlist/add/${selectedColorVariantId}/`;
+      const variant = colorVariants.find(v => v.id === selectedColorVariantId);
       if (variant) {
         if (variant.images && variant.images.length > 0) {
           updateThumbnails(variant.images);
           changeImage(variant.images[0]);
         }
-        updateSizeOptions(selectedColor);
+        updateSizeOptions(selectedColorVariantId);
       }
     }
     updateWishlistButton();

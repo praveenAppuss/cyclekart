@@ -72,7 +72,7 @@ class ProductSizeStock(models.Model):
         ('L', 'Large'),
     ]
 
-    color_variant = models.ForeignKey(ProductColorVariant, on_delete=models.CASCADE, related_name='size_stocks',null=True, blank=True)
+    color_variant = models.ForeignKey(ProductColorVariant, on_delete=models.CASCADE, related_name='size_stocks', null=True, blank=True)
     size = models.CharField(max_length=1, choices=SIZE_CHOICES)
     quantity = models.PositiveIntegerField(default=0)
 
@@ -81,3 +81,6 @@ class ProductSizeStock(models.Model):
 
     def __str__(self):
         return f"{self.color_variant} - {self.size} - Qty: {self.quantity}"
+
+    def get_size_display(self):
+        return dict(self.SIZE_CHOICES).get(self.size, self.size)
