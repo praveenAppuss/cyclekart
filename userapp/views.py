@@ -360,7 +360,7 @@ def product_detail(request, product_id):
                 'id': stock.id,  # Added to match template's size_stock_id
                 'size': stock.size,
                 'quantity': stock.quantity,
-                'display': stock.get_size_display()  # Use full display name
+                'display': stock.size  
             }
             for stock in variant.size_stocks.all()
         ]
@@ -376,6 +376,8 @@ def product_detail(request, product_id):
     }
     
     return render(request, 'product_detail.html', context)
+
+
 # user profile section ---------------------------------------------------
 
 @login_required
@@ -696,7 +698,7 @@ def wishlist_view(request):
             color_variant=item.color_variant, quantity__gt=0
         ).values('id', 'size', 'quantity')
         size_map[item.color_variant.id] = [
-            {'id': s['id'], 'size': s['size'], 'display': dict(ProductSizeStock.SIZE_CHOICES)[s['size']]}
+            {'id': s['id'], 'size': s['size'], 'display': s['size']}  # Use raw size for display
             for s in sizes
         ]
 
@@ -780,7 +782,7 @@ def add_to_cart_from_wishlist(request):
             return redirect('wishlist')
 
         if stock_entry.quantity < 1:
-            messages.warning(request, f"Size {stock_entry.get_size_display()} in color {color_variant.name} is out of stock.")
+            messages.warning(request, f"Size {stock_entry.size} in color {color_variant.name} is out of stock.")
             return redirect('wishlist')
 
         max_quantity = min(stock_entry.quantity, 5)
@@ -800,20 +802,19 @@ def add_to_cart_from_wishlist(request):
         if not created:
             new_quantity = cart_item.quantity + quantity
             if new_quantity > max_quantity:
-                messages.warning(request, f"Cannot add more. Max limit is {max_quantity} for {color_variant.name} {stock_entry.get_size_display()}.")
+                messages.warning(request, f"Cannot add more. Max limit is {max_quantity} for {color_variant.name} {stock_entry.size}.")
             else:
                 cart_item.quantity = new_quantity
                 cart_item.save()
-                messages.success(request, f"{product.name} ({color_variant.name}, {stock_entry.get_size_display()}) quantity updated in cart.")
+                messages.success(request, f"{product.name} ({color_variant.name}, {stock_entry.size}) quantity updated in cart.")
         else:
             cart_item.quantity = quantity
             cart_item.save()
-            messages.success(request, f"{product.name} ({color_variant.name}, {stock_entry.get_size_display()}) added to cart.")
+            messages.success(request, f"{product.name} ({color_variant.name}, {stock_entry.size}) added to cart.")
 
         Wishlist.objects.filter(user=request.user, color_variant=color_variant).delete()
         return redirect('cart_view')
     return redirect('wishlist')
-
 
 # ------------checkout view---------------------------------------------------
 @login_required

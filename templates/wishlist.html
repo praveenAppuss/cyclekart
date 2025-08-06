@@ -53,12 +53,12 @@
             </div>
           </div>
           <div class="text-right">
-            {% if item.discount_percentage > 0 %}
-              <p class="text-sm text-red-500 line-through">₹{{ item.color_variant.product.price|floatformat:0 }}</p>
-              <p class="text-base font-semibold text-gray-800">₹{{ item.color_variant.product.discount_price|floatformat:0 }}</p>
+            <p class="text-sm text-red-500 line-through">₹{{ item.color_variant.product.price|floatformat:0 }}</p>
+            <p class="text-base font-semibold text-gray-800">
+              ₹{{ item.color_variant.product.discount_price|default:item.color_variant.product.price|floatformat:0 }}
+            </p>
+            {% if item.discount_percentage > 0 and item.color_variant.product.discount_price and item.color_variant.product.discount_price < item.color_variant.product.price %}
               <p class="text-sm text-green-600">(-{{ item.discount_percentage|floatformat:0 }}%)</p>
-            {% else %}
-              <p class="text-base font-semibold text-gray-800">₹{{ item.color_variant.product.price|floatformat:0 }}</p>
             {% endif %}
           </div>
         </div>

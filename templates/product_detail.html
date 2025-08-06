@@ -275,7 +275,7 @@
         images: [{% for image in variant.images.all %}"{{ image.image.url }}"{% if not forloop.last %},{% endif %}{% endfor %}],
         sizes: [
           {% for size_stock in variant.size_stocks.all %}
-            { id: {{ size_stock.id }}, size: "{{ size_stock.size }}", quantity: {{ size_stock.quantity }}, display: "{{ size_stock.get_size_display }}" }{% if not forloop.last %},{% endif %}
+            { id: {{ size_stock.id }}, size: "{{ size_stock.size }}", quantity: {{ size_stock.quantity }}, display: "{{ size_stock.size }}" }{% if not forloop.last %},{% endif %}
           {% endfor %}
         ]
       }{% if not forloop.last %},{% endif %}
