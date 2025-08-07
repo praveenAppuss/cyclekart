@@ -1,14 +1,14 @@
 {% extends 'header.html' %}
 {% load static %}
-
+{% load custom_filters %}
 {% block content %}
 <div class="bg-slate-50 py-12 px-4 sm:px-10">
     <div class="max-w-6xl mx-auto">
 
         <!-- Breadcrumb -->
-        <div class="text-sm text-gray-500 mb-6">
-            <span class="text-black font-medium">Checkout</span>  / 
-            <span>cyclekart</span> > <span class="text-gray-700 font-semibold">Checkout</span>
+        <div class="text-md text-gray-500 mb-6">
+            <span class="text-black font-bold">Checkout</span>  
+            
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
@@ -19,7 +19,7 @@
                 <!-- Address -->
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-semibold text-slate-800">Shipping address</h2>
-                    <button onclick="toggleModal()"
+                    <button onclick="toggleModal('addModal')"
                         class="px-4 py-1.5 bg-black text-white text-sm rounded hover:bg-gray-800">+ Add new</button>
                 </div>
 
@@ -33,15 +33,15 @@
                             data-mobile="{{ address.mobile }}" data-address_line="{{ address.address_line }}"
                             data-district="{{ address.district }}" data-state="{{ address.state }}"
                             data-pin_code="{{ address.pin_code }}" data-country="{{ address.country }}"
-                            {% if forloop.first %}selected{% endif %}>
-                            {{ address.full_name }}
+                            {% if address.is_default %}selected{% endif %}>
+                            {{ address.full_name }} 
                         </option>
                         {% endfor %}
                     </select>
                 </div>
 
                 <!-- Selected Address -->
-                <form id="addressForm" method="post" action="{% url 'update_address' addresses.0.id %}">
+                <form id="addressForm" method="post" action="{% url 'update_address' addresses.0.id %}?next=/checkout/">
                     {% csrf_token %}
                     <div class="grid grid-cols-2 gap-4 text-sm">
                         <input type="text" id="address_line" name="address_line" placeholder="Street Address"
@@ -65,8 +65,6 @@
                             class="bg-black text-white px-4 py-2 rounded">Edit</button>
                         <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded hidden"
                             id="saveBtn">Save</button>
-                        <a id="deleteLink" href="{% url 'delete_address' addresses.0.id %}"
-                            class="text-red-600 text-xl ml-auto">Delete</a>
                     </div>
                 </form>
                 {% else %}
@@ -77,34 +75,19 @@
                 <form id="checkoutForm" method="post" action="{% url 'place_order' %}">
                     {% csrf_token %}
                     <!-- Hidden input for selected address ID -->
-                    <input type="hidden" name="selected_address" id="hiddenAddressId" value="{{ addresses.0.id }}">
+                    <input type="hidden" name="selected_address" id="hiddenAddressId" value="{% if addresses %}{{ addresses.0.id }}{% endif %}">
 
                     <!-- Payment Methods -->
                     <div class="mt-9 border-0 shadow rounded p-4">
                         <h2 class="text-base font-semibold mb-2">Payment Methods</h2>
                         <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
                         <div class="space-y-3 text-sm">
-                            <!-- <label class="flex items-center gap-2 text-sm">
-                                <input type="radio" name="payment_method" value="card" class="accent-blue-600" required>
-                                <i data-lucide="credit-card" class="w-4 h-4 text-gray-600"></i>
-                                <span>Debit Card / Credit Card</span>
-                            </label>
-                            <label class="flex items-center gap-2 text-sm">
-                                <input type="radio" name="payment_method" value="net_banking" class="accent-blue-600">
-                                <i data-lucide="landmark" class="w-4 h-4 text-gray-600"></i>
-                                <span>Net Banking</span>
-                            </label>
-                            <label class="flex items-center gap-2 text-sm">
-                                <input type="radio" name="payment_method" value="wallet" class="accent-blue-600">
-                                <i data-lucide="wallet" class="w-4 h-4 text-gray-600"></i>
-                                <span>Wallet</span>
-                            </label> -->
                             <label class="flex items-center gap-2 text-sm">
                                 {% if final_total > 100000 %}
                                 <input type="radio" disabled class="accent-blue-600">
                                 <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
                                 <span class="line-through text-gray-400">Cash on Delivery</span>
-                                <span class="text-red-500 text-xs ml-2">(COD not available for orders above ₹10000)</span>
+                                <span class="text-red-500 text-xs ml-2">(COD not available for orders above ₹100000)</span>
                                 {% else %}
                                 <input type="radio" name="payment_method" value="cod" class="accent-blue-600" checked>
                                 <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
@@ -125,14 +108,27 @@
             <div class="bg-white rounded-xl p-6 shadow h-fit sticky top-20">
                 <h3 class="text-lg font-semibold text-slate-800 mb-4">Your Order</h3>
 
-                <!-- Cart items thumbnails -->
-                <div class="flex items-center space-x-3 mb-4">
+                <!-- Cart Items List -->
+                <div class="space-y-4 mb-4">
                     {% for item in cart_items %}
-                    <img src="{{ item.product.thumbnail.url }}" class="w-10 h-10 object-cover rounded-full border"
-                        alt="{{ item.product.name }}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <img src="{% if item.color_variant and item.color_variant.images.first %}{{ item.color_variant.images.first.image.url }}{% else %}{{ item.product.thumbnail.url }}{% endif %}" class="w-10 h-10 object-cover rounded border"
+                                alt="{{ item.product.name }}" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
+                            <div>
+                                <p class="text-xs font-small"> {{ item.size_stock.size }}</p>
+                                <p class="text-xs text-gray-500">Qty: {{ item.quantity }}</p>
+                            </div>
+                        </div>
+                        <div class="text-sm font-semibold">
+                            {% if item.product.discount_price %}
+                                ₹{{ item.product.discount_price|floatformat:2 }}
+                            {% else %}
+                                ₹{{ item.product.price|mul:item.quantity|floatformat:2 }}
+                            {% endif %}
+                        </div>
+                    </div>
                     {% endfor %}
-                    <a href="{% url 'cart_view' %}"
-                        class="ml-auto text-sm text-slate-600 border px-2 py-1 rounded hover:bg-slate-100">Edit Cart</a>
                 </div>
 
                 <!-- Totals -->
@@ -150,7 +146,7 @@
                         <span>Free</span>
                     </div>
                     <div class="flex justify-between">
-                        <span>Tax:</span>
+                        <span>Tax (5%):</span>
                         <span>₹{{ taxes|floatformat:2 }}</span>
                     </div>
                     <hr class="my-2">
@@ -158,6 +154,13 @@
                         <span>Total</span>
                         <span>₹{{ final_total|floatformat:2 }}</span>
                     </div>
+                </div>
+
+                <!-- Edit Cart Button -->
+                <div class="mt-6">
+                    <a href="{% url 'cart_view' %}" class="w-full inline-block bg-gray-200 text-gray-800 py-2 px-4 rounded-lg text-center text-sm font-medium hover:bg-gray-300">
+                        Edit Cart
+                    </a>
                 </div>
 
                 <!-- Coupon -->
@@ -174,12 +177,12 @@
     </div>
 </div>
 
-<!-- Modal -->
+<!-- Modal for Adding Address -->
 <div id="addModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
     <div class="bg-white rounded p-6 w-full max-w-xl relative">
-        <button onclick="toggleModal()" class="absolute top-2 right-4 text-xl">✖</button>
+        <button onclick="toggleModal('addModal')" class="absolute top-2 right-4 text-xl">✖</button>
         <h3 class="text-lg font-bold mb-4">Add New Address</h3>
-        <form method="post" action="{% url 'add_address' %}">
+        <form method="post" action="{% url 'add_address' %}?next=/checkout/">
             {% csrf_token %}
             <div class="grid grid-cols-2 gap-4">
                 <input name="full_name" placeholder="Full Name" required class="border p-2 rounded">
@@ -191,17 +194,54 @@
                 <input name="country" placeholder="Country" required class="border p-2 rounded">
             </div>
             <div class="mt-4 flex justify-end gap-2">
-                <button type="button" onclick="toggleModal()" class="px-4 py-2 border rounded">Cancel</button>
+                <button type="button" onclick="toggleModal('addModal')" class="px-4 py-2 border rounded">Cancel</button>
                 <button type="submit" class="bg-black text-white px-4 py-2 rounded">Save Address</button>
             </div>
         </form>
     </div>
 </div>
 
+<!-- Modal for Adding Address -->
+<div id="addModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
+    <div class="bg-white rounded p-6 w-full max-w-xl relative">
+        <button onclick="toggleModal('addModal')" class="absolute top-2 right-4 text-xl">✖</button>
+        <h3 class="text-lg font-bold mb-4">Add New Address</h3>
+        <form method="post" action="{% url 'add_address' %}?next=/checkout/">
+            {% csrf_token %}
+            <div class="grid grid-cols-2 gap-4">
+                <input name="full_name" placeholder="Full Name" required class="border p-2 rounded">
+                <input name="mobile" placeholder="Mobile" required class="border p-2 rounded">
+                <input name="address_line" placeholder="Street/Area" required class="border p-2 rounded">
+                <input name="district" placeholder="District" required class="border p-2 rounded">
+                <input name="state" placeholder="State" required class="border p-2 rounded">
+                <input name="pin_code" placeholder="Pincode" required class="border p-2 rounded">
+                <input name="country" placeholder="Country" required class="border p-2 rounded">
+            </div>
+            <div class="mt-4 flex justify-end gap-2">
+                <button type="button" onclick="toggleModal('addModal')" class="px-4 py-2 border rounded">Cancel</button>
+                <button type="submit" class="bg-black text-white px-4 py-2 rounded">Save Address</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal for Validation Error -->
+<div id="validationModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
+    <div class="bg-white rounded p-6 w-full max-w-md text-center relative">
+        <button onclick="toggleModal('validationModal')" class="absolute top-2 right-4 text-xl">✖</button>
+        <h3 class="text-lg font-bold mb-4">Validation Error</h3>
+        <p class="text-sm text-gray-700">Please select an address and payment method.</p>
+        <button onclick="toggleModal('validationModal')" class="mt-4 bg-gray-900 text-white px-4 py-2 rounded-lg">OK</button>
+    </div>
+</div>
+
 <!-- Scripts -->
 <script>
-    function toggleModal() {
-        document.getElementById("addModal").classList.toggle("hidden");
+    function toggleModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.toggle("hidden");
+        }
     }
 
     function makeEditable() {
@@ -214,8 +254,7 @@
         const option = select.selectedOptions[0];
         if (!option) return;
         const addressId = option.value;
-        document.getElementById("addressForm").action = `/addresses/update/${addressId}/`;
-        document.getElementById("deleteLink").href = `/addresses/delete/${addressId}/`;
+        document.getElementById("addressForm").action = `/addresses/update/${addressId}/?next=/checkout/`;
         document.getElementById("hiddenAddressId").value = addressId; // Update hidden input
 
         document.getElementById("full_name").value = option.dataset.full_name;
@@ -239,7 +278,7 @@
             const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
             if (!addressId || !paymentMethod) {
                 e.preventDefault();
-                alert('Please select an address and payment method');
+                toggleModal('validationModal'); // Show validation modal instead of alert
             }
         });
     });

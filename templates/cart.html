@@ -5,17 +5,6 @@
 <div class="min-h-screen bg-white py-10 px-4">
   <div class="max-w-6xl mx-auto">
 
-    <!-- Toast Messages -->
-    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
-      {% if messages %}
-        {% for message in messages %}
-          <div data-message="{{ message }}" class="toast p-4 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 {% if message.tags == 'error' %}bg-red-100 text-red-800{% elif message.tags == 'warning' %}bg-yellow-100 text-yellow-800{% else %}bg-green-100 text-green-800{% endif %}">
-            {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
-    </div>
-
     <h2 class="text-xl font-bold text-gray-800 mb-6">Your Cart</h2>
 
     {% if cart_items %}
@@ -48,7 +37,10 @@
             </div>
           </div>
           <div class="flex items-center space-x-5">
-            <span class="text-md font-semibold text-gray-900" data-subtotal>₹{{ item.subtotal|floatformat:0 }}</span>
+            <!-- Display only the original price (price field) -->
+            <span class="text-md font-semibold text-gray-900" data-unit-price>
+              ₹{{ item.product.price|floatformat:0 }}
+            </span>
             <div class="flex items-center space-x-2">
               {% if item.is_available %}
                 <button onclick="updateQuantity('{{ item.id }}', 'decrement')"
@@ -133,17 +125,11 @@
   </div>
 </div>
 
-<!-- JavaScript for Toasts, Modal, and AJAX Quantity Updates -->
+<!-- JavaScript for SweetAlert2 Toast and Other Functionality -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    const toasts = document.querySelectorAll('.toast');
-    toasts.forEach(toast => {
-      setTimeout(() => toast.style.opacity = '1', 100);
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 300);
-      }, 2500);
-    });
+    // No toast initialization needed anymore
   });
 
   function openRemoveModal(itemId) {
@@ -161,26 +147,49 @@
   }
 
   function showToast(message, type) {
-    const toastContainer = document.getElementById("toast-container");
-    const toast = document.createElement("div");
-    toast.className = `toast p-4 rounded-lg shadow-lg opacity-0 transition-opacity duration-300 ${
-      type === "success" ? "bg-green-100 text-green-800" :
-      type === "error" ? "bg-red-100 text-red-800" :
-      "bg-yellow-100 text-yellow-800"
-    }`;
-    toast.textContent = message;
-    toastContainer.appendChild(toast);
-    setTimeout(() => toast.style.opacity = '1', 100);
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 300);
-    }, 2500);
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer);
+        toast.addEventListener('mouseleave', Swal.resumeTimer);
+      }
+    });
+
+    if (type === "success") {
+      Toast.fire({
+        icon: 'success',
+        title: message,
+        customClass: {
+          popup: 'animated fadeInDown'
+        }
+      });
+    } else if (type === "error") {
+      Toast.fire({
+        icon: 'error',
+        title: message,
+        customClass: {
+          popup: 'animated fadeInDown'
+        }
+      });
+    } else { // warning
+      Toast.fire({
+        icon: 'warning',
+        title: message,
+        customClass: {
+          popup: 'animated fadeInDown'
+        }
+      });
+    }
   }
 
   async function updateQuantity(itemId, action) {
     const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
     const quantityDisplay = itemElement.querySelector('.quantity-display');
-    const subtotalDisplay = itemElement.querySelector('[data-subtotal]');
+    const unitPriceDisplay = itemElement.querySelector('[data-unit-price]'); // Reference to the fixed price
     const incrementBtn = itemElement.querySelector('.increment-btn');
     const decrementBtn = itemElement.querySelector('.decrement-btn');
     const maxQuantity = parseInt(incrementBtn.dataset.maxQuantity || 5);
@@ -196,7 +205,7 @@
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRFToken': '{{ csrf_token }}'
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         },
         body: `action=${action}`
       });
@@ -204,7 +213,7 @@
       const data = await response.json();
       if (data.success) {
         quantityDisplay.textContent = data.quantity;
-        subtotalDisplay.textContent = `₹${data.subtotal.toFixed(0)}`;
+        // Do not update unitPriceDisplay, keep it fixed
         showToast(data.message, 'success');
 
         // Update button states
@@ -219,6 +228,12 @@
         decrementBtn.classList.toggle('cursor-not-allowed', newQuantity <= 1);
         decrementBtn.classList.toggle('bg-gray-200', newQuantity > 1);
         decrementBtn.classList.toggle('hover:bg-gray-300', newQuantity > 1);
+
+        // Update order summary
+        document.querySelector('[data-cart-total]').textContent = `₹${data.cart_total.toFixed(0)}`;
+        document.querySelector('[data-total-discount]').textContent = `-₹${data.total_discount.toFixed(0)}`;
+        document.querySelector('[data-taxes]').textContent = `₹${data.taxes.toFixed(2)}`;
+        document.querySelector('[data-final-total]').textContent = `₹${data.total.toFixed(2)}`;
       } else {
         showToast(data.message, 'error');
       }

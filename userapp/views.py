@@ -428,8 +428,7 @@ def update_profile(request):
     
 
 # Address management section---------------------------------
-
-@login_required
+@login_required(login_url='user_login')
 def address_list(request):
     addresses = Address.objects.filter(user=request.user)
     form = AddressForm()
@@ -455,30 +454,36 @@ def address_list(request):
     }
     return render(request, 'address_page.html', context)
 
-
-
-@login_required
+@login_required(login_url='user_login')
 def add_address(request):
     if request.method == 'POST':
         form = AddressForm(request.POST)
         if form.is_valid():
             address = form.save(commit=False)
             address.user = request.user
+            # Handle default address logic
+            is_default = not Address.objects.filter(user=request.user, is_default=True).exists()
+            address.is_default = is_default
             address.save()
-            return redirect('address_list')  
+            if is_default:
+                Address.objects.filter(user=request.user).exclude(id=address.id).update(is_default=False)
+            next_url = request.GET.get('next', 'address_list')
+            return redirect(next_url)  # Redirect to /checkout/ if next is provided
     return redirect('address_list')
 
-@login_required
+@login_required(login_url='user_login')
 def update_address(request, pk):
     address = get_object_or_404(Address, pk=pk, user=request.user)
     if request.method == 'POST':
         form = AddressForm(request.POST, instance=address)
         if form.is_valid():
             form.save()
-            return redirect('address_list')
+            next_url = request.GET.get('next', 'address_list')
+            return redirect(next_url)  # Redirect to /checkout/ if next is provided
     return redirect('address_list')
 
-@login_required
+# Keep delete_address but exclude it from checkout context (no change needed here)
+@login_required(login_url='user_login')
 def delete_address(request, pk):
     address = get_object_or_404(Address, pk=pk, user=request.user)
     address.delete()
@@ -576,29 +581,28 @@ def cart_view(request):
         'product__color_variants__size_stocks'
     ).all() if cart else []
 
-    total_subtotal = Decimal('0')
+    total_subtotal = Decimal('0')  # Based on original price * quantity
     total_discount = Decimal('0')
     has_unavailable_items = False
     taxes = Decimal('0')
-    TAX_RATE = Decimal('0.05')  # Configurable tax rate
+    TAX_RATE = Decimal('0.05')  # 5% tax rate
 
     for item in cart_items:
-        # Calculate subtotal (use discount_price if available)
-        item_price = item.product.discount_price if item.product.discount_price and item.product.discount_price < item.product.price else item.product.price
-        item.subtotal = item.quantity * item_price
+        # Calculate subtotal based on original price
+        item.subtotal = item.quantity * item.product.price
         total_subtotal += item.subtotal
-
+        
         # Get product image and color variant
-        item.color_variant = item.color_variant  # Already fetched via select_related
+        item.color_variant = item.color_variant
         item.image = item.color_variant.images.first().image.url if item.color_variant.images.exists() else item.product.thumbnail.url if item.product.thumbnail else ''
         
         # Check stock and availability
-        item.size_stock = item.size_stock  # Already fetched via select_related
+        item.size_stock = item.size_stock
         item.stock = item.size_stock.quantity
-        item.max_quantity = min(item.stock, 5)  # Max 5 items
-        item.size_display = item.size_stock.get_size_display()  # Use get_size_display for size label
+        item.max_quantity = min(item.stock, 5)
+        item.size_display = item.size_stock.get_size_display()
 
-        # Check if item is unavailable (out of stock, product/category blocked or deleted)
+        # Check if item is unavailable
         if (item.product.is_deleted or not item.product.is_active or 
             item.product.category.is_deleted or not item.product.category.is_active or 
             item.quantity > item.stock):
@@ -609,13 +613,13 @@ def cart_view(request):
 
         # Calculate savings (discount) for each item
         if item.product.discount_price and item.product.discount_price < item.product.price:
-            item_savings = item.product.price - item.product.discount_price
-            item.savings = item_savings * item.quantity
+            item_savings = (item.product.price - item.product.discount_price) * item.quantity
+            item.savings = item_savings
             total_discount += item.savings
         else:
             item.savings = Decimal('0')
 
-    # Calculate taxes (5% of subtotal)
+    # Calculate taxes (5% of subtotal based on original price)
     taxes = total_subtotal * TAX_RATE
     # Calculate final total (subtotal + taxes - total_discount)
     final_total = total_subtotal + taxes - total_discount
@@ -628,8 +632,6 @@ def cart_view(request):
         'total': final_total,
         'has_unavailable_items': has_unavailable_items,
     })
-
-
 
 @login_required(login_url='user_login')
 def update_cart_quantity(request, cart_item_id):
@@ -662,8 +664,18 @@ def update_cart_quantity(request, cart_item_id):
         cart_item.quantity = new_quantity
         cart_item.save()
 
-        item_price = cart_item.product.discount_price if cart_item.product.discount_price and cart_item.product.discount_price < cart_item.product.price else cart_item.product.price
-        subtotal = new_quantity * item_price
+        # Recalculate subtotal based on original price
+        subtotal = new_quantity * cart_item.product.price
+        # Calculate savings (discount) for the updated quantity
+        savings = (cart_item.product.price - (cart_item.product.discount_price or cart_item.product.price)) * new_quantity if cart_item.product.discount_price and cart_item.product.discount_price < cart_item.product.price else Decimal('0')
+
+        # Recalculate cart totals
+        cart = cart_item.cart
+        cart_items = cart.items.select_related('product', 'size_stock').all()
+        new_cart_total = sum(item.quantity * item.product.price for item in cart_items)  # Subtotal based on original price
+        new_total_discount = sum((item.product.price - (item.product.discount_price or item.product.price)) * item.quantity for item in cart_items if item.product.discount_price and item.product.discount_price < item.product.price)
+        new_taxes = new_cart_total * Decimal('0.05')
+        new_total = new_cart_total + new_taxes - new_total_discount
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             storage = get_messages(request)
@@ -672,6 +684,11 @@ def update_cart_quantity(request, cart_item_id):
                 'success': True,
                 'quantity': new_quantity,
                 'subtotal': float(subtotal),
+                'savings': float(savings),
+                'cart_total': float(new_cart_total),
+                'total_discount': float(new_total_discount),
+                'taxes': float(new_taxes),
+                'total': float(new_total),
                 'message': message
             })
         return redirect('cart_view')
@@ -816,8 +833,10 @@ def add_to_cart_from_wishlist(request):
         return redirect('cart_view')
     return redirect('wishlist')
 
+
+
 # ------------checkout view---------------------------------------------------
-@login_required
+@login_required(login_url='user_login')
 def checkout_view(request):
     user = request.user
 
@@ -828,7 +847,7 @@ def checkout_view(request):
     # Fetch cart and cart items
     try:
         cart = Cart.objects.get(user=user)
-        cart_items = CartItem.objects.filter(cart=cart, product__is_active=True)
+        cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
     except Cart.DoesNotExist:
         cart = None
         cart_items = []
@@ -839,9 +858,8 @@ def checkout_view(request):
     total_quantity = 0
 
     for item in cart_items:
-        product = item.product
-        original_price = product.price
-        discount_price = product.discount_price or original_price
+        original_price = item.product.price
+        discount_price = item.product.discount_price if item.product.discount_price and item.product.discount_price < original_price else original_price
         quantity = item.quantity
 
         item_total = original_price * quantity
@@ -851,10 +869,9 @@ def checkout_view(request):
         total_discount += item_discount
         total_quantity += quantity
 
-    shipping_cost = 0  
-    taxes = subtotal * Decimal('0.05')  
-    
-    final_total = subtotal + shipping_cost+taxes
+    shipping_cost = 0  # Free shipping
+    taxes = subtotal * Decimal('0.05')  # 5% tax
+    final_total = subtotal - total_discount + shipping_cost + taxes
 
     context = {
         'addresses': addresses,
@@ -865,7 +882,7 @@ def checkout_view(request):
         'shipping_cost': shipping_cost,
         'final_total': final_total,
         'total_quantity': total_quantity,
-        'taxes':taxes,
+        'taxes': taxes,
     }
 
     return render(request, 'checkout.html', context)
@@ -900,7 +917,7 @@ def place_order(request):
         # Get the user's cart
         cart = get_object_or_404(Cart, user=request.user)
         cart_items = CartItem.objects.filter(cart=cart)
-        logger.debug(f"Cart items: {[(item.product.name, item.size, item.quantity) for item in cart_items]}")
+        logger.debug(f"Cart items: {[(item.product.name, item.size_stock.size, item.quantity) for item in cart_items]}")
 
         # Check if cart is empty
         if not cart_items.exists():
@@ -908,30 +925,30 @@ def place_order(request):
             logger.error("Cart is empty")
             return redirect('cart_view')
 
-        # Validate COD for orders above ₹10000
-        total = calculate_cart_total(cart_items)  # Assume this is defined
+        # Calculate total
+        def calculate_cart_total(items):
+            total = 0
+            for item in items:
+                discount_price = item.product.discount_price if item.product.discount_price and item.product.discount_price < item.product.price else item.product.price
+                total += discount_price * item.quantity
+            return total
+
+        total = calculate_cart_total(cart_items)
         logger.debug(f"Calculated total: {total}")
-        if payment_method == 'cod' and total > 100000:
+
+        # Validate COD for orders above ₹100000
+        if payment_method == 'cod' and total > Decimal('100000'):
             messages.error(request, "Cash on Delivery not available for orders above ₹100000.")
             logger.error("COD not allowed for total > ₹100000")
             return redirect('checkout')
 
         # Check stock availability for each item
         for item in cart_items:
-            if not item.size:
-                messages.error(request, f"No size specified for {item.product.name}")
-                logger.error(f"No size specified for product: {item.product.name}")
-                return redirect('cart_view')
-            try:
-                size_stock = ProductSizeStock.objects.get(product=item.product, size=item.size)
-                logger.debug(f"Stock check for {item.product.name} (Size {item.size}): {size_stock.quantity}")
-                if size_stock.quantity < item.quantity:
-                    messages.error(request, f"Insufficient stock for {item.product.name} (Size {item.size}). Available: {size_stock.quantity}")
-                    logger.error(f"Insufficient stock for {item.product.name} (Size {item.size}): {size_stock.quantity} < {item.quantity}")
-                    return redirect('cart_view')
-            except ProductSizeStock.DoesNotExist:
-                messages.error(request, f"No stock record found for {item.product.name} (Size {item.size})")
-                logger.error(f"No ProductSizeStock for {item.product.name} (Size {item.size})")
+            size_stock = item.size_stock
+            logger.debug(f"Stock check for {item.product.name} (Size {size_stock.size}): {size_stock.quantity}")
+            if size_stock.quantity < item.quantity:
+                messages.error(request, f"Insufficient stock for {item.product.name} (Size {size_stock.size}). Available: {size_stock.quantity}")
+                logger.error(f"Insufficient stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} < {item.quantity}")
                 return redirect('cart_view')
 
         # Create order and update stock atomically
@@ -954,19 +971,19 @@ def place_order(request):
 
                 # Create OrderItems and reduce stock
                 for item in cart_items:
-                    size_stock = ProductSizeStock.objects.get(product=item.product, size=item.size)
-                    logger.debug(f"Reducing stock for {item.product.name} (Size {item.size}): {size_stock.quantity} -> {size_stock.quantity - item.quantity}")
+                    size_stock = item.size_stock
+                    logger.debug(f"Reducing stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} -> {size_stock.quantity - item.quantity}")
                     size_stock.quantity -= item.quantity
                     size_stock.save()
 
                     OrderItem.objects.create(
                         order=order,
                         product=item.product,
+                        size=size_stock.size,
                         quantity=item.quantity,
-                        price=item.product.price,
-                        size=item.size
+                        price=item.product.discount_price or item.product.price
                     )
-                    logger.debug(f"OrderItem created for {item.product.name} (Size {item.size}, Qty: {item.quantity})")
+                    logger.debug(f"OrderItem created for {item.product.name} (Size {size_stock.size}, Qty: {item.quantity})")
 
                 # Clear cart
                 cart_items.delete()
@@ -979,7 +996,7 @@ def place_order(request):
             return redirect('checkout')
     return redirect('checkout')
 
-    
+
 
 @login_required
 @never_cache
