@@ -1,24 +1,51 @@
-
 {% extends 'header.html' %}
 {% load static %}
 
 {% block content %}
-<div class="min-h-screen flex flex-col justify-center items-center p-6 bg-gray-50">
-  <div class="bg-white p-6 rounded-lg shadow-lg text-center w-full max-w-md">
-    <h2 class="text-2xl font-bold text-gray-600 mb-2">Thank you for your order!</h2>
-    <p class="text-gray-600 mb-4">Your order has been placed successfully.</p>
+<div class="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
+<div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col md:flex-row gap-8">
 
-    <!-- Order Summary -->
-    <div class="bg-gray-100 p-4 rounded mb-6">
-      <p class="text-sm text-gray-700">Order ID: <span class="font-semibold">{{ order.order_id }}</span></p>
-      <p class="text-sm text-gray-700">Order Date: <span class="font-semibold">{{ order.created_at|date:"d M Y, H:i A" }}</span></p>
-      <p class="text-sm text-gray-700">Email: <span class="font-semibold">{{ order.user.email }}</span></p>
-      <p class="text-sm text-gray-700">Total Amount: <span class="font-semibold">₹{{ order.total_amount|floatformat:2 }}</span></p>
+    <!-- Left: Illustration Section -->
+    <div class="flex-1 flex flex-col items-center justify-center text-center">
+      <img src="https://img.icons8.com/color/96/000000/checked-checkbox.png" alt="Order Success" class="mb-4 w-24 h-24 object-contain animate-bounce">
+      <h2 class="text-3xl font-bold text-gray-800 mb-3 animate-pulse">Thank You, {{ order.user.first_name|default:"Valued Customer" }}!</h2>
+      <p class="text-lg text-gray-600">Your order has been placed successfully. We're excited to serve you!</p>
     </div>
 
-    <div class="flex gap-4 justify-center">
-      <a href="{% url 'orders_list' %}" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition">View Order Details</a>
-      <a href="{% url 'userproduct_list' %}" class="px-4 py-2 bg-gray-300 text-black rounded hover:bg-gray-400 transition">Continue Shopping</a>
+    <!-- Right: Order Summary + Buttons -->
+    <div class="flex-1 flex flex-col justify-between">
+      <!-- Order Summary -->
+      <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-md mb-6">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2 text-center">Order Summary</h3>
+        <div class="grid grid-cols-2 gap-4 text-sm">
+          <div class="text-gray-700">Order ID:</div>
+          <div class="font-semibold text-gray-900 text-right">{{ order.order_id }}</div>
+          <div class="text-gray-700">Order Date:</div>
+          <div class="font-semibold text-gray-900 text-right">{{ order.created_at|date:"d M Y, H:i A" }}</div>
+          <div class="text-gray-700">Email:</div>
+          <div class="font-semibold text-gray-900 text-right">{{ order.user.email }}</div>
+          <div class="text-gray-700">Total Amount:</div>
+          <div class="font-semibold text-gray-900 text-right">₹{{ order.total_amount|floatformat:2 }}</div>
+        </div>
+      </div>
+
+   <!-- Buttons -->
+<div class="flex gap-3 justify-center">
+  <a href="{% url 'order_detail' order.id %}" class="px-4 py-2 bg-gray-600 text-white text-sm rounded-md hover:bg-gray-700 transition flex items-center gap-2">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+    View Order Details
+  </a>
+  <a href="{% url 'userproduct_list' %}" class="px-4 py-2 bg-gray-300 text-gray-800 text-sm rounded-md hover:bg-gray-400 transition flex items-center gap-2">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+    </svg>
+    Continue Shopping
+  </a>
+</div>
+
     </div>
   </div>
 </div>
