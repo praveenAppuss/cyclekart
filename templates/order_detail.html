@@ -4,17 +4,20 @@
 {% block content %}
 <div class="min-h-screen bg-slate-50 px-4 py-8">
     <div class="max-w-5xl mx-auto">
-        <h2 class="text-3xl font-bold mb-2">Order Tracking - {{ order.id }}</h2>
-        <p class="text-sm text-gray-600 mb-6">Track your order status and delivery information for Order #{{ order.id }}</p>
+        <h2 class="text-3xl font-bold mb-2">Order Tracking - {{ order.order_id }}</h2>
+        <p class="text-sm text-gray-600 mb-6">Track your order status and delivery information for Order #{{ order.order_id }}</p>
 
-        <!-- Cancel Entire Order Button -->
-        {% if order.status|lower != 'cancelled' and order.status|lower != 'delivered' and order.status|lower != 'returned' %}
-        <div class="mb-6 text-right">
-            <button onclick="openModal('cancel', null)" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
-                Cancel Entire Order
-            </button>
+        <!-- Cancel Entire Order Button and Invoice Download -->
+        <div class="mb-6 text-right space-x-2">
+            {% if order.status|lower != 'cancelled' and order.status|lower != 'delivered' and order.status|lower != 'returned' %}
+                <button onclick="openModal('cancel', null)" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
+                    Cancel Entire Order
+                </button>
+            {% endif %}
+            <a href="{% url 'download_invoice' order.id %}" class="bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-600">
+                Download Invoice (PDF)
+            </a>
         </div>
-        {% endif %}
 
         <!-- Order Cards for Each Item -->
         {% for item in items %}
@@ -45,16 +48,12 @@
                     <div class="mt-1">
                         {% if order.payment_method == 'cod' and order.status|lower != 'delivered' and order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
                             <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">PENDING</span>
-
                         {% elif order.payment_method != 'cod' and order.status|lower == 'cancelled' %}
                             <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">REFUNDED</span>
-
                         {% elif order.payment_method != 'cod' and order.status|lower == 'returned' %}
                             <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">REFUNDED</span>
-
                         {% elif order.status|lower == 'delivered' %}
                             <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">COMPLETED</span>
-
                         {% elif order.payment_method != 'cod' and order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
                             <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">COMPLETED</span>
                         {% endif %}
@@ -98,12 +97,12 @@
             <div class="bg-white p-4 rounded-xl shadow-md">
                 <h4 class="font-semibold text-lg mb-2">Order Summary</h4>
                 <div class="text-sm text-gray-700 space-y-1">
-                    <div class="flex justify-between"><span>Subtotal</span><span>₹{{ subtotal|floatformat:2 }}</span></div>
-                    <div class="flex justify-between text-green-600"><span>Discount</span><span>- ₹{{ discount|floatformat:2 }}</span></div>
-                    <div class="flex justify-between"><span>Tax</span><span>₹{{ tax|floatformat:2 }}</span></div>
-                    <div class="flex justify-between"><span>Shipping</span><span>₹{{ shipping|floatformat:2 }}</span></div>
+                    <div class="flex justify-between"><span>Subtotal</span><span>₹{{ order.subtotal|floatformat:2 }}</span></div>
+                    <div class="flex justify-between text-green-600"><span>Discount</span><span>- ₹{{ order.discount|floatformat:2 }}</span></div>
+                    <div class="flex justify-between"><span>Tax</span><span>₹{{ order.tax|floatformat:2 }}</span></div>
+                    <div class="flex justify-between"><span>Shipping</span><span>₹{{ order.shipping_cost|floatformat:2 }}</span></div>
                     <hr class="my-1">
-                    <div class="flex justify-between font-semibold text-lg mt-1"><span>Total</span><span>₹{{ grand_total|floatformat:2 }}</span></div>
+                    <div class="flex justify-between font-semibold text-lg mt-1"><span>Total</span><span>₹{{ order.total_amount|floatformat:2 }}</span></div>
                 </div>
             </div>
         </div>
@@ -137,6 +136,8 @@
     </div>
 </div>
 
+<!-- SweetAlert2 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     function openModal(action, itemId) {
         const modal = document.getElementById('actionModal');
@@ -174,6 +175,25 @@
             e.preventDefault();
             alert('Reason is required for return.');
         }
+    });
+
+    // Display Django messages as SweetAlert2 toasts
+    document.addEventListener('DOMContentLoaded', () => {
+        {% for message in messages %}
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: '{{ message.tags }}' === 'success' ? 'success' : '{{ message.tags }}' === 'error' ? 'error' : 'warning',
+                title: '{{ message }}',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            });
+        {% endfor %}
     });
 </script>
 {% endblock %}

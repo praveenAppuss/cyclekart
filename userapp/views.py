@@ -1,4 +1,4 @@
-from datetime import timezone
+from django.utils import timezone
 from decimal import Decimal
 import uuid
 
@@ -899,7 +899,6 @@ logger = logging.getLogger(__name__)
 
 @login_required
 @never_cache
-@no_cache_view
 def place_order(request):
     if request.method == 'POST':
         # Get form data
@@ -928,19 +927,24 @@ def place_order(request):
             logger.error("Cart is empty")
             return redirect('cart_view')
 
-        # Calculate total
-        def calculate_cart_total(items):
-            total = 0
-            for item in items:
-                discount_price = item.product.discount_price if item.product.discount_price and item.product.discount_price < item.product.price else item.product.price
-                total += discount_price * item.quantity
-            return total
+        # Calculate totals
+        subtotal = Decimal('0.00')
+        discount = Decimal('0.00')
+        for item in cart_items:
+            original_price = item.product.price
+            item_discount_price = item.product.discount_price or original_price
+            subtotal += original_price * item.quantity
+            discount += (original_price - item_discount_price) * item.quantity
 
-        total = calculate_cart_total(cart_items)
-        logger.debug(f"Calculated total: {total}")
+        tax_rate = Decimal('0.05')  # 5% tax; adjust as needed
+        tax = (subtotal - discount) * tax_rate
+        shipping_cost = Decimal('0.00')  # Free shipping
+        total_amount = (subtotal - discount) + tax + shipping_cost
+
+        logger.debug(f"Calculated: subtotal={subtotal}, discount={discount}, tax={tax}, shipping={shipping_cost}, total={total_amount}")
 
         # Validate COD for orders above ₹100000
-        if payment_method == 'cod' and total > Decimal('100000'):
+        if payment_method == 'cod' and total_amount > Decimal('100000'):
             messages.error(request, "Cash on Delivery not available for orders above ₹100000.")
             logger.error("COD not allowed for total > ₹100000")
             return redirect('checkout')
@@ -961,13 +965,17 @@ def place_order(request):
                 unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
                 logger.debug(f"Generated order_id: {unique_order_id}")
 
-                # Create Order
+                # Create Order with calculated fields
                 order = Order.objects.create(
                     user=request.user,
                     address=address,
                     payment_method=payment_method,
                     order_id=unique_order_id,
-                    total_amount=total,
+                    subtotal=subtotal,
+                    discount=discount,
+                    tax=tax,
+                    shipping_cost=shipping_cost,
+                    total_amount=total_amount,
                     status='pending'
                 )
                 logger.debug(f"Order created: {order.order_id}")
@@ -982,11 +990,13 @@ def place_order(request):
                     OrderItem.objects.create(
                         order=order,
                         product=item.product,
+                        color_variant=item.color_variant,  # Ensure color_variant is set
                         size=size_stock.size,
                         quantity=item.quantity,
-                        price=item.product.discount_price or item.product.price
+                        price=item.product.discount_price or item.product.price,
+                        discount_price=item.product.discount_price  # Set if applicable
                     )
-                    logger.debug(f"OrderItem created for {item.product.name} (Size {size_stock.size}, Qty: {item.quantity})")
+                    logger.debug(f"OrderItem created for {item.product.name} (Color: {item.color_variant}, Size: {size_stock.size}, Qty: {item.quantity})")
 
                 # Clear cart
                 cart_items.delete()
@@ -1122,113 +1132,80 @@ def cancel_order(request, order_id):
 
     try:
         with transaction.atomic():
+            items_to_cancel = []
             if item_id:
                 item = get_object_or_404(OrderItem, id=item_id, order=order)
                 if item.status == 'active':
-                    item.status = 'cancelled'
-                    item.save()
-                    logger.info(f"Item {item_id} status updated to 'cancelled' for order {order_id}")
-                    # Attempt stock adjustment with fallback
-                    try:
-                        if item.color_variant and item.size:
-                            size_stock, created = ProductSizeStock.objects.get_or_create(
-                                color_variant=item.color_variant,
-                                size=item.size,
-                                defaults={'quantity': 0}
-                            )
-                            initial_quantity = size_stock.quantity
-                            size_stock.quantity += item.quantity
-                            size_stock.save()
-                            logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (created: {created}, "
-                                        f"from {initial_quantity} to {size_stock.quantity})")
-                        elif item.size:  # Fallback for cases with size but no color_variant
-                            logger.warning(f"Missing color_variant for item {item_id}, using size only. color_variant: {item.color_variant}, size: {item.size}")
-                            size_stock, created = ProductSizeStock.objects.get_or_create(
-                                size=item.size,
-                                defaults={'quantity': 0, 'color_variant': None}  # Placeholder, adjust if needed
-                            )
-                            initial_quantity = size_stock.quantity
-                            size_stock.quantity += item.quantity
-                            size_stock.save()
-                            logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (created: {created}, "
-                                        f"from {initial_quantity} to {size_stock.quantity}) using size only")
-                        else:
-                            logger.warning(f"Missing color_variant or size for item {item_id}, stock adjustment skipped. "
-                                           f"color_variant: {item.color_variant}, size: {item.size}")
-                            messages.warning(request, f"Item {item_id} cancelled, but stock not updated due to missing color_variant or size.")
-                    except Exception as e:
-                        logger.error(f"Stock adjustment failed for order {order_id}, item {item_id}: {str(e)}")
-                        messages.warning(request, f"Item {item_id} cancelled, but stock adjustment failed due to an error.")
+                    items_to_cancel.append(item)
+                else:
+                    messages.error(request, f"Item {item_id} cannot be cancelled: already {item.status}.")
+                    return redirect('order_detail', order_id=order.id)
             else:
-                for item in order.items.filter(status='active'):
-                    item.status = 'cancelled'
-                    item.save()
-                    logger.info(f"Item {item.id} status updated to 'cancelled' for order {order_id}")
-                    try:
-                        if item.color_variant and item.size:
-                            size_stock, created = ProductSizeStock.objects.get_or_create(
-                                color_variant=item.color_variant,
-                                size=item.size,
-                                defaults={'quantity': 0}
-                            )
-                            initial_quantity = size_stock.quantity
-                            size_stock.quantity += item.quantity
-                            size_stock.save()
-                            logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (created: {created}, "
-                                        f"from {initial_quantity} to {size_stock.quantity})")
-                        elif item.size:  # Fallback for cases with size but no color_variant
-                            logger.warning(f"Missing color_variant for item {item.id}, using size only. color_variant: {item.color_variant}, size: {item.size}")
-                            size_stock, created = ProductSizeStock.objects.get_or_create(
-                                size=item.size,
-                                defaults={'quantity': 0, 'color_variant': None}  # Placeholder, adjust if needed
-                            )
-                            initial_quantity = size_stock.quantity
-                            size_stock.quantity += item.quantity
-                            size_stock.save()
-                            logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (created: {created}, "
-                                        f"from {initial_quantity} to {size_stock.quantity}) using size only")
-                        else:
-                            logger.warning(f"Missing color_variant or size for item {item.id}, stock adjustment skipped. "
-                                           f"color_variant: {item.color_variant}, size: {item.size}")
-                            messages.warning(request, f"Item {item.id} cancelled, but stock not updated due to missing color_variant or size.")
-                    except Exception as e:
-                        logger.error(f"Stock adjustment failed for order {order_id}, item {item.id}: {str(e)}")
-                        messages.warning(request, f"Item {item.id} cancelled, but stock adjustment failed due to an error.")
+                items_to_cancel = list(order.items.filter(status='active'))
+                if not items_to_cancel:
+                    messages.error(request, "No active items to cancel in this order.")
+                    return redirect('order_detail', order_id=order.id)
 
-            # Update order status to 'cancelled' if no active items remain
-            active_items = order.items.filter(status='active').exists()
-            if not active_items:
+            refund_amount = Decimal('0.00')
+            for item in items_to_cancel:
+                item.status = 'cancelled'
+                item.save()
+                logger.info(f"Item {item.id} status updated to 'cancelled' for order {order.order_id}")
+
+                # Stock adjustment: Only proceed if both color_variant and size exist
+                if item.color_variant and item.size:
+                    try:
+                        size_stock = ProductSizeStock.objects.get(
+                            color_variant=item.color_variant,
+                            size=item.size
+                        )
+                        initial_quantity = size_stock.quantity
+                        size_stock.quantity += item.quantity
+                        size_stock.save()
+                        logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} "
+                                    f"(from {initial_quantity} to {size_stock.quantity})")
+                    except ProductSizeStock.DoesNotExist:
+                        logger.error(f"ProductSizeStock not found for item {item.id} "
+                                     f"(color_variant: {item.color_variant}, size: {item.size})")
+                        messages.warning(request, f"Item cancelled, but stock not updated: variant/size not found.")
+                    except Exception as e:
+                        logger.error(f"Stock adjustment failed for item {item.id}: {str(e)}")
+                        messages.warning(request, f"Item cancelled, but stock adjustment failed.")
+                else:
+                    logger.warning(f"Skipping stock update for item {item.id}: "
+                                   f"color_variant={item.color_variant}, size={item.size}")
+                    messages.warning(request, f"Item cancelled, but stock not updated: missing variant/size data.")
+
+                # Accumulate refund (use discount_price if applicable)
+                refund_amount += (item.discount_price or item.price) * item.quantity
+
+            # Update order status if no active items remain
+            if not order.items.filter(status='active').exists():
                 order.status = 'cancelled'
-                order.save()
-                logger.info(f"Order {order_id} status updated to 'cancelled' as no active items remain")
-            else:
-                logger.info(f"Order {order_id} still has active items: {order.items.filter(status='active').count()}")
+                order.cancelled_at = timezone.now()  # Correct usage
+                logger.info(f"Order {order.order_id} status updated to 'cancelled'")
 
             order.cancel_reason = reason if reason else None
             order.save()
 
-        # Calculate refund amount manually outside the transaction
-        refund_amount = 0
-        if not item_id:
-            refund_amount = order.total_amount
-        else:
-            canceled_items = order.items.filter(status='cancelled')
-            for item in canceled_items:
-                refund_amount += item.price * item.quantity
+        # Handle refund outside transaction
         if order.payment_method != 'cod' and refund_amount > 0:
-            wallet = order.user.wallet
-            if wallet:
+            try:
+                wallet = order.user.wallet
                 WalletService.add_balance(wallet, refund_amount, f"Refund for Order {order.order_id}", order)
-                messages.success(request, f"{item_id and 'Item' or 'Order'} cancelled and refund processed.")
-            else:
-                messages.warning(request, f"{item_id and 'Item' or 'Order'} cancelled, but no wallet found for refund.")
+                messages.success(request, f"{'Item' if item_id else 'Order'} cancelled and refund processed.")
+            except Exception as e:
+                logger.error(f"Refund failed for order {order.order_id}: {str(e)}")
+                messages.warning(request, f"{'Item' if item_id else 'Order'} cancelled, but refund failed.")
         else:
-            messages.success(request, f"{item_id and 'Item' or 'Order'} cancelled successfully.")
+            messages.success(request, f"{'Item' if item_id else 'Order'} cancelled successfully.")
 
     except Exception as e:
-        logger.error(f"Error cancelling order {order_id}: {str(e)}")
-        messages.error(request, f"Error cancelling {item_id and 'item' or 'order'}: {str(e)}")
+        logger.error(f"Error cancelling order {order.order_id}: {str(e)}")
+        messages.error(request, f"Error cancelling {'item' if item_id else 'order'}: {str(e)}")
+
     return redirect('order_detail', order_id=order.id)
+
 
 @never_cache
 @require_POST
