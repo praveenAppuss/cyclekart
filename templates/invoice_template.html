@@ -1,90 +1,196 @@
-<!-- templates/orders/invoice_template.html -->
-{% load custom_filters %}
 <!DOCTYPE html>
+{% load custom_filters %}
+
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <title>Invoice - {{ order.order_id }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @page {
+            margin: 0.25in; /* Reduced margin to fit content */
+        }
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 10pt;
+            color: #333333;
+            background-color: #ffffff;
+        }
+        .invoice-container {
+            max-width: 700px; /* Reduced width to save space */
+            margin: 0 auto;
+            border: 1px solid #cccccc;
+            padding: 10px; /* Reduced padding */
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        }
+        .header {
+            border-bottom: 2px solid #003087; /* Thinner border */
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        .header h1 {
+            font-size: 18pt; /* Reduced font size */
+            color: #003087;
+            font-weight: bold;
+        }
+        .header h2 {
+            font-size: 14pt; /* Reduced font size */
+            font-weight: bold;
+            color: #1a202c;
+        }
+        .header p {
+            font-size: 8pt; /* Reduced font size */
+            color: #4a5568;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        .details-table th {
+            background-color: #edf2f7;
+            border-bottom: 1px solid #cbd5e0;
+            padding: 5px; /* Reduced padding */
+            text-align: left;
+            font-weight: bold;
+            color: #2d3748;
+            font-size: 9pt; /* Reduced font size */
+        }
+        .details-table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 3px 5px; /* Reduced padding */
+            vertical-align: top;
+            font-size: 9pt; /* Reduced font size */
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+        .items-table th {
+            background-color: #edf2f7;
+            border-bottom: 1px solid #cbd5e0;
+            padding: 5px; /* Reduced padding */
+            text-align: left;
+            font-weight: bold;
+            color: #2d3748;
+            font-size: 9pt; /* Reduced font size */
+        }
+        .items-table td {
+            border-bottom: 1px solid #e2e8f0;
+            padding: 3px 5px; /* Reduced padding */
+            vertical-align: top;
+            font-size: 9pt; /* Reduced font size */
+        }
+        .summary {
+            border-top: 1px solid #cbd5e0; /* Thinner border */
+            padding-top: 5px; /* Reduced padding */
+            text-align: right;
+        }
+        .summary .total {
+            font-size: 12pt; /* Reduced font size */
+            font-weight: bold;
+            color: #1a202c;
+        }
+        .summary p {
+            font-size: 8pt; /* Reduced font size */
+            color: #4a5568;
+            margin: 1px 0; /* Reduced margin */
+        }
+        .footer {
+            text-align: center;
+            padding-top: 10px; /* Reduced padding */
+            border-top: 1px solid #e2e8f0;
+            color: #4a5568;
+            font-size: 8pt; /* Reduced font size */
+        }
+    </style>
 </head>
 
-<body class="bg-white text-gray-800 text-sm p-6 font-sans">
-    <div class="max-w-3xl mx-auto border p-6 shadow-md rounded-lg">
+<body>
+    <div class="invoice-container">
         <!-- Header -->
-        <div class="flex justify-between items-center border-b pb-4 mb-6">
+        <div class="header">
             <div>
-                <h1 class="text-2xl font-bold text-blue-700">CycleKart</h1>
-                <p class="text-gray-500">www.cyclekart.com</p>
+                <h1>CycleKart</h1>
+                <p>www.cyclekart.com</p>
             </div>
-            <div class="text-right">
-                <h2 class="text-xl font-semibold">INVOICE</h2>
-                <p class="text-gray-500">#{{ order.order_id }}</p>
-                <p class="text-gray-500">{{ order.created_at|date:"d M Y" }}</p>
+            <div style="text-align: right;">
+                <h2>INVOICE</h2>
+                <p>#{{ order.order_id }}</p>
+                <p>Date: {{ order.created_at|date:"d M Y" }}</p>
             </div>
         </div>
 
-        <!-- Customer & Shipping Info -->
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <div>
-                <h3 class="font-semibold text-gray-700 mb-1">Customer</h3>
-                <p>{{ order.user.first_name }} {{ order.user.last_name }}</p>
-                <p>{{ order.user.email }}</p>
-            </div>
-            <div>
-                <h3 class="font-semibold text-gray-700 mb-1">Shipping Address</h3>
-                <p>{{ order.address.full_name }}</p>
-                <p>{{ order.address.street_address }}</p>
-                <p>{{ order.address.city }}, {{ order.address.state }} - {{ order.address.postal_code }}</p>
-                <p>{{ order.address.country }}</p>
-                <p>Phone: {{ order.address.phone }}</p>
-            </div>
+        <!-- Details Table -->
+        <div>
+            <table class="details-table">
+                <tr>
+                    <th>Customer</th>
+                    <td>{{ order.user.first_name }} {{ order.user.last_name|default:"" }}</td>
+                </tr>
+                <tr>
+                    <th>Email</th>
+                    <td>{{ order.user.email }}</td>
+                </tr>
+                <tr>
+                    <th>Shipping Address</th>
+                    <td>
+                        {{ order.address.full_name }}<br>
+                        {{ order.address.mobile }}<br>
+                        {{ order.address.address_line }}<br>
+                        {{ order.address.district }}, {{ order.address.state }}, {{ order.address.country }} - {{ order.address.pin_code }}
+                    </td>
+                </tr>
+            </table>
         </div>
 
-        <!-- Items -->
-        <div class="mb-6">
-            <table class="w-full text-left border-collapse">
-                <thead class="bg-gray-100 text-gray-700">
+        <!-- Items Table -->
+        <div>
+            <table class="items-table">
+                <thead>
                     <tr>
-                        <th class="py-2 px-4 border">#</th>
-                        <th class="py-2 px-4 border">Product</th>
-                        <th class="py-2 px-4 border">Size</th>
-                        <th class="py-2 px-4 border">Qty</th>
-                        <th class="py-2 px-4 border">Price</th>
-                        <th class="py-2 px-4 border">Total</th>
+                        <th>#</th>
+                        <th>Product</th>
+                        <th style="text-align: center;">Size</th>
+                        <th style="text-align: center;">Qty</th>
+                        <th style="text-align: right;">Price</th>
+                        <th style="text-align: right;">Total</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in order.items.all %}
-                    <tr class="border-b">
-                        <td class="py-2 px-4 border">{{ forloop.counter }}</td>
-                        <td class="py-2 px-4 border">{{ item.product.name }}</td>
-                        <td class="py-2 px-4 border">{{ item.size|default:"-" }}</td>
-                        <td class="py-2 px-4 border">{{ item.quantity }}</td>
-                        <td class="py-2 px-4 border">₹{{ item.price }}</td>
-                        <td class="py-2 px-4 border">₹{{ item.quantity|mul:item.price|floatformat:2 }}</td>
-                    </tr>
-                    {% endfor %}
+                    {% if order.items.all %}
+                        {% for item in order.items.all %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ item.product.name }}</td>
+                            <td style="text-align: center;">{{ item.size|default:"-" }}</td>
+                            <td style="text-align: center;">{{ item.quantity }}</td>
+                            <td style="text-align: right;">{{ item.price|floatformat:2 }}</td>
+                            <td style="text-align: right;">{{ item.quantity|mul:item.price|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 5px;">No items found for this order.</td>
+                        </tr>
+                    {% endif %}
                 </tbody>
             </table>
         </div>
 
         <!-- Summary -->
-        <div class="flex justify-end">
-            <div class="w-full max-w-sm">
-                <div class="flex justify-between py-2 border-t text-base">
-                    <span class="font-semibold">Total:</span>
-                    <span class="font-semibold">₹{{ order.total_amount }}</span>
-                </div>
-                <div class="text-right text-sm text-gray-500 mt-1">
-                    <p>Payment Method: {{ order.get_payment_method_display }}</p>
-                    <p>Status: {{ order.get_status_display }}</p>
-                </div>
+        <div class="summary">
+            <div class="total" style="display: flex; justify-content: space-between;">
+                <span>Total:</span>
+                <span>{{ order.total_amount|floatformat:2 }}</span>
             </div>
+            <p>Payment Method: {{ order.get_payment_method_display }}</p>
+            <p>Status: {{ order.get_status_display }}</p>
         </div>
 
         <!-- Footer -->
-        <div class="text-center text-xs text-gray-500 mt-6 pt-4 border-t">
+        <div class="footer">
             <p>Thank you for shopping with CycleKart!</p>
         </div>
     </div>

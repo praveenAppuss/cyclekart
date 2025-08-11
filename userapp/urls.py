@@ -33,6 +33,6 @@ urlpatterns = [
     path('orders/invoice/<int:order_id>/',views.download_invoice, name='download_invoice'),
     path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
     path('orders/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
-
+    path('return-order/<int:order_id>/', views.return_order, name='return_order'),
 
 ]

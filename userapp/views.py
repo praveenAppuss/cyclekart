@@ -1,5 +1,9 @@
+from datetime import timezone
 from decimal import Decimal
 import uuid
+
+from django.forms import DecimalField
+from .services import WalletService
 from django.shortcuts import render, redirect
 from django.contrib.auth import get_user_model, authenticate, login, logout
 from django.contrib.auth.hashers import make_password
@@ -11,19 +15,18 @@ from django.contrib.auth import BACKEND_SESSION_KEY
 import random
 from django.db.models.functions import Coalesce
 from django.core.paginator import Paginator
-from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.contrib.messages import get_messages
 from django.contrib import messages
 from adminapp.models import Product,Category,Brand,ProductSizeStock,ProductColorVariant
-from userapp.models import CustomUser,Address,Cart,CartItem,Wishlist,Order,OrderItem
+from userapp.models import CustomUser,Address,Cart,CartItem, ReturnRequest,Wishlist,Order,OrderItem
 import re
 from django.views.decorators.cache import never_cache
 from .utils import no_cache_view,calculate_cart_total
 from django.http import HttpResponse, JsonResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
-from django.db.models import Q, F, FloatField, ExpressionWrapper, Case, When, Value, IntegerField,Min,Max
+from django.db.models import Q, F, FloatField, ExpressionWrapper, Case, When, Value, IntegerField,Min,Max,Sum
 from .forms import AddressForm
 import json
 from django.db.models import Exists, OuterRef
@@ -1009,7 +1012,7 @@ def order_success(request, order_id):
 @login_required
 def orders_list_view(request):
     user = request.user
-    query = request.GET.get('q', '')
+    query = request.GET.get('q', '').strip()
     sort = request.GET.get('sort', 'latest')
 
     # Filter orders belonging to the user
@@ -1029,21 +1032,24 @@ def orders_list_view(request):
     sort_by = sort_options.get(sort, '-created_at')
     orders = orders.order_by(sort_by)
 
+    # Pagination
+    paginator = Paginator(orders, 5)  # 5 orders per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     context = {
-        'orders': orders,
+        'orders': page_obj,
         'query': query,
         'sort': sort,
     }
     return render(request, 'orders_list.html', context)
 
-
-
-
-
 @login_required
 def download_invoice(request, order_id):
     try:
         order = Order.objects.get(id=order_id, user=request.user)
+        if order.status == 'cancelled':
+            return HttpResponse("Cannot download invoice for cancelled order", status=400)
     except Order.DoesNotExist:
         return HttpResponse("Order not found", status=404)
 
@@ -1059,10 +1065,8 @@ def download_invoice(request, order_id):
     pisa_status = pisa.CreatePDF(html, dest=response)
 
     if pisa_status.err:
-        return HttpResponse('Error generating invoice PDF')
+        return HttpResponse('Error generating invoice PDF', status=500)
     return response
-
-
 
 @login_required
 def order_detail(request, order_id):
@@ -1076,21 +1080,21 @@ def order_detail(request, order_id):
 
     for item in items:
         product = item.product
-        original_price = product.price
-        discount_price = product.discount_price or original_price
+        original_price = item.price  # Use OrderItem price for accuracy
+        discount_price = item.discount_price if item.discount_price else original_price
         quantity = item.quantity
 
         item_total = original_price * quantity
-        item_discount = (original_price - discount_price) * quantity
+        item_discount = (original_price - discount_price) * quantity if discount_price else Decimal('0.00')
 
         subtotal += item_total
         total_discount += item_discount
         total_quantity += quantity
 
-    shipping_cost = Decimal('0.00')  # Update if needed
-    taxes = subtotal * Decimal('0.05')  # 5% tax
-
-    final_total = subtotal + shipping_cost + taxes
+    # Use model fields for accuracy
+    shipping_cost = order.shipping_cost
+    taxes = order.tax
+    final_total = order.total_amount  # Use stored total_amount for consistency
 
     context = {
         'order': order,
@@ -1104,34 +1108,171 @@ def order_detail(request, order_id):
     }
     return render(request, 'order_detail.html', context)
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 @never_cache
 @require_POST
 @login_required
 def cancel_order(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
-    reason = request.POST.get('cancel_reason', '')
+    item_id = request.POST.get('item_id')
+    reason = request.POST.get('reason', '').strip()
 
-    if order.status != 'cancelled':
-        order.status = 'cancelled'
+    try:
+        with transaction.atomic():
+            if item_id:
+                item = get_object_or_404(OrderItem, id=item_id, order=order)
+                if item.status == 'active':
+                    item.status = 'cancelled'
+                    item.save()
+                    logger.info(f"Item {item_id} status updated to 'cancelled' for order {order_id}")
+                    # Attempt stock adjustment with fallback
+                    try:
+                        if item.color_variant and item.size:
+                            size_stock, created = ProductSizeStock.objects.get_or_create(
+                                color_variant=item.color_variant,
+                                size=item.size,
+                                defaults={'quantity': 0}
+                            )
+                            initial_quantity = size_stock.quantity
+                            size_stock.quantity += item.quantity
+                            size_stock.save()
+                            logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (created: {created}, "
+                                        f"from {initial_quantity} to {size_stock.quantity})")
+                        elif item.size:  # Fallback for cases with size but no color_variant
+                            logger.warning(f"Missing color_variant for item {item_id}, using size only. color_variant: {item.color_variant}, size: {item.size}")
+                            size_stock, created = ProductSizeStock.objects.get_or_create(
+                                size=item.size,
+                                defaults={'quantity': 0, 'color_variant': None}  # Placeholder, adjust if needed
+                            )
+                            initial_quantity = size_stock.quantity
+                            size_stock.quantity += item.quantity
+                            size_stock.save()
+                            logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (created: {created}, "
+                                        f"from {initial_quantity} to {size_stock.quantity}) using size only")
+                        else:
+                            logger.warning(f"Missing color_variant or size for item {item_id}, stock adjustment skipped. "
+                                           f"color_variant: {item.color_variant}, size: {item.size}")
+                            messages.warning(request, f"Item {item_id} cancelled, but stock not updated due to missing color_variant or size.")
+                    except Exception as e:
+                        logger.error(f"Stock adjustment failed for order {order_id}, item {item_id}: {str(e)}")
+                        messages.warning(request, f"Item {item_id} cancelled, but stock adjustment failed due to an error.")
+            else:
+                for item in order.items.filter(status='active'):
+                    item.status = 'cancelled'
+                    item.save()
+                    logger.info(f"Item {item.id} status updated to 'cancelled' for order {order_id}")
+                    try:
+                        if item.color_variant and item.size:
+                            size_stock, created = ProductSizeStock.objects.get_or_create(
+                                color_variant=item.color_variant,
+                                size=item.size,
+                                defaults={'quantity': 0}
+                            )
+                            initial_quantity = size_stock.quantity
+                            size_stock.quantity += item.quantity
+                            size_stock.save()
+                            logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (created: {created}, "
+                                        f"from {initial_quantity} to {size_stock.quantity})")
+                        elif item.size:  # Fallback for cases with size but no color_variant
+                            logger.warning(f"Missing color_variant for item {item.id}, using size only. color_variant: {item.color_variant}, size: {item.size}")
+                            size_stock, created = ProductSizeStock.objects.get_or_create(
+                                size=item.size,
+                                defaults={'quantity': 0, 'color_variant': None}  # Placeholder, adjust if needed
+                            )
+                            initial_quantity = size_stock.quantity
+                            size_stock.quantity += item.quantity
+                            size_stock.save()
+                            logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (created: {created}, "
+                                        f"from {initial_quantity} to {size_stock.quantity}) using size only")
+                        else:
+                            logger.warning(f"Missing color_variant or size for item {item.id}, stock adjustment skipped. "
+                                           f"color_variant: {item.color_variant}, size: {item.size}")
+                            messages.warning(request, f"Item {item.id} cancelled, but stock not updated due to missing color_variant or size.")
+                    except Exception as e:
+                        logger.error(f"Stock adjustment failed for order {order_id}, item {item.id}: {str(e)}")
+                        messages.warning(request, f"Item {item.id} cancelled, but stock adjustment failed due to an error.")
 
-        if order.payment_method != 'cod':
-            order.payment_status = 'refunded'
+            # Update order status to 'cancelled' if no active items remain
+            active_items = order.items.filter(status='active').exists()
+            if not active_items:
+                order.status = 'cancelled'
+                order.save()
+                logger.info(f"Order {order_id} status updated to 'cancelled' as no active items remain")
+            else:
+                logger.info(f"Order {order_id} still has active items: {order.items.filter(status='active').count()}")
 
-        order.save()
+            order.cancel_reason = reason if reason else None
+            order.save()
 
-        # Restore stock per size
-        for item in order.items.all():
-            product = item.product
-            size = item.size  # Assuming size is stored in the order item
-            quantity = item.quantity
+        # Calculate refund amount manually outside the transaction
+        refund_amount = 0
+        if not item_id:
+            refund_amount = order.total_amount
+        else:
+            canceled_items = order.items.filter(status='cancelled')
+            for item in canceled_items:
+                refund_amount += item.price * item.quantity
+        if order.payment_method != 'cod' and refund_amount > 0:
+            wallet = order.user.wallet
+            if wallet:
+                WalletService.add_balance(wallet, refund_amount, f"Refund for Order {order.order_id}", order)
+                messages.success(request, f"{item_id and 'Item' or 'Order'} cancelled and refund processed.")
+            else:
+                messages.warning(request, f"{item_id and 'Item' or 'Order'} cancelled, but no wallet found for refund.")
+        else:
+            messages.success(request, f"{item_id and 'Item' or 'Order'} cancelled successfully.")
 
-            try:
-                size_stock = ProductSizeStock.objects.get(product=product, size=size)
-                size_stock.quantity += quantity
-                size_stock.save()
-            except ProductSizeStock.DoesNotExist:
-                # Optional: create stock record if missing
-                ProductSizeStock.objects.create(product=product, size=size, quantity=quantity)
+    except Exception as e:
+        logger.error(f"Error cancelling order {order_id}: {str(e)}")
+        messages.error(request, f"Error cancelling {item_id and 'item' or 'order'}: {str(e)}")
+    return redirect('order_detail', order_id=order.id)
 
-    messages.success(request, "Order cancelled successfully and stock restored.")
+@never_cache
+@require_POST
+@login_required
+def return_order(request, order_id):
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    item_id = request.POST.get('item_id')
+    reason = request.POST.get('reason', '').strip()
+
+    if not reason:
+        messages.error(request, "Return reason is required.")
+        return redirect('order_detail', order_id=order.id)
+
+    if order.status != 'delivered':
+        messages.error(request, "Order must be delivered to request a return.")
+        return redirect('order_detail', order_id=order.id)
+
+    try:
+        with transaction.atomic():
+            if item_id:
+                item = get_object_or_404(OrderItem, id=item_id, order=order)
+                if item.status == 'active':
+                    ReturnRequest.objects.create(order_item=item, user=request.user, reason=reason, status='pending')
+                    item.status = 'returned'
+                    item.save()
+                    size_stock = item.size_stock
+                    size_stock.quantity += item.quantity
+                    size_stock.save()
+            else:
+                for item in order.items.filter(status='active'):
+                    ReturnRequest.objects.create(order_item=item, user=request.user, reason=reason, status='pending')
+                    item.status = 'returned'
+                    item.save()
+                    size_stock = item.size_stock
+                    size_stock.quantity += item.quantity
+                    size_stock.save()
+            # Update order status to 'return request' if any item is returned
+            if order.items.filter(status='returned').exists() and order.status != 'returned':
+                order.status = 'return request'
+            order.save()
+            messages.success(request, "Return request submitted for verification.")
+
+    except Exception as e:
+        messages.error(request, f"Error submitting return request: {str(e)}")
+        return redirect('order_detail', order_id=order.id)
+
     return redirect('order_detail', order_id=order.id)

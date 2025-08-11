@@ -4,52 +4,84 @@
 {% block content %}
 <div class="min-h-screen bg-slate-50 px-4 py-8">
     <div class="max-w-5xl mx-auto">
-        <h2 class="text-3xl font-bold mb-2">Order Tracking</h2>
-        <p class="text-sm text-gray-600 mb-6">Track your order status and delivery information</p>
+        <h2 class="text-3xl font-bold mb-2">Order Tracking - {{ order.id }}</h2>
+        <p class="text-sm text-gray-600 mb-6">Track your order status and delivery information for Order #{{ order.id }}</p>
 
-        <!-- Order Card -->
+        <!-- Cancel Entire Order Button -->
+        {% if order.status|lower != 'cancelled' and order.status|lower != 'delivered' and order.status|lower != 'returned' %}
+        <div class="mb-6 text-right">
+            <button onclick="openModal('cancel', null)" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
+                Cancel Entire Order
+            </button>
+        </div>
+        {% endif %}
+
+        <!-- Order Cards for Each Item -->
+        {% for item in items %}
         <div class="bg-white p-4 rounded-xl shadow-md mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center">
             <div class="flex items-start gap-4">
-                <img src="{{ items.0.product.thumbnail.url }}" alt="" class="w-24 h-24 object-cover rounded-md border" />
+                <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}"
+                     class="w-24 h-24 object-cover rounded-md border" />
                 <div>
-                    <h3 class="font-semibold text-lg">{{ items.0.product.name }}</h3>
-                    <p class="text-sm text-gray-700">Size: {{ items.0.size }} | Quantity: {{ items.0.quantity }}</p>
-                    <p class="text-sm text-gray-700 font-medium mt-1">₹{{ items.0.price }}</p>
+                    <h3 class="font-semibold text-lg">{{ item.product.name }}</h3>
+                    <p class="text-sm text-gray-700">Size: {{ item.size|default:"-" }} | Quantity: {{ item.quantity }}</p>
+                    <p class="text-sm text-gray-700 font-medium mt-1">₹{{ item.price|floatformat:2 }}</p>
 
                     <!-- Order Status & ETA -->
                     <div class="flex items-center gap-4 mt-2">
-                        {% if order.status == 'cancelled' %}
+                        {% if item.status|lower == 'cancelled' %}
                         <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Cancelled</span>
-                        {% elif order.status == 'delivered' %}
+                        {% elif order.status|lower == 'delivered' %}
                         <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Delivered</span>
+                        {% elif order.status|lower == 'returned' %}
+                        <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Returned</span>
                         {% else %}
                         <span class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">Processing</span>
                         {% endif %}
-                        <span class="text-sm text-gray-600">expected by {{ order.created_at|date:"m/d/Y" }}</span>
+                        <span class="text-sm text-gray-600">Expected by {{ order.created_at|date:"m/d/Y" }}</span>
                     </div>
 
                     <!-- Payment Status -->
                     <div class="mt-1">
-                        {% if order.payment_method == 'cod' and order.status != 'cancelled' %}
-                        <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">PENDING</span>
-                        {% elif order.status == 'cancelled' and order.payment_method != 'cod' %}
-                        <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">REFUNDED</span>
-                        {% else %}
-                        <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">COMPLETED</span>
+                        {% if order.payment_method == 'cod' and order.status|lower != 'delivered' and order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
+                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">PENDING</span>
+
+                        {% elif order.payment_method != 'cod' and order.status|lower == 'cancelled' %}
+                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">REFUNDED</span>
+
+                        {% elif order.payment_method != 'cod' and order.status|lower == 'returned' %}
+                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">REFUNDED</span>
+
+                        {% elif order.status|lower == 'delivered' %}
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">COMPLETED</span>
+
+                        {% elif order.payment_method != 'cod' and order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">COMPLETED</span>
                         {% endif %}
                     </div>
                 </div>
             </div>
 
-            <!-- Cancel Button -->
-            {% if order.status != 'cancelled' %}
-            <div class="mt-4 sm:mt-0">
-                <button onclick="openModal()" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
-                    Cancel Item
-                </button>
-            </div>
+            <!-- Action Button -->
+            {% if item.status|lower == 'active' %}
+                {% if order.status|lower == 'delivered' %}
+                <div class="mt-4 sm:mt-0">
+                    <button onclick="openModal('return', {{ item.id }})" class="bg-yellow-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-yellow-600">
+                        Return Item
+                    </button>
+                </div>
+                {% elif order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
+                <div class="mt-4 sm:mt-0">
+                    <button onclick="openModal('cancel', {{ item.id }})" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
+                        Cancel Item
+                    </button>
+                </div>
+                {% endif %}
             {% endif %}
         </div>
+        {% empty %}
+        <p class="text-gray-600 text-center">No items in this order.</p>
+        {% endfor %}
 
         <!-- Delivery & Summary Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -57,54 +89,91 @@
                 <h4 class="font-semibold text-lg mb-2">Delivery Address</h4>
                 <div class="text-sm text-gray-700">
                     <p class="font-semibold">{{ order.address.full_name }}</p>
-                    <p>{{ order.address.city }}</p>
-                    <p>{{ order.address.state }}, {{ order.address.pin_code }}</p>
+                    <p>{{ order.address.mobile }}</p>
+                    <p>{{ order.address.address_line }}</p>
+                    <p>{{ order.address.district }}, {{ order.address.state }}, {{ order.address.country }} - {{ order.address.pin_code }}</p>
                 </div>
             </div>
 
             <div class="bg-white p-4 rounded-xl shadow-md">
                 <h4 class="font-semibold text-lg mb-2">Order Summary</h4>
                 <div class="text-sm text-gray-700 space-y-1">
-                    <div class="flex justify-between"><span>Subtotal</span><span>₹{{ subtotal|floatformat:2}}</span></div>
+                    <div class="flex justify-between"><span>Subtotal</span><span>₹{{ subtotal|floatformat:2 }}</span></div>
                     <div class="flex justify-between text-green-600"><span>Discount</span><span>- ₹{{ discount|floatformat:2 }}</span></div>
                     <div class="flex justify-between"><span>Tax</span><span>₹{{ tax|floatformat:2 }}</span></div>
                     <div class="flex justify-between"><span>Shipping</span><span>₹{{ shipping|floatformat:2 }}</span></div>
-                    <hr>
-                    <div class="flex justify-between font-semibold text-lg mt-2"><span>Total</span><span>₹{{ grand_total|floatformat:2 }}</span></div>
+                    <hr class="my-1">
+                    <div class="flex justify-between font-semibold text-lg mt-1"><span>Total</span><span>₹{{ grand_total|floatformat:2 }}</span></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Cancel Modal -->
-<div id="cancelModal" class="fixed inset-0 bg-black bg-opacity-40 z-50 hidden items-center justify-center">
+<!-- Action Modal -->
+<div id="actionModal" class="fixed inset-0 bg-black bg-opacity-40 z-50 hidden items-center justify-center">
     <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-        <h3 class="text-lg font-semibold mb-2">Cancel Order</h3>
-        <p class="text-sm text-gray-600 mb-3">Are you sure you want to cancel this order?</p>
-        <form id="cancelForm" method="POST" action="{% url 'cancel_order' order.id %}">
+        <h3 id="modalTitle" class="text-lg font-semibold mb-2"></h3>
+        <p class="text-sm text-gray-600 mb-3" id="modalDescription"></p>
+        <form id="actionForm" method="POST" action="">
             {% csrf_token %}
-            <textarea name="cancel_reason" rows="3" placeholder="Reason for cancellation (optional)"
-                class="w-full text-sm border p-2 rounded mb-3"></textarea>
+            <input type="hidden" name="item_id" id="modalItemId">
+            <input type="hidden" name="action" id="modalAction">
+            <div class="mb-4">
+                <label for="reason" class="block text-sm font-medium text-gray-700">
+                    Reason <span id="reasonRequired" class="text-red-500">*</span>
+                </label>
+                <textarea name="reason" id="reason" rows="3" class="w-full text-sm border p-2 rounded mb-3" placeholder="Enter reason"></textarea>
+            </div>
             <div class="flex justify-end gap-2">
-                <button type="button" onclick="closeModal()"
-                    class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">Close</button>
-                <button type="submit"
-                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">Confirm Cancel</button>
+                <button type="button" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300" onclick="closeModal()">
+                    Close
+                </button>
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                    Submit
+                </button>
             </div>
         </form>
     </div>
 </div>
 
 <script>
-    function openModal() {
-        document.getElementById('cancelModal').classList.remove('hidden');
-        document.getElementById('cancelModal').classList.add('flex');
+    function openModal(action, itemId) {
+        const modal = document.getElementById('actionModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalDescription = document.getElementById('modalDescription');
+        const modalItemId = document.getElementById('modalItemId');
+        const modalAction = document.getElementById('modalAction');
+        const reasonRequired = document.getElementById('reasonRequired');
+        const actionForm = document.getElementById('actionForm');
+
+        modalTitle.textContent = action === 'cancel' ? 'Cancel Item' : 'Return Item';
+        modalDescription.textContent = action === 'cancel' ? 
+            (itemId ? 'Are you sure you want to cancel this item?' : 'Are you sure you want to cancel the entire order?') : 
+            'Please provide a reason to return this item.';
+        modalItemId.value = itemId || '';
+        modalAction.value = action;
+        reasonRequired.style.display = action === 'return' ? 'inline' : 'none';
+        actionForm.action = action === 'cancel' ? "{% url 'cancel_order' order.id %}" : "{% url 'return_order' order.id %}";
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
     }
 
     function closeModal() {
-        document.getElementById('cancelModal').classList.add('hidden');
-        document.getElementById('cancelModal').classList.remove('flex');
+        const modal = document.getElementById('actionModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        document.getElementById('reason').value = '';
     }
+
+    // Form Submission Validation
+    document.getElementById('actionForm').addEventListener('submit', (e) => {
+        const reason = document.getElementById('reason').value.trim();
+        const action = document.getElementById('modalAction').value;
+        if (action === 'return' && !reason) {
+            e.preventDefault();
+            alert('Reason is required for return.');
+        }
+    });
 </script>
 {% endblock %}
