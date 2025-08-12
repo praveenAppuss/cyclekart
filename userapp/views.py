@@ -1,7 +1,6 @@
 from django.utils import timezone
 from decimal import Decimal
 import uuid
-
 from django.forms import DecimalField
 from .services import WalletService
 from django.shortcuts import render, redirect
@@ -162,7 +161,7 @@ def verify_otp(request):
         return render(request, 'verify_otp.html', {'error': 'Invalid OTP'})
     return render(request, 'verify_otp.html')
 
-@no_cache_view
+
 @never_cache
 def user_login(request):
     if request.user.is_authenticated:
@@ -227,6 +226,8 @@ def user_logout(request):
 
 
 @login_required(login_url='user_login')
+@never_cache
+@no_cache_view
 def user_home(request):
     all_products = list(Product.objects.filter(is_active=True, is_deleted=False))
     featured_products = random.sample(all_products, min(len(all_products), 4))  
@@ -333,6 +334,7 @@ def user_product_list(request):
 
 
 @login_required(login_url='user_login')
+@never_cache
 def product_detail(request, product_id):
     product = get_object_or_404(Product, id=product_id, is_deleted=False, is_active=True)
     
@@ -384,6 +386,7 @@ def product_detail(request, product_id):
 # user profile section ---------------------------------------------------
 
 @login_required
+@never_cache
 def profile_view(request):
     user = request.user
     user_addresses = Address.objects.filter(user=user)  # Only current user
@@ -398,6 +401,7 @@ def profile_view(request):
 
 
 @login_required
+@never_cache
 def upload_profile_image(request):
     if request.method == 'POST' and request.FILES.get('profile_image'):
         request.user.profile_image = request.FILES['profile_image']
@@ -406,6 +410,7 @@ def upload_profile_image(request):
 
 
 @login_required
+@never_cache
 def update_profile(request):
     if request.method == 'POST':
         user = request.user
@@ -432,6 +437,7 @@ def update_profile(request):
 
 # Address management section---------------------------------
 @login_required(login_url='user_login')
+@never_cache
 def address_list(request):
     addresses = Address.objects.filter(user=request.user)
     form = AddressForm()
@@ -458,6 +464,7 @@ def address_list(request):
     return render(request, 'address_page.html', context)
 
 @login_required(login_url='user_login')
+@never_cache
 def add_address(request):
     if request.method == 'POST':
         form = AddressForm(request.POST)
@@ -475,6 +482,7 @@ def add_address(request):
     return redirect('address_list')
 
 @login_required(login_url='user_login')
+@never_cache
 def update_address(request, pk):
     address = get_object_or_404(Address, pk=pk, user=request.user)
     if request.method == 'POST':
@@ -487,6 +495,7 @@ def update_address(request, pk):
 
 # Keep delete_address but exclude it from checkout context (no change needed here)
 @login_required(login_url='user_login')
+@never_cache
 def delete_address(request, pk):
     address = get_object_or_404(Address, pk=pk, user=request.user)
     address.delete()
@@ -497,6 +506,7 @@ def delete_address(request, pk):
 
 # Cart Management
 @login_required(login_url='user_login')
+@never_cache
 def add_to_cart(request, product_id):
     product = get_object_or_404(Product, id=product_id)
 
@@ -639,6 +649,7 @@ def cart_view(request):
     })
 
 @login_required(login_url='user_login')
+@never_cache
 def update_cart_quantity(request, cart_item_id):
     cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
     
@@ -700,6 +711,7 @@ def update_cart_quantity(request, cart_item_id):
     
 
 @login_required(login_url='user_login')
+@never_cache
 def remove_from_cart(request, cart_item_id):
     cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
     product_name = cart_item.product.name
@@ -712,6 +724,7 @@ def remove_from_cart(request, cart_item_id):
 
 # Wishlist Management
 @login_required(login_url='user_login')
+@never_cache
 def wishlist_view(request):
     wishlist_items = Wishlist.objects.filter(user=request.user).select_related('color_variant__product')
     size_map = {}
@@ -731,6 +744,7 @@ def wishlist_view(request):
 
 
 @login_required(login_url='user_login')
+@never_cache
 def add_to_wishlist(request, color_variant_id):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
@@ -765,6 +779,7 @@ def add_to_wishlist(request, color_variant_id):
 
 
 @login_required(login_url='user_login')
+@never_cache
 def remove_from_wishlist(request, wishlist_id):
     item = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
     product_name = item.color_variant.product.name
@@ -774,6 +789,7 @@ def remove_from_wishlist(request, wishlist_id):
     return redirect('wishlist')
 
 @login_required(login_url='user_login')
+@never_cache
 def add_to_cart_from_wishlist(request):
     if request.method == 'POST':
         color_variant_id = request.POST.get('color_variant_id')
@@ -842,6 +858,7 @@ def add_to_cart_from_wishlist(request):
 
 # ------------checkout view---------------------------------------------------
 @login_required(login_url='user_login')
+@never_cache
 def checkout_view(request):
     user = request.user
 
@@ -1022,6 +1039,7 @@ def order_success(request, order_id):
 
 
 @login_required
+@never_cache
 def orders_list_view(request):
     user = request.user
     query = request.GET.get('q', '').strip()
@@ -1057,6 +1075,7 @@ def orders_list_view(request):
     return render(request, 'orders_list.html', context)
 
 @login_required
+@never_cache
 def download_invoice(request, order_id):
     try:
         order = Order.objects.get(id=order_id, user=request.user)
@@ -1081,6 +1100,7 @@ def download_invoice(request, order_id):
     return response
 
 @login_required
+@never_cache
 def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     items = order.items.select_related('product').all()
@@ -1131,7 +1151,6 @@ def cancel_order(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     item_id = request.POST.get('item_id')
     reason = request.POST.get('reason', '').strip()
-
     try:
         with transaction.atomic():
             items_to_cancel = []
