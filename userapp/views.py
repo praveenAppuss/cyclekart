@@ -577,6 +577,8 @@ def get_sizes(request, color_variant_id):
 
 
 @login_required(login_url='user_login')
+@never_cache
+@no_cache_view
 def cart_view(request):
     cart = Cart.objects.filter(user=request.user).first()
     cart_items = cart.items.select_related('product', 'color_variant', 'size_stock').prefetch_related(
