@@ -23,6 +23,10 @@ urlpatterns = [
     path('products/edit/<int:product_id>/', views.edit_product, name='edit_product'),
     path('products/delete/<int:product_id>/', views.delete_product, name='delete_product'),
     path('products/toggle-status/<int:product_id>/', views.toggle_product_status, name='toggle_product_status'),
+    path('orders/', views.admin_order_list, name='admin_order_list'),
+    path('orders/<int:order_id>/', views.admin_order_detail, name='admin_order_detail'),
+    path('orders/<int:order_id>/status/', views.update_order_status, name='update_order_status'),
+    path('return-request/<int:request_id>/verify/', views.verify_return_request, name='verify_return_request'),
 
 
 

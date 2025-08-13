@@ -1,6 +1,6 @@
 from pathlib import Path
 from decouple import config
-
+import dj_database_url
 # import logging
 
 # logging.basicConfig(level=logging.DEBUG)
@@ -74,6 +74,7 @@ TEMPLATES = [
 # ------------------ Database ------------------
 DATABASES = {
     'default': {
+        # dj_database_url.parse(config("DATABASE_URL"))
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': config('DB_NAME'),
         'USER': config('DB_USER'),
@@ -81,6 +82,7 @@ DATABASES = {
         'HOST': config('DB_HOST'),
         'PORT': config('DB_PORT'),
     }
+    
 }
 
 

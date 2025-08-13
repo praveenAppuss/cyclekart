@@ -4,21 +4,8 @@
 {% block content %}
 <div class="min-h-screen bg-slate-50 py-10 px-6">
   <div class="max-w-5xl mx-auto">
-    <!-- Toast Messages -->
-    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
-      {% if messages %}
-        {% for message in messages %}
-          <div class="toast px-4 py-2 rounded-lg shadow-md text-white text-sm
-                      {% if message.tags == 'success' %}bg-green-600
-                      {% elif message.tags == 'error' %}bg-red-600
-                      {% elif message.tags == 'warning' %}bg-yellow-500
-                      {% else %}bg-blue-600{% endif %} transition-opacity duration-300">
-            {{ message }}
-          </div>
-        {% endfor %}
-      {% endif %}
-    </div>
 
+    <!-- Wishlist Title -->
     <h2 class="text-3xl font-bold text-slate-800 mb-6">Your Wishlist</h2>
 
     {% if wishlist_items %}
@@ -36,17 +23,19 @@
                 {{ item.color_variant.product.name }} ({{ item.color_variant.name }})
               </h3>
               <p class="text-sm text-gray-500 mt-1">Added On: {{ item.added_at|date:"n/j/Y" }}</p>
+
               {% if item.color_variant.product.is_deleted or not item.color_variant.product.is_active or not item.color_variant.product.category.is_active %}
                 <span class="text-red-500 text-sm font-medium">Unavailable</span>
               {% else %}
                 <button onclick="openSizeModal('{{ item.color_variant.id }}', '{{ item.color_variant.product.name }}', '{{ item.color_variant.name }}')"
-                        class="text-sm text-blue-600 hover:underline mt-1" aria-label="Add {{ item.color_variant.product.name }} ({{ item.color_variant.name }}) to cart">
+                        class="text-sm text-blue-600 hover:underline mt-1">
                   Add to Cart
                 </button>
               {% endif %}
+
               <form method="POST" action="{% url 'remove_from_wishlist' item.id %}" class="inline ml-2">
                 {% csrf_token %}
-                <button type="submit" class="text-sm text-red-600 hover:underline" aria-label="Remove {{ item.color_variant.product.name }} ({{ item.color_variant.name }}) from wishlist">
+                <button type="submit" class="text-sm text-red-600 hover:underline">
                   × Remove
                 </button>
               </form>
@@ -84,21 +73,39 @@
       <p class="mb-3 text-sm text-gray-600">Please select your size:</p>
       <div class="flex justify-center gap-3 mb-4" id="sizeOptions"></div>
       <div class="flex justify-between">
-        <button type="button" onclick="closeModal()" class="text-gray-500 px-4 py-2 border rounded" aria-label="Cancel size selection">Cancel</button>
-        <button type="submit" class="bg-black text-white px-4 py-2 rounded" aria-label="Add to cart">Add to Cart</button>
+        <button type="button" onclick="closeModal()" class="text-gray-500 px-4 py-2 border rounded">Cancel</button>
+        <button type="submit" class="bg-black text-white px-4 py-2 rounded">Add to Cart</button>
       </div>
     </form>
-    <button onclick="closeModal()" class="absolute top-2 right-3 text-gray-400 hover:text-black text-xl" aria-label="Close modal">×</button>
+    <button onclick="closeModal()" class="absolute top-2 right-3 text-gray-400 hover:text-black text-xl">×</button>
   </div>
 </div>
+
+<!-- SweetAlert for wishlist messages -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    {% if messages %}
+      {% for message in messages %}
+        {% if 'wishlist' in message.tags %}
+          Swal.fire({
+            icon: '{{ message.tags|cut:"wishlist" }}',
+            title: '{{ message|escapejs }}',
+            timer: 2000,
+            showConfirmButton: false
+          });
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  });
+</script>
 
 <!-- Modal JS -->
 <script>
   function openSizeModal(colorVariantId, productName, colorName) {
     document.getElementById("modalColorVariantId").value = colorVariantId;
     document.getElementById("modalTitle").textContent = `Select Size - ${productName} (${colorName})`;
-    
-    // Access sizes from the template context and filter by colorVariantId
+
     const sizesData = {{ sizes|safe }};
     const sizes = sizesData[colorVariantId] || [];
     const sizeOptions = document.getElementById("sizeOptions");
@@ -112,7 +119,7 @@
       btn.type = "button";
       btn.className = "size-btn w-10 h-10 border rounded hover:bg-slate-800 hover:text-white transition";
       btn.textContent = size.display;
-      btn.dataset.sizeStockId = size.id;  // Use size_stock ID
+      btn.dataset.sizeStockId = size.id;
       btn.onclick = () => selectSize(size.id);
       sizeOptions.appendChild(btn);
     });
@@ -135,14 +142,5 @@
       }
     });
   }
-
-  // Auto-hide toast messages
-  document.addEventListener("DOMContentLoaded", function () {
-    setTimeout(() => {
-      const toasts = document.querySelectorAll(".toast");
-      toasts.forEach(toast => toast.classList.add("opacity-0"));
-      setTimeout(() => toasts.forEach(toast => toast.remove()), 300);
-    }, 3000);
-  });
 </script>
 {% endblock %}

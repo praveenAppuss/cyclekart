@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import user_passes_test
 from django.views.decorators.http import require_POST
 from django.db.models import Q,Sum
 from django.core.paginator import Paginator
-from userapp.models import CustomUser
+from userapp.models import CustomUser, Order, ReturnRequest, WalletTransaction
 from django.utils.text import slugify
 from adminapp.models import Product, Category, Brand, ProductColorVariant, ProductImage,ProductSizeStock
 import base64
@@ -15,6 +15,7 @@ from django.core.files.base import ContentFile
 import logging
 from django.db import transaction
 from django.http import HttpResponseBadRequest, HttpResponseServerError
+from django.utils import timezone
 
 def superuser_required(view_func):
     return user_passes_test(lambda u: u.is_authenticated and u.is_superuser, login_url='admin_login')(view_func)
@@ -703,3 +704,157 @@ def toggle_product_status(request, product_id):
     status = "listed" if product.is_active else "unlisted"
     messages.success(request, f"Product has been {status}.")
     return redirect('product_list')
+
+
+
+# ------------------------ordermanagement--------------------------------------#
+logger = logging.getLogger(__name__)
+
+@superuser_required
+def admin_order_list(request):
+    # Get query parameters
+    search_query = request.GET.get('q', '')
+    sort_by = request.GET.get('sort', '-created_at')  # Default: desc by date
+    filter_status = request.GET.get('status', '')
+
+    # Base queryset
+    orders = Order.objects.all()
+
+    # Search by order_id or user details
+    if search_query:
+        orders = orders.filter(
+            Q(order_id__icontains=search_query) |
+            Q(user__username__icontains=search_query) |
+            Q(user__email__icontains=search_query)
+        )
+
+    # Filter by status
+    if filter_status:
+        orders = orders.filter(status=filter_status)
+
+    # Sort
+    if sort_by in ['created_at', '-created_at', 'status', '-status']:
+        orders = orders.order_by(sort_by)
+    else:
+        orders = orders.order_by('-created_at')  # Fallback
+
+    # Pagination
+    paginator = Paginator(orders, 10)  # 10 orders per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'search_query': search_query,
+        'sort_by': sort_by,
+        'filter_status': filter_status,
+        'status_choices': Order.STATUS_CHOICES,
+    }
+    return render(request, 'admin_order_list.html', context)
+
+
+@superuser_required
+def admin_order_detail(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    context = {
+        'order': order,
+        'items': order.items.all(),
+    }
+    return render(request, 'admin_order_detail.html', context)
+
+
+@superuser_required
+@require_POST
+def update_order_status(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+    new_status = request.POST.get('status')
+
+    if new_status not in dict(Order.STATUS_CHOICES):
+        logger.error(f"Invalid status {new_status} for order {order.order_id}")
+        messages.error(request, "Invalid status selected.")
+        return redirect('admin_order_detail', order_id=order.id)
+
+    if new_status != order.status:
+        order.status = new_status
+        if new_status == 'delivered':
+            order.delivered_at = timezone.now()
+        elif new_status == 'cancelled':
+            order.cancelled_at = timezone.now()
+        else:
+            order.delivered_at = None
+            order.cancelled_at = None
+        order.save()
+        logger.info(f"Order {order.order_id} status updated to {new_status}")
+        messages.success(request, f"Order {order.order_id} status updated to {order.get_status_display()}.")
+    else:
+        messages.info(request, "No changes made to order status.")
+
+    return redirect('admin_order_detail', order_id=order.id)
+
+
+@superuser_required
+@require_POST
+def verify_return_request(request, request_id):
+    return_request = get_object_or_404(ReturnRequest, id=request_id)
+    action = request.POST.get('action')  # 'accept' or 'reject'
+
+    try:
+        with transaction.atomic():
+            if action == 'accept':
+                return_request.status = 'accepted'
+                return_request.verified_at = timezone.now()
+                return_request.order_item.status = 'returned'
+                return_request.order_item.save()
+
+                # Refund to wallet
+                order = return_request.order_item.order
+                if order.payment_method != 'cod':
+                    refund_amount = (return_request.order_item.discount_price or return_request.order_item.price) * return_request.order_item.quantity
+                    wallet = return_request.user.wallet
+                    WalletTransaction.objects.create(
+                        wallet=wallet,
+                        order=order,
+                        amount=refund_amount,
+                        transaction_type='credit',
+                        description=f"Refund for return of {return_request.order_item.product.name} (Order {order.order_id})"
+                    )
+                    wallet.balance += refund_amount
+                    wallet.save()
+                    logger.info(f"Refunded ₹{refund_amount} to wallet for {return_request.user.username} (Order {order.order_id})")
+                    messages.success(request, f"Return request accepted. ₹{refund_amount} refunded to user's wallet.")
+
+                # Update stock
+                if return_request.order_item.color_variant and return_request.order_item.size:
+                    try:
+                        size_stock = ProductSizeStock.objects.get(
+                            color_variant=return_request.order_item.color_variant,
+                            size=return_request.order_item.size
+                        )
+                        size_stock.quantity += return_request.order_item.quantity
+                        size_stock.save()
+                        logger.info(f"Stock updated for {size_stock} (+{return_request.order_item.quantity})")
+                    except ProductSizeStock.DoesNotExist:
+                        logger.error(f"Stock not found for {return_request.order_item.color_variant}, {return_request.order_item.size}")
+                        messages.warning(request, "Return accepted, but stock not updated: variant/size not found.")
+
+                # Update order status if all items are returned/cancelled
+                if not order.items.filter(status='active').exists():
+                    order.status = 'returned'
+                    order.return_reason = return_request.reason
+                    order.save()
+                    logger.info(f"Order {order.order_id} status updated to 'returned'")
+
+            elif action == 'reject':
+                return_request.status = 'rejected'
+                return_request.verified_at = timezone.now()
+                messages.success(request, "Return request rejected.")
+            else:
+                messages.error(request, "Invalid action.")
+                return redirect('admin_order_detail', order_id=return_request.order_item.order.id)
+
+            return_request.save()
+    except Exception as e:
+        logger.error(f"Error processing return request {return_request.id}: {str(e)}")
+        messages.error(request, f"Error processing return request: {str(e)}")
+
+    return redirect('admin_order_detail', order_id=return_request.order_item.order.id)

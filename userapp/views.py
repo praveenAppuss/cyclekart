@@ -785,7 +785,7 @@ def remove_from_wishlist(request, wishlist_id):
     product_name = item.color_variant.product.name
     color_name = item.color_variant.name
     item.delete()
-    messages.success(request, f"{product_name} ({color_name}) removed from wishlist.")
+    messages.success(request, f"{product_name} ({color_name}) removed from wishlist.",extra_tags="wishlist")
     return redirect('wishlist')
 
 @login_required(login_url='user_login')
@@ -851,7 +851,7 @@ def add_to_cart_from_wishlist(request):
             messages.success(request, f"{product.name} ({color_variant.name}, {stock_entry.size}) added to cart.")
 
         Wishlist.objects.filter(user=request.user, color_variant=color_variant).delete()
-        return redirect('cart_view')
+        return redirect('wishlist')
     return redirect('wishlist')
 
 

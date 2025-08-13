@@ -14,9 +14,11 @@
                     Cancel Entire Order
                 </button>
             {% endif %}
-            <a href="{% url 'download_invoice' order.id %}" class="bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-600">
-                Download Invoice (PDF)
-            </a>
+            {% if order.status|lower != 'cancelled' %}
+                <a href="{% url 'download_invoice' order.id %}" class="bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-600">
+                    Download Invoice (PDF)
+                </a>
+            {% endif %}
         </div>
 
         <!-- Order Cards for Each Item -->
