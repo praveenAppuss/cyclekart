@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import user_passes_test
 from django.views.decorators.http import require_POST
 from django.db.models import Q,Sum
 from django.core.paginator import Paginator
+from userapp.services import WalletService
 from userapp.models import CustomUser, Order, ReturnRequest, WalletTransaction
 from django.utils.text import slugify
 from adminapp.models import Product, Category, Brand, ProductColorVariant, ProductImage,ProductSizeStock
@@ -774,28 +775,47 @@ def update_order_status(request, order_id):
         messages.error(request, "Invalid status selected.")
         return redirect('adminapp:admin_order_detail', order_id=order.id)
 
-    # Check if the current status is 'cancelled'
     if order.status == 'cancelled':
         logger.warning(f"Attempted to update status of cancelled order {order.order_id}")
         messages.error(request, "Cannot update status of a cancelled order.")
         return redirect('admin_order_detail', order_id=order.id)
 
     if new_status != order.status:
-        order.status = new_status
-        if new_status == 'delivered':
-            order.delivered_at = timezone.now()
-        elif new_status == 'cancelled':
-            order.cancelled_at = timezone.now()
-        # Add returned handling if needed
-        elif new_status == 'returned':
-            order.delivered_at = None
-            order.cancelled_at = None
-        else:
-            order.delivered_at = None
-            order.cancelled_at = None
-        order.save()
-        logger.info(f"Order {order.order_id} status updated to {new_status}")
-        messages.success(request, f"Order {order.order_id} status updated to {order.get_status_display()}.")
+        with transaction.atomic():
+            order.status = new_status
+            if new_status == 'delivered':
+                order.delivered_at = timezone.now()
+                if order.payment_status == 'pending' and order.payment_method != 'cod':
+                    order.payment_status = 'paid'
+            elif new_status == 'cancelled':
+                order.cancelled_at = timezone.now()
+                if order.payment_status == 'paid' and order.payment_method != 'cod':
+                    # Trigger refund logic (assume WalletService or similar)
+                    try:
+                        wallet = order.user.wallet
+                        refund_amount = order.total_amount
+                        WalletService.add_balance(wallet, refund_amount, f"Refund for cancelled Order {order.order_id}", order)
+                        order.payment_status = 'pending'  # Reset after refund
+                        logger.info(f"Refunded ₹{refund_amount} for cancelled order {order.order_id}")
+                    except Exception as e:
+                        logger.error(f"Refund failed for order {order.order_id}: {str(e)}")
+                        messages.warning(request, "Status updated, but refund failed.")
+            elif new_status == 'returned':
+                order.returned_at = timezone.now()
+                order.delivered_at = None
+                order.cancelled_at = None
+                # Ensure all items are return_accepted before setting to 'returned'
+                if not order.items.filter(status='return_accepted').exists():
+                    messages.error(request, "Cannot set to 'returned' unless all items are return accepted.")
+                    return redirect('admin_order_detail', order_id=order.id)
+            else:
+                order.delivered_at = None
+                order.cancelled_at = None
+                order.returned_at = None
+
+            order.save()
+            logger.info(f"Order {order.order_id} status updated to {new_status}")
+            messages.success(request, f"Order {order.order_id} status updated to {order.get_status_display()}.")
     else:
         messages.info(request, "No changes made to order status.")
 
@@ -806,63 +826,69 @@ def update_order_status(request, order_id):
 def verify_return_request(request, request_id):
     return_request = get_object_or_404(ReturnRequest, id=request_id)
     action = request.POST.get('action')  # 'accept' or 'reject'
+    item = return_request.order_item
+    order = item.order
 
     try:
         with transaction.atomic():
             if action == 'accept':
                 return_request.status = 'accepted'
                 return_request.verified_at = timezone.now()
-                return_request.order_item.status = 'returned'
-                return_request.order_item.save()
+                item.status = 'return_accepted'
+                item.is_return_approved = True
+                item.save()
 
                 # Refund to wallet
-                order = return_request.order_item.order
                 if order.payment_method != 'cod':
-                    refund_amount = (return_request.order_item.discount_price or return_request.order_item.price) * return_request.order_item.quantity
+                    refund_amount = (item.discount_price or item.price) * item.quantity
                     wallet = return_request.user.wallet
                     WalletTransaction.objects.create(
                         wallet=wallet,
                         order=order,
                         amount=refund_amount,
                         transaction_type='credit',
-                        description=f"Refund for return of {return_request.order_item.product.name} (Order {order.order_id})"
+                        description=f"Refund for return of {item.product.name} (Order {order.order_id})"
                     )
                     wallet.balance += refund_amount
                     wallet.save()
+                    if order.payment_status == 'paid':
+                        order.payment_status = 'pending'  # Reset after refund
+                        order.save()
                     logger.info(f"Refunded ₹{refund_amount} to wallet for {return_request.user.username} (Order {order.order_id})")
                     messages.success(request, f"Return request accepted. ₹{refund_amount} refunded to user's wallet.")
 
                 # Update stock
-                if return_request.order_item.color_variant and return_request.order_item.size:
+                if item.color_variant and item.size:
                     try:
-                        size_stock = ProductSizeStock.objects.get(
-                            color_variant=return_request.order_item.color_variant,
-                            size=return_request.order_item.size
-                        )
-                        size_stock.quantity += return_request.order_item.quantity
+                        size_stock = ProductSizeStock.objects.get(color_variant=item.color_variant, size=item.size)
+                        size_stock.quantity += item.quantity
                         size_stock.save()
-                        logger.info(f"Stock updated for {size_stock} (+{return_request.order_item.quantity})")
+                        logger.info(f"Stock updated for {size_stock} (+{item.quantity})")
                     except ProductSizeStock.DoesNotExist:
-                        logger.error(f"Stock not found for {return_request.order_item.color_variant}, {return_request.order_item.size}")
+                        logger.error(f"Stock not found for {item.color_variant}, {item.size}")
                         messages.warning(request, "Return accepted, but stock not updated: variant/size not found.")
 
-                # Update order status if all items are returned/cancelled
-                if not order.items.filter(status='active').exists():
+                # Update order status if all items are returned or cancelled
+                if not order.items.filter(status__in=['active', 'return_requested']).exists():
                     order.status = 'returned'
-                    order.return_reason = return_request.reason
+                    order.returned_at = timezone.now()
                     order.save()
                     logger.info(f"Order {order.order_id} status updated to 'returned'")
 
             elif action == 'reject':
                 return_request.status = 'rejected'
                 return_request.verified_at = timezone.now()
+                item.status = 'return_rejected'
+                item.is_return_rejected = True
+                item.return_rejected_reason = request.POST.get('reason', 'No reason provided')
+                item.save()
                 messages.success(request, "Return request rejected.")
             else:
                 messages.error(request, "Invalid action.")
-                return redirect('admin_order_detail', order_id=return_request.order_item.order.id)
+                return redirect('admin_order_detail', order_id=item.order.id)
 
             return_request.save()
     except Exception as e:
         logger.error(f"Error processing return request {return_request.id}: {str(e)}")
         messages.error(request, f"Error processing return request: {str(e)}")
-    return redirect('admin_order_detail', order_id=return_request.order_item.order.id)
+    return redirect('admin_order_detail', order_id=item.order.id)

@@ -14,12 +14,14 @@
                     Cancel Entire Order
                 </button>
             {% endif %}
-            {% if order.status|lower != 'cancelled' %}
+            {% if order.payment_status == 'paid' and order.status|lower != 'cancelled' %}
                 <a href="{% url 'download_invoice' order.id %}" class="bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-600">
                     Download Invoice (PDF)
                 </a>
             {% endif %}
         </div>
+
+       
 
         <!-- Order Cards for Each Item -->
         {% for item in items %}
@@ -35,30 +37,34 @@
                     <!-- Order Status & ETA -->
                     <div class="flex items-center gap-4 mt-2">
                         {% if item.status|lower == 'cancelled' %}
-                        <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Cancelled</span>
+                            <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Cancelled</span>
+                        {% elif item.status|lower == 'return_accepted' %}
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Return Accepted</span>
+                        {% elif item.status|lower == 'return_rejected' %}
+                            <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Return Rejected</span>
+                        {% elif item.status|lower == 'return_requested' %}
+                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">Return Requested</span>
                         {% elif order.status|lower == 'delivered' %}
-                        <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Delivered</span>
-                        {% elif order.status|lower == 'returned' %}
-                        <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Returned</span>
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Delivered</span>
                         {% else %}
-                        <span class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">Processing</span>
+                            <span class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">Processing</span>
                         {% endif %}
                         <span class="text-sm text-gray-600">Expected by {{ order.created_at|date:"d/m/Y" }}</span>
                     </div>
 
                     <!-- Payment Status -->
                     <div class="mt-1">
-                        <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">payment status :</span>
-                        {% if order.payment_method == 'cod' and order.status|lower != 'delivered' and order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
-                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">PENDING</span>
-                        {% elif order.payment_method != 'cod' and order.status|lower == 'cancelled' %}
-                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">REFUNDED</span>
-                        {% elif order.payment_method != 'cod' and order.status|lower == 'returned' %}
-                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">REFUNDED</span>
-                        {% elif order.status|lower == 'delivered' %}
-                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">COMPLETED</span>
-                        {% elif order.payment_method != 'cod' and order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
-                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">COMPLETED</span>
+                        <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Payment Status:</span>
+                        {% if order.payment_status == 'pending' %}
+                            <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">Pending</span>
+                        {% elif order.payment_status == 'failed' %}
+                            <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Failed</span>
+                        {% elif order.payment_status == 'paid' and order.status|lower == 'cancelled' %}
+                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>
+                        {% elif order.payment_status == 'paid' and order.status|lower == 'returned' and item.status|lower == 'return_accepted' %}
+                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>
+                        {% elif order.payment_status == 'paid' %}
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Completed</span>
                         {% endif %}
                     </div>
                 </div>
@@ -67,23 +73,85 @@
             <!-- Action Button -->
             {% if item.status|lower == 'active' %}
                 {% if order.status|lower == 'delivered' %}
-                <div class="mt-4 sm:mt-0">
-                    <button onclick="openModal('return', {{ item.id }})" class="bg-yellow-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-yellow-600">
-                        Return Item
-                    </button>
-                </div>
+                    <div class="mt-4 sm:mt-0">
+                        <button onclick="openModal('return', {{ item.id }})" class="bg-yellow-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-yellow-600">
+                            Return Item
+                        </button>
+                    </div>
                 {% elif order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
-                <div class="mt-4 sm:mt-0">
-                    <button onclick="openModal('cancel', {{ item.id }})" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
-                        Cancel Item
-                    </button>
-                </div>
+                    <div class="mt-4 sm:mt-0">
+                        <button onclick="openModal('cancel', {{ item.id }})" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
+                            Cancel Item
+                        </button>
+                    </div>
                 {% endif %}
+            {% elif item.status|lower == 'return_requested' and not item.is_return_approved and not item.is_return_rejected %}
+                <div class="mt-4 sm:mt-0 text-sm text-gray-600">Awaiting Admin Review</div>
             {% endif %}
         </div>
         {% empty %}
         <p class="text-gray-600 text-center">No items in this order.</p>
         {% endfor %}
+
+         <!-- Order Status Tracker -->
+        <div class="mb-6">
+            <h4 class="font-semibold mb-4 text-lg text-gray-800">Order Progress</h4>
+            <div class="relative flex items-center justify-between text-sm font-medium bg-white p-6 rounded-xl shadow-lg">
+                {% for item in progress_data %}
+                    <div class="flex-1 text-center relative z-10">
+                        <!-- Debug: Check the icon value -->
+                        
+                        {% if item.status == "completed" %}
+                            <div class="w-10 h-10 mx-auto rounded-full bg-green-500 flex items-center justify-center transform transition-transform duration-300 hover:scale-110">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    {% if item.icon == "shopping-cart" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>{% endif %}
+                                    {% if item.icon == "truck" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM3 5h18M3 5v7a2 2 0 002 2h13.5M3 5l1.5 7M21 5l-1.5 7"></path>{% endif %}
+                                    {% if item.icon == "arrow-right-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7m0-14h6m-6 14h6"></path>{% endif %}
+                                    {% if item.icon == "check-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>{% endif %}
+                                    {% if item.icon == "refresh" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M4 4l5 5M19 19v-5h-5m5 5l-5-5M4 19l5-5m11-4a7 7 0 11-14 0 7 7 0 0114 0z"></path>{% endif %}
+                                    {% if item.icon == "x-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>{% endif %}
+                                </svg>
+                            </div>
+                            <p class="text-green-700 mt-2 font-semibold">{{ item.step }}</p>
+                        {% elif item.status == "current" %}
+                            <div class="w-10 h-10 mx-auto rounded-full bg-yellow-500 animate-pulse flex items-center justify-center transform transition-transform duration-300 hover:scale-110">
+                                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    {% if item.icon == "shopping-cart" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>{% endif %}
+                                    {% if item.icon == "truck" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM3 5h18M3 5v7a2 2 0 002 2h13.5M3 5l1.5 7M21 5l-1.5 7"></path>{% endif %}
+                                    {% if item.icon == "arrow-right-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7m0-14h6m-6 14h6"></path>{% endif %}
+                                    {% if item.icon == "check-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>{% endif %}
+                                    {% if item.icon == "refresh" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M4 4l5 5M19 19v-5h-5m5 5l-5-5M4 19l5-5m11-4a7 7 0 11-14 0 7 7 0 0114 0z"></path>{% endif %}
+                                    {% if item.icon == "x-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>{% endif %}
+                                </svg>
+                            </div>
+                            <p class="text-yellow-700 mt-2 font-semibold">{{ item.step }}</p>
+                        {% else %}
+                            <div class="w-10 h-10 mx-auto rounded-full bg-gray-300 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    {% if item.icon == "shopping-cart" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>{% endif %}
+                                    {% if item.icon == "truck" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0zM3 5h18M3 5v7a2 2 0 002 2h13.5M3 5l1.5 7M21 5l-1.5 7"></path>{% endif %}
+                                    {% if item.icon == "arrow-right-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7m0-14h6m-6 14h6"></path>{% endif %}
+                                    {% if item.icon == "check-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>{% endif %}
+                                    {% if item.icon == "refresh" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M4 4l5 5M19 19v-5h-5m5 5l-5-5M4 19l5-5m11-4a7 7 0 11-14 0 7 7 0 0114 0z"></path>{% endif %}
+                                    {% if item.icon == "x-circle" %}<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>{% endif %}
+                                </svg>
+                            </div>
+                            <p class="text-gray-500 mt-2">{{ item.step }}</p>
+                        {% endif %}
+
+                        {% if not forloop.last %}
+                            <div class="absolute top-5 left-1/2 transform -translate-x-1/2 w-full h-1 bg-gray-200 z-0">
+                                {% if item.status == "completed" %}
+                                    <div class="h-full bg-green-500 transition-all duration-500"></div>
+                                {% elif item.status == "current" %}
+                                    <div class="h-full bg-gradient-to-r from-green-500 to-gray-200 transition-all duration-500"></div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
 
         <!-- Delivery & Summary Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -100,12 +168,12 @@
             <div class="bg-white p-4 rounded-xl shadow-md">
                 <h4 class="font-semibold text-lg mb-2">Order Summary</h4>
                 <div class="text-sm text-gray-700 space-y-1">
-                    <div class="flex justify-between"><span>Subtotal</span><span>₹{{ order.subtotal|floatformat:2 }}</span></div>
-                    <div class="flex justify-between text-green-600"><span>Discount</span><span>- ₹{{ order.discount|floatformat:2 }}</span></div>
-                    <div class="flex justify-between"><span>Tax</span><span>₹{{ order.tax|floatformat:2 }}</span></div>
-                    <div class="flex justify-between"><span>Shipping</span><span>₹{{ order.shipping_cost|floatformat:2 }}</span></div>
+                    <div class="flex justify-between"><span>Subtotal</span><span>₹{{ subtotal|floatformat:2 }}</span></div>
+                    <div class="flex justify-between text-green-600"><span>Discount</span><span>- ₹{{ discount|floatformat:2 }}</span></div>
+                    <div class="flex justify-between"><span>Tax</span><span>₹{{ tax|floatformat:2 }}</span></div>
+                    <div class="flex justify-between"><span>Shipping</span><span>₹{{ shipping|floatformat:2 }}</span></div>
                     <hr class="my-1">
-                    <div class="flex justify-between font-semibold text-lg mt-1"><span>Total</span><span>₹{{ order.total_amount|floatformat:2 }}</span></div>
+                    <div class="flex justify-between font-semibold text-lg mt-1"><span>Total</span><span>₹{{ grand_total|floatformat:2 }}</span></div>
                 </div>
             </div>
         </div>

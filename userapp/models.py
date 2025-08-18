@@ -65,10 +65,12 @@ class Wishlist(models.Model):
 class Order(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
         ('shipped', 'Shipped'),
         ('out_for_delivery', 'Out for Delivery'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
+        ('returned', 'Returned'),  # Added
     ]
 
     PAYMENT_METHOD_CHOICES = [
@@ -78,27 +80,42 @@ class Order(models.Model):
         ('wallet', 'Wallet'),
     ]
 
+    PAYMENT_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('failed', 'Failed'),
+    ]
+
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='orders')
     address = models.ForeignKey(Address, on_delete=models.SET_NULL, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     order_id = models.CharField(max_length=100, unique=True)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cod')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')  # Added
     created_at = models.DateTimeField(auto_now_add=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    returned_at = models.DateTimeField(null=True, blank=True)  # Added
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    cancel_reason = models.TextField(blank=True, null=True)  # Optional reason for cancellation
-    return_reason = models.TextField(blank=True, null=True)  # Mandatory reason for return (to be validated in forms)
+    cancel_reason = models.TextField(blank=True, null=True)
+    return_reason = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"Order {self.order_id}"
 
-
 class OrderItem(models.Model):
+    STATUS_CHOICES = [
+        ('active', 'Ordered'),
+        ('cancelled', 'Cancelled'),
+        ('return_requested', 'Return Requested'),
+        ('return_accepted', 'Return Accepted'),
+        ('return_rejected', 'Return Rejected'),
+    ]
+
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
     color_variant = models.ForeignKey(ProductColorVariant, on_delete=models.SET_NULL, null=True, blank=True)
@@ -106,7 +123,15 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
     discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    status = models.CharField(max_length=20, choices=[('active', 'Active'), ('cancelled', 'Cancelled'), ('returned', 'Returned')], default='active')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    is_return_requested = models.BooleanField(default=False)  # Added
+    is_return_approved = models.BooleanField(default=False)  # Added
+    is_return_rejected = models.BooleanField(default=False)  # Added
+    is_cancelled = models.BooleanField(default=False)  # Added
+    return_reason = models.TextField(blank=True, null=True)  # Added
+    cancel_reason = models.TextField(blank=True, null=True)  # Added
+    return_rejected_reason = models.TextField(blank=True, null=True)  # Added
+    return_requested_at = models.DateTimeField(blank=True, null=True)  # Added
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"

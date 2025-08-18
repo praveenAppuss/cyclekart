@@ -1105,14 +1105,13 @@ def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     items = order.items.select_related('product').all()
 
-    # Price calculations
+    # Price calculations (for verification, but use model fields where possible)
     subtotal = Decimal('0.00')
     total_discount = Decimal('0.00')
     total_quantity = 0
 
     for item in items:
-        product = item.product
-        original_price = item.price  # Use OrderItem price for accuracy
+        original_price = item.price
         discount_price = item.discount_price if item.discount_price else original_price
         quantity = item.quantity
 
@@ -1123,22 +1122,41 @@ def order_detail(request, order_id):
         total_discount += item_discount
         total_quantity += quantity
 
-    # Use model fields for accuracy
+    # Use model fields for accuracy and consistency with stored values
     shipping_cost = order.shipping_cost
     taxes = order.tax
-    final_total = order.total_amount  # Use stored total_amount for consistency
+    final_total = order.total_amount
+
+    # Prepare progress tracker data
+    steps = ["Pending", "Confirmed", "Shipped", "Out for Delivery", "Delivered", "Returned", "Cancelled"]
+    status_map = ["pending", "confirmed", "shipped", "out_for_delivery", "delivered", "returned", "cancelled"]
+    icons = ["shopping-cart", "truck", "arrow-right-circle", "check-circle", "refresh", "x-circle", "x-circle"]
+    current_step = status_map.index(order.status.lower()) if order.status.lower() in status_map else 0
+
+    # Precompute step data with statuses
+    progress_data = []
+    for index in range(len(steps)):
+        status = "completed" if index < current_step else "current" if index == current_step else "future"
+        progress_data.append({
+            'step': steps[index],
+            'icon': icons[index],  # Ensure exact match with template conditions
+            'status': status
+        })
 
     context = {
         'order': order,
         'items': items,
-        'subtotal': subtotal,
-        'discount': total_discount,
+        'subtotal': order.subtotal,
+        'discount': order.discount,
         'tax': taxes,
         'shipping': shipping_cost,
         'grand_total': final_total,
         'total_quantity': total_quantity,
+        'progress_data': progress_data,
     }
     return render(request, 'order_detail.html', context)
+
+
 
 import logging
 
@@ -1151,6 +1169,7 @@ def cancel_order(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     item_id = request.POST.get('item_id')
     reason = request.POST.get('reason', '').strip()
+
     try:
         with transaction.atomic():
             items_to_cancel = []
@@ -1170,56 +1189,50 @@ def cancel_order(request, order_id):
             refund_amount = Decimal('0.00')
             for item in items_to_cancel:
                 item.status = 'cancelled'
+                item.is_cancelled = True
+                item.cancel_reason = reason if reason else None
                 item.save()
                 logger.info(f"Item {item.id} status updated to 'cancelled' for order {order.order_id}")
 
-                # Stock adjustment: Only proceed if both color_variant and size exist
                 if item.color_variant and item.size:
                     try:
-                        size_stock = ProductSizeStock.objects.get(
-                            color_variant=item.color_variant,
-                            size=item.size
-                        )
+                        size_stock = ProductSizeStock.objects.get(color_variant=item.color_variant, size=item.size)
                         initial_quantity = size_stock.quantity
                         size_stock.quantity += item.quantity
                         size_stock.save()
-                        logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} "
-                                    f"(from {initial_quantity} to {size_stock.quantity})")
+                        logger.info(f"Stock adjusted for ProductSizeStock {size_stock.id} (from {initial_quantity} to {size_stock.quantity})")
                     except ProductSizeStock.DoesNotExist:
-                        logger.error(f"ProductSizeStock not found for item {item.id} "
-                                     f"(color_variant: {item.color_variant}, size: {item.size})")
+                        logger.error(f"ProductSizeStock not found for item {item.id} (color_variant: {item.color_variant}, size: {item.size})")
                         messages.warning(request, f"Item cancelled, but stock not updated: variant/size not found.")
                     except Exception as e:
                         logger.error(f"Stock adjustment failed for item {item.id}: {str(e)}")
                         messages.warning(request, f"Item cancelled, but stock adjustment failed.")
                 else:
-                    logger.warning(f"Skipping stock update for item {item.id}: "
-                                   f"color_variant={item.color_variant}, size={item.size}")
+                    logger.warning(f"Skipping stock update for item {item.id}: color_variant={item.color_variant}, size={item.size}")
                     messages.warning(request, f"Item cancelled, but stock not updated: missing variant/size data.")
 
-                # Accumulate refund (use discount_price if applicable)
                 refund_amount += (item.discount_price or item.price) * item.quantity
 
-            # Update order status if no active items remain
             if not order.items.filter(status='active').exists():
                 order.status = 'cancelled'
-                order.cancelled_at = timezone.now()  # Correct usage
+                order.cancelled_at = timezone.now()
+                order.cancel_reason = reason if reason else None
+                order.save()
                 logger.info(f"Order {order.order_id} status updated to 'cancelled'")
 
-            order.cancel_reason = reason if reason else None
-            order.save()
-
-        # Handle refund outside transaction
-        if order.payment_method != 'cod' and refund_amount > 0:
-            try:
-                wallet = order.user.wallet
-                WalletService.add_balance(wallet, refund_amount, f"Refund for Order {order.order_id}", order)
-                messages.success(request, f"{'Item' if item_id else 'Order'} cancelled and refund processed.")
-            except Exception as e:
-                logger.error(f"Refund failed for order {order.order_id}: {str(e)}")
-                messages.warning(request, f"{'Item' if item_id else 'Order'} cancelled, but refund failed.")
-        else:
-            messages.success(request, f"{'Item' if item_id else 'Order'} cancelled successfully.")
+            if refund_amount > 0 and order.payment_method != 'cod':
+                try:
+                    wallet = order.user.wallet
+                    WalletService.add_balance(wallet, refund_amount, f"Refund for Order {order.order_id}", order)
+                    if order.payment_status == 'paid':
+                        order.payment_status = 'pending'  # Reset after refund
+                        order.save()
+                    messages.success(request, f"{'Item' if item_id else 'Order'} cancelled and ₹{refund_amount} refunded.")
+                except Exception as e:
+                    logger.error(f"Refund failed for order {order.order_id}: {str(e)}")
+                    messages.warning(request, f"{'Item' if item_id else 'Order'} cancelled, but refund failed.")
+            else:
+                messages.success(request, f"{'Item' if item_id else 'Order'} cancelled successfully.")
 
     except Exception as e:
         logger.error(f"Error cancelling order {order.order_id}: {str(e)}")
@@ -1239,7 +1252,6 @@ def return_order(request, order_id):
     if not reason:
         messages.error(request, "Return reason is required.")
         return redirect('order_detail', order_id=order.id)
-    
 
     if order.status != 'delivered':
         messages.error(request, "Order must be delivered to request a return.")
@@ -1251,43 +1263,34 @@ def return_order(request, order_id):
                 item = get_object_or_404(OrderItem, id=item_id, order=order)
                 if item.status == 'active':
                     ReturnRequest.objects.create(order_item=item, user=request.user, reason=reason, status='pending')
-                    item.status = 'returned'
+                    item.status = 'return_requested'
+                    item.is_return_requested = True
+                    item.return_reason = reason
+                    item.return_requested_at = timezone.now()
                     item.save()
-                    # Update stock using ProductSizeStock
-                    if item.color_variant and item.size:
-                        try:
-                            size_stock = ProductSizeStock.objects.get(
-                                color_variant=item.color_variant,
-                                size=item.size
-                            )
-                            size_stock.quantity += item.quantity
-                            size_stock.save()
-                        except ProductSizeStock.DoesNotExist:
-                            messages.warning(request, f"Stock not updated for {item.product.name} (variant: {item.color_variant.name}, size: {item.size}): record not found.")
+                    # Stock update (optional, typically done on acceptance)
+                    logger.info(f"Return request submitted for item {item.id} in order {order.order_id}")
+                else:
+                    messages.error(request, f"Item {item_id} cannot be returned: already {item.status}.")
+                    return redirect('order_detail', order_id=order.id)
             else:
                 for item in order.items.filter(status='active'):
                     ReturnRequest.objects.create(order_item=item, user=request.user, reason=reason, status='pending')
-                    item.status = 'returned'
+                    item.status = 'return_requested'
+                    item.is_return_requested = True
+                    item.return_reason = reason
+                    item.return_requested_at = timezone.now()
                     item.save()
-                    # Update stock using ProductSizeStock
-                    if item.color_variant and item.size:
-                        try:
-                            size_stock = ProductSizeStock.objects.get(
-                                color_variant=item.color_variant,
-                                size=item.size
-                            )
-                            size_stock.quantity += item.quantity
-                            size_stock.save()
-                        except ProductSizeStock.DoesNotExist:
-                            messages.warning(request, f"Stock not updated for {item.product.name} (variant: {item.color_variant.name}, size: {item.size}): record not found.")
+                    logger.info(f"Return request submitted for item {item.id} in order {order.order_id}")
 
-            # Update order status to 'return request' if any item is returned
-            if order.items.filter(status='returned').exists() and order.status != 'returned':
-                order.status = 'return request'
+            # Update order status if any item is return_requested
+            if order.items.filter(status='return_requested').exists() and order.status not in ['returned', 'cancelled']:
+                order.status = 'return request'  # Custom state, adjust as needed
                 order.save()
             messages.success(request, "Return request submitted for verification.")
 
     except Exception as e:
+        logger.error(f"Error submitting return request for order {order.order_id}: {str(e)}")
         messages.error(request, f"Error submitting return request: {str(e)}")
         return redirect('order_detail', order_id=order.id)
 
