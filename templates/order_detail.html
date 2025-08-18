@@ -4,8 +4,8 @@
 {% block content %}
 <div class="min-h-screen bg-slate-50 px-4 py-8">
     <div class="max-w-5xl mx-auto">
-        <h2 class="text-3xl font-bold mb-2">Order Tracking - {{ order.order_id }}</h2>
-        <p class="text-sm text-gray-600 mb-6">Track your order status and delivery information for Order #{{ order.order_id }}</p>
+        <h2 class="text-xl font-bold mb-2">Order Tracking - {{ order.order_id }}</h2>
+        <p class="text-xs text-gray-600 mb-6">Track your order status and delivery information for Order #{{ order.order_id }}</p>
 
         <!-- Cancel Entire Order Button and Invoice Download -->
         <div class="mb-6 text-right space-x-2">
@@ -43,11 +43,12 @@
                         {% else %}
                         <span class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">Processing</span>
                         {% endif %}
-                        <span class="text-sm text-gray-600">Expected by {{ order.created_at|date:"m/d/Y" }}</span>
+                        <span class="text-sm text-gray-600">Expected by {{ order.created_at|date:"d/m/Y" }}</span>
                     </div>
 
                     <!-- Payment Status -->
                     <div class="mt-1">
+                        <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">payment status :</span>
                         {% if order.payment_method == 'cod' and order.status|lower != 'delivered' and order.status|lower != 'cancelled' and order.status|lower != 'returned' %}
                             <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">PENDING</span>
                         {% elif order.payment_method != 'cod' and order.status|lower == 'cancelled' %}

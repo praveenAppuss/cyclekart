@@ -739,7 +739,7 @@ def admin_order_list(request):
         orders = orders.order_by('-created_at')  # Fallback
 
     # Pagination
-    paginator = Paginator(orders, 10)  # 10 orders per page
+    paginator = Paginator(orders, 4)  # 10 orders per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -772,6 +772,12 @@ def update_order_status(request, order_id):
     if new_status not in dict(Order.STATUS_CHOICES):
         logger.error(f"Invalid status {new_status} for order {order.order_id}")
         messages.error(request, "Invalid status selected.")
+        return redirect('adminapp:admin_order_detail', order_id=order.id)
+
+    # Check if the current status is 'cancelled'
+    if order.status == 'cancelled':
+        logger.warning(f"Attempted to update status of cancelled order {order.order_id}")
+        messages.error(request, "Cannot update status of a cancelled order.")
         return redirect('admin_order_detail', order_id=order.id)
 
     if new_status != order.status:
@@ -780,6 +786,10 @@ def update_order_status(request, order_id):
             order.delivered_at = timezone.now()
         elif new_status == 'cancelled':
             order.cancelled_at = timezone.now()
+        # Add returned handling if needed
+        elif new_status == 'returned':
+            order.delivered_at = None
+            order.cancelled_at = None
         else:
             order.delivered_at = None
             order.cancelled_at = None
@@ -790,7 +800,6 @@ def update_order_status(request, order_id):
         messages.info(request, "No changes made to order status.")
 
     return redirect('admin_order_detail', order_id=order.id)
-
 
 @superuser_required
 @require_POST
@@ -856,5 +865,4 @@ def verify_return_request(request, request_id):
     except Exception as e:
         logger.error(f"Error processing return request {return_request.id}: {str(e)}")
         messages.error(request, f"Error processing return request: {str(e)}")
-
     return redirect('admin_order_detail', order_id=return_request.order_item.order.id)

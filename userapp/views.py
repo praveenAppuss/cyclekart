@@ -1239,6 +1239,7 @@ def return_order(request, order_id):
     if not reason:
         messages.error(request, "Return reason is required.")
         return redirect('order_detail', order_id=order.id)
+    
 
     if order.status != 'delivered':
         messages.error(request, "Order must be delivered to request a return.")
@@ -1252,21 +1253,38 @@ def return_order(request, order_id):
                     ReturnRequest.objects.create(order_item=item, user=request.user, reason=reason, status='pending')
                     item.status = 'returned'
                     item.save()
-                    size_stock = item.size_stock
-                    size_stock.quantity += item.quantity
-                    size_stock.save()
+                    # Update stock using ProductSizeStock
+                    if item.color_variant and item.size:
+                        try:
+                            size_stock = ProductSizeStock.objects.get(
+                                color_variant=item.color_variant,
+                                size=item.size
+                            )
+                            size_stock.quantity += item.quantity
+                            size_stock.save()
+                        except ProductSizeStock.DoesNotExist:
+                            messages.warning(request, f"Stock not updated for {item.product.name} (variant: {item.color_variant.name}, size: {item.size}): record not found.")
             else:
                 for item in order.items.filter(status='active'):
                     ReturnRequest.objects.create(order_item=item, user=request.user, reason=reason, status='pending')
                     item.status = 'returned'
                     item.save()
-                    size_stock = item.size_stock
-                    size_stock.quantity += item.quantity
-                    size_stock.save()
+                    # Update stock using ProductSizeStock
+                    if item.color_variant and item.size:
+                        try:
+                            size_stock = ProductSizeStock.objects.get(
+                                color_variant=item.color_variant,
+                                size=item.size
+                            )
+                            size_stock.quantity += item.quantity
+                            size_stock.save()
+                        except ProductSizeStock.DoesNotExist:
+                            messages.warning(request, f"Stock not updated for {item.product.name} (variant: {item.color_variant.name}, size: {item.size}): record not found.")
+
             # Update order status to 'return request' if any item is returned
             if order.items.filter(status='returned').exists() and order.status != 'returned':
                 order.status = 'return request'
-            order.save()
+                order.save()
             messages.success(request, "Return request submitted for verification.")
 
     except Exception as e:
