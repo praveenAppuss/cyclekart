@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     # Your apps
     'userapp',
     'adminapp',
+    'widget_tweaks',
 ]
 
 SITE_ID = 1

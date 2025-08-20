@@ -209,6 +209,7 @@ def resend_otp(request):
     if not signup_data:
         return redirect('user_signup')
     otp = str(random.randint(100000, 999999))
+    print(otp)
     request.session['otp'] = otp
     send_mail(
         subject='CycleKart - Resend OTP',
@@ -217,6 +218,7 @@ def resend_otp(request):
         recipient_list=[signup_data['email']],
         fail_silently=False,
     )
+    print(otp)
     return redirect('verify_otp')
 
 
@@ -1333,3 +1335,29 @@ def wallet_page(request):
     wallet, created = Wallet.objects.get_or_create(user=request.user)
     transactions = wallet.transactions.all().order_by('-created_at')
     return render(request, "wallet.html", {"wallet": wallet, "transactions": transactions})
+
+
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
+from allauth.socialaccount.models import SocialAccount
+
+
+@login_required
+def change_password(request):
+    # Check if user is Google authenticated
+    if SocialAccount.objects.filter(user=request.user, provider='google').exists():
+        return render(request, "change_password.html", {"is_google_user": True})
+
+    if request.method == "POST":
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)  # Keeps user logged in
+            messages.success(request, "Password updated successfully.")
+            return redirect('change_password')  # Redirect to avoid resubmission
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = PasswordChangeForm(request.user)
+
+    return render(request, "change_password.html", {"form": form, "is_google_user": False})
