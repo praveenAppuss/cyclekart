@@ -135,6 +135,10 @@ class OrderItem(models.Model):
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"
+    
+    class Meta:
+        verbose_name = "Order Item"
+        verbose_name_plural = "Order Items"
 
 
 class Wallet(models.Model):

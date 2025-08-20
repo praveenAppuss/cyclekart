@@ -21,8 +21,6 @@
             {% endif %}
         </div>
 
-       
-
         <!-- Order Cards for Each Item -->
         {% for item in items %}
         <div class="bg-white p-4 rounded-xl shadow-md mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center">
@@ -38,14 +36,16 @@
                     <div class="flex items-center gap-4 mt-2">
                         {% if item.status|lower == 'cancelled' %}
                             <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Cancelled</span>
-                        {% elif item.status|lower == 'return_accepted' %}
-                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Return Accepted</span>
                         {% elif item.status|lower == 'return_rejected' %}
                             <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Return Rejected</span>
                         {% elif item.status|lower == 'return_requested' %}
                             <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">Return Requested</span>
-                        {% elif order.status|lower == 'delivered' %}
+                        {% elif order.status|lower == 'delivered' and item.status|lower == 'active' %}
                             <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Delivered</span>
+                        {% elif order.status|lower == 'returned' and item.status|lower == 'return_accepted' %}
+                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Returned</span>
+                        {% elif item.status|lower == 'return_accepted' %}
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Return Accepted</span>
                         {% else %}
                             <span class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">Processing</span>
                         {% endif %}
@@ -59,12 +59,14 @@
                             <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">Pending</span>
                         {% elif order.payment_status == 'failed' %}
                             <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Failed</span>
+                        {% elif order.status|lower == 'delivered' and order.payment_status == 'paid' %}
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Paid</span>
+                        {% elif order.status|lower == 'returned' and order.payment_status == 'paid' and item.status|lower == 'return_accepted' %}
+                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>
                         {% elif order.payment_status == 'paid' and order.status|lower == 'cancelled' %}
                             <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>
-                        {% elif order.payment_status == 'paid' and order.status|lower == 'returned' and item.status|lower == 'return_accepted' %}
-                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>
                         {% elif order.payment_status == 'paid' %}
-                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Completed</span>
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Paid</span>
                         {% endif %}
                     </div>
                 </div>

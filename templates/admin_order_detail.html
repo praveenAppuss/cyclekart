@@ -46,6 +46,21 @@
                     {% if order.return_reason %}<p><strong>Return Reason:</strong> {{ order.return_reason }}</p>{% endif %}
                 </div>
             </div>
+            <div class="max-w-xs bg-white p-6 rounded-xl shadow-md mb-8">
+                <h3 class="text-lg font-semibold mb-4 border-b pb-2">Update Order Status</h3>
+                <form method="POST" action="{% url 'update_order_status' order.id %}">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
+                        <select name="status" id="status" class="w-full border rounded-md p-2 text-sm">
+                            {% for status_value, status_label in order.STATUS_CHOICES %}
+                                <option value="{{ status_value }}" {% if order.status == status_value %}selected{% endif %}>{{ status_label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Update Status</button>
+                </form>
+            </div>
         </div>
 
         <!-- Order Items -->
@@ -61,6 +76,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200">
@@ -81,80 +97,34 @@
                                     {{ item.get_status_display }}
                                 </span>
                             </td>
+                            <td class="px-6 py-4 text-sm">
+    {% if item.status == 'return_requested' %}
+        <form method="POST" action="{% url 'return_accept' item.id %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="text-green-600 hover:text-green-800 mr-2">Accept</button>
+        </form>
+        <form method="POST" action="{% url 'return_reject' item.id %}" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="text-red-600 hover:text-red-800">Reject</button>
+        </form>
+    {% elif item.status == 'return_accepted' %}
+        <span class="text-green-600">Accepted</span>
+    {% elif item.status == 'return_rejected' %}
+        <span class="text-red-600">Rejected</span>
+        {% if item.return_rejected_reason %}<br><small class="text-muted">{{ item.return_rejected_reason }}</small>{% endif %}
+    {% else %}
+        <span class="text-gray-500">N/A</span>
+    {% endif %}
+</td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-sm text-gray-500 text-center">No items in this order.</td>
+                            <td colspan="7" class="px-6 py-4 text-sm text-gray-500 text-center">No items in this order.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <div class="max-w-xs bg-white p-6 rounded-xl shadow-md mb-8">
-            <h3 class="text-lg font-semibold mb-4 border-b pb-2">Update Order Status</h3>
-            <form method="POST" action="{% url 'update_order_status' order.id %}">
-                {% csrf_token %}
-                <div class="mb-4">
-                    <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
-                    <select name="status" id="status" class="w-full border rounded-md p-2 text-sm">
-                        {% for status_value, status_label in order.STATUS_CHOICES %}
-                            <option value="{{ status_value }}" {% if order.status == status_value %}selected{% endif %}>{{ status_label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Update Status</button>
-            </form>
-        </div>
-
-        <!-- Return Requests -->
-        <div class="bg-white p-6 rounded-xl shadow-md mb-8">
-            <h3 class="text-lg font-semibold mb-4 border-b pb-2">Return Requests</h3>
-            <table class="min-w-full divide-y divide-gray-200">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-200">
-                    {% for request in order.items.return_requests.all %}
-                    <tr>
-                        <td class="px-6 py-4 text-sm text-gray-900">{{ request.order_item.product.name }}</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">{{ request.reason }}</td>
-                        <td class="px-6 py-4 text-sm">
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if request.status == 'pending' %}bg-blue-100 text-blue-800
-                                {% elif request.status == 'accepted' %}bg-green-100 text-green-700
-                                {% elif request.status == 'rejected' %}bg-red-100 text-red-700{% endif %}">
-                                {{ request.get_status_display }}
-                            </span>
-                        </td>
-                        <td class="px-6 py-4 text-sm">
-                            {% if request.status == 'pending' %}
-                            <form method="POST" action="{% url 'verify_return_request' request.id %}" class="inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="accept">
-                                <button type="submit" class="text-green-600 hover:text-green-800 mr-2">Accept</button>
-                            </form>
-                            <form method="POST" action="{% url 'verify_return_request' request.id %}" class="inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="reject" name="reason" id="reason">
-                                <button type="submit" class="text-red-600 hover:text-red-800">Reject</button>
-                            </form>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="4" class="px-6 py-4 text-sm text-gray-500 text-center">No return requests.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
         </div>
 
         <!-- Order Summary -->

@@ -1,0 +1,61 @@
+{% extends 'header.html' %}
+{% load static %}
+{% block content %}
+
+<div class="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+    <!-- Sidebar -->
+    {% include 'sidebar.html' %}
+
+    <!-- Main Wallet Section -->
+    <div class="flex-1 p-8">
+        <h1 class="text-2xl font-bold mb-6">Wallet</h1>
+
+        <!-- Wallet Balance -->
+        <div class="bg-white rounded-xl shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold">Wallet Balance</h2>
+            <p class="mt-2 text-xl font-bold text-green-600">
+                Available wallet balance: ₹{{ wallet.balance }}
+            </p>
+        </div>
+
+        <!-- Wallet Transactions -->
+        <div class="bg-white rounded-xl shadow p-6">
+            <h2 class="text-lg font-semibold mb-4">Wallet Transaction History</h2>
+            
+            <table class="w-full text-sm text-left">
+                <thead>
+                    <tr class="border-b">
+                        <th class="px-4 py-2">Transaction ID</th>
+                        <th class="px-4 py-2">Date</th>
+                        <th class="px-4 py-2">Amount</th>
+                        <th class="px-4 py-2">Type</th>
+                        <th class="px-4 py-2">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in transactions %}
+                    <tr class="border-b">
+                        <td class="px-4 py-2">{{ t.id }}</td>
+                        <td class="px-4 py-2">{{ t.created_at|date:"d M Y" }}</td>
+                        <td class="px-4 py-2 {% if t.transaction_type == 'credit' %}text-green-600{% else %}text-red-600{% endif %}">
+                            ₹{{ t.amount }}
+                        </td>
+                        <td class="px-4 py-2 capitalize">{{ t.transaction_type }}</td>
+                        <td class="px-4 py-2">
+                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
+                                SUCCESS
+                            </span>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4">No transactions found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

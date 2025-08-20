@@ -26,8 +26,8 @@ urlpatterns = [
     path('orders/', views.admin_order_list, name='admin_order_list'),
     path('orders/<int:order_id>/', views.admin_order_detail, name='admin_order_detail'),
     path('orders/<int:order_id>/status/', views.update_order_status, name='update_order_status'),
-    path('return-request/<int:request_id>/verify/', views.verify_return_request, name='verify_return_request'),
-
+    path('admin/order/<int:item_id>/accept-return/',views.return_accept, name='return_accept'),
+    path('admin/order/<int:item_id>/reject-return/',views.return_reject, name='return_reject'),
 
 
 ]

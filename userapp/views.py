@@ -18,7 +18,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib.messages import get_messages
 from django.contrib import messages
 from adminapp.models import Product,Category,Brand,ProductSizeStock,ProductColorVariant
-from userapp.models import CustomUser,Address,Cart,CartItem, ReturnRequest,Wishlist,Order,OrderItem
+from userapp.models import CustomUser,Address,Cart,CartItem, ReturnRequest,Wishlist,Order,OrderItem,Wallet,WalletTransaction
 import re
 from django.views.decorators.cache import never_cache
 from .utils import no_cache_view,calculate_cart_total
@@ -1295,3 +1295,41 @@ def return_order(request, order_id):
         return redirect('order_detail', order_id=order.id)
 
     return redirect('order_detail', order_id=order.id)
+
+
+def process_return_request(request, order_id):
+    order = get_object_or_404(Order, id=order_id)
+
+    if order.payment_status == "Paid" and order.return_status == "Accepted":
+        wallet, created = Wallet.objects.get_or_create(user=order.user)
+
+        # Refund the amount
+        refund_amount = Decimal(order.total_price)
+        wallet.balance += refund_amount
+        wallet.save()
+
+        # Create transaction
+        WalletTransaction.objects.create(
+            wallet=wallet,
+            order=order,
+            amount=refund_amount,
+            transaction_type="credit",
+            description="Refund for returned order"
+        )
+
+        # Update order/payment status
+        order.payment_status = "Refunded"
+        order.save()
+
+        messages.success(request, f"₹{refund_amount} has been refunded to your wallet.")
+    else:
+        messages.error(request, "Return request is not eligible for refund.")
+
+    return redirect("wallet_page")
+
+
+@login_required
+def wallet_page(request):
+    wallet, created = Wallet.objects.get_or_create(user=request.user)
+    transactions = wallet.transactions.all().order_by('-created_at')
+    return render(request, "wallet.html", {"wallet": wallet, "transactions": transactions})

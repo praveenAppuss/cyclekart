@@ -34,5 +34,6 @@ urlpatterns = [
     path('orders/<int:order_id>/', views.order_detail, name='order_detail'),
     path('orders/<int:order_id>/cancel/', views.cancel_order, name='cancel_order'),
     path('return-order/<int:order_id>/', views.return_order, name='return_order'),
-
+    path("wallet/", views.wallet_page, name="wallet_page"),
+    path("orders/<int:order_id>/refund/", views.process_return_request, name="process_return_request"),
 ]
