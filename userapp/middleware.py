@@ -4,13 +4,13 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.urls import reverse 
 
+from django.utils.cache import add_never_cache_headers
 
-class DisableCacheMiddleware(MiddlewareMixin): 
+class NoCacheMiddleware(MiddlewareMixin):
     def process_response(self, request, response):
-        response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        response['Pragma'] = 'no-cache'
-        response['Expires'] = '0'
+        add_never_cache_headers(response)
         return response
+
     
 class BlockedUserMiddleware:
     def __init__(self, get_response):

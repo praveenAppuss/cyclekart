@@ -49,7 +49,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'adminapp.middleware.DisableAdminCacheMiddleware',
-    'userapp.middleware.DisableCacheMiddleware',
+    'userapp.middleware.NoCacheMiddleware',
     'userapp.middleware.BlockedUserMiddleware',
 ]
 
@@ -100,11 +100,15 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # ------------------ Allauth Redirects ------------------
+LOGIN_URL = 'user_login'
+LOGIN_REDIRECT_URL = 'user_home'
+LOGOUT_REDIRECT_URL = 'user_login'
 
-LOGIN_REDIRECT_URL = '/home/'
-ACCOUNT_LOGIN_REDIRECT_URL = '/home/'
-ACCOUNT_SIGNUP_REDIRECT_URL = '/home/'
-ACCOUNT_LOGOUT_REDIRECT_URL = '/login/'
+
+LOGIN_REDIRECT_URL = '/user_home/'
+ACCOUNT_LOGIN_REDIRECT_URL = '/user_home/'
+ACCOUNT_SIGNUP_REDIRECT_URL = '/user_home/'
+ACCOUNT_LOGOUT_REDIRECT_URL = '/user_login/'
 
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'  # Google handles it
