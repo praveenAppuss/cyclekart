@@ -1,4 +1,6 @@
 from django.utils import timezone
+from django.views.decorators.cache import cache_control
+
 from decimal import Decimal
 import uuid
 from django.forms import DecimalField
@@ -221,15 +223,18 @@ def resend_otp(request):
     print(otp)
     return redirect('verify_otp')
 
-
+@never_cache
+@cache_control(no_store=True, no_cache=True, must_revalidate=True, max_age=0)
 def user_logout(request):
     logout(request)
+    request.session.flush()
     return redirect('user_login')
 
 
 @login_required(login_url='user_login')
-@never_cache
-@no_cache_view
+# @never_cache
+# @no_cache_view
+@cache_control(no_store=True, no_cache=True, must_revalidate=True)
 def user_home(request):
     all_products = list(Product.objects.filter(is_active=True, is_deleted=False))
     featured_products = random.sample(all_products, min(len(all_products), 4))  

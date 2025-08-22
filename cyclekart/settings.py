@@ -49,6 +49,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'adminapp.middleware.DisableAdminCacheMiddleware',
+    'userapp.middleware.DisableCacheMiddleware',
+    'userapp.middleware.BlockedUserMiddleware',
 ]
 
 # ------------------ URL and WSGI ------------------
@@ -145,7 +147,7 @@ SOCIALACCOUNT_PROVIDERS = {
 
 
 
-# ✅ Custom adapters to skip confirmation and auto-link Google to email
+#  Custom adapters to skip confirmation and auto-link Google to email
 ACCOUNT_ADAPTER = 'userapp.adapters.NoNewUsersAccountAdapter'
 SOCIALACCOUNT_ADAPTER = 'userapp.adapters.AutoConnectSocialAccountAdapter'
 
