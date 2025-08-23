@@ -49,7 +49,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'adminapp.middleware.DisableAdminCacheMiddleware',
-    'userapp.middleware.NoCacheMiddleware',
+    'userapp.middleware.NoCacheForAuthenticatedMiddleware',
     'userapp.middleware.BlockedUserMiddleware',
 ]
 
@@ -109,6 +109,11 @@ LOGIN_REDIRECT_URL = '/user_home/'
 ACCOUNT_LOGIN_REDIRECT_URL = '/user_home/'
 ACCOUNT_SIGNUP_REDIRECT_URL = '/user_home/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/user_login/'
+
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_AGE = 60 * 30  # 30 min
+SESSION_SAVE_EVERY_REQUEST = True
+
 
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'  # Google handles it

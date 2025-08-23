@@ -1,7 +1,9 @@
 from django.utils import timezone
 from django.views.decorators.cache import cache_control
-
+from .otp import generate_otp, send_otp_email
 from decimal import Decimal
+import logging
+logger = logging.getLogger(__name__)
 import uuid
 from django.forms import DecimalField
 from .services import WalletService
@@ -33,9 +35,14 @@ import json
 from django.db.models import Exists, OuterRef
 from django.utils.safestring import mark_safe
 from django.views.decorators.http import require_POST
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
+from allauth.socialaccount.models import SocialAccount
+
 User = get_user_model()
 
 @no_cache_view
+@never_cache
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 def user_signup(request):
     if request.user.is_authenticated:
@@ -108,6 +115,7 @@ def user_signup(request):
 
 
 @no_cache_view
+@never_cache
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 def verify_otp(request):
     if request.user.is_authenticated:
@@ -165,6 +173,7 @@ def verify_otp(request):
 
 
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def user_login(request):
     if request.user.is_authenticated:
         return redirect('user_home')
@@ -205,7 +214,7 @@ def user_login(request):
     return render(request, 'user_login.html')
 
 
-
+@never_cache
 def resend_otp(request):
     signup_data = request.session.get('signup_data')
     if not signup_data:
@@ -225,14 +234,17 @@ def resend_otp(request):
 
 
 @cache_control(no_store=True, no_cache=True, must_revalidate=True, max_age=0)
+@never_cache
 def user_logout(request):
-    logout(request)
-    request.session.flush()
+    logout(request)              
+    request.session.flush()      
     return redirect('user_login')
 
 
+
 @login_required(login_url='user_login')
-@cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@cache_control(no_store=True, no_cache=True, must_revalidate=True,max_age=0)
+@never_cache
 def user_home(request):
     all_products = list(Product.objects.filter(is_active=True, is_deleted=False))
     featured_products = random.sample(all_products, min(len(all_products), 4))  
@@ -241,6 +253,7 @@ def user_home(request):
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def user_product_list(request):
     # Base queryset: exclude blocked/unlisted products
     products = Product.objects.filter(is_deleted=False, is_active=True).prefetch_related('color_variants', 'color_variants__size_stocks')
@@ -341,6 +354,7 @@ def user_product_list(request):
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def product_detail(request, product_id):
     product = get_object_or_404(Product, id=product_id, is_deleted=False, is_active=True)
     
@@ -393,6 +407,7 @@ def product_detail(request, product_id):
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def profile_view(request):
     user = request.user
     user_addresses = Address.objects.filter(user=user)  # Only current user
@@ -408,47 +423,119 @@ def profile_view(request):
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def upload_profile_image(request):
     if request.method == 'POST' and request.FILES.get('profile_image'):
         request.user.profile_image = request.FILES['profile_image']
         request.user.save()
     return redirect('profile')
 
-
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def update_profile(request):
+    user = request.user
     if request.method == 'POST':
-        user = request.user
-        user.username = request.POST.get('username', user.username)
-        user.email = request.POST.get('email', user.email)
-        user.mobile = request.POST.get('mobile', user.mobile)
+        if 'otp' in request.POST:
+            entered_otp = request.POST.get('otp')
+            session_otp = request.session.get('otp')
+            pending_email = request.session.get('pending_email')
+            if entered_otp == session_otp and pending_email:
+                if CustomUser.objects.filter(email=pending_email).exclude(id=user.id).exists():
+                    messages.error(request, "This email is already in use.")
+                    return redirect('profile')
+                user.email = pending_email
+                user.save()
+                request.session.pop('otp', None)
+                request.session.pop('pending_email', None)
+                messages.success(request, "Email updated successfully.")
+            else:
+                messages.error(request, "Invalid or expired OTP.")
+            return redirect('profile')
+
+        username = request.POST.get('username', user.username).strip()
+        email = request.POST.get('email', user.email).strip()
+        mobile = request.POST.get('mobile', user.mobile).strip()
+
+        errors = {}
+        if not email:
+            errors['email'] = "Email is required."
+        elif not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+            errors['email'] = "Enter a valid email address."
+        elif email != user.email and CustomUser.objects.filter(email=email).exclude(id=user.id).exists():
+            errors['email'] = "This email is already in use."
+
+        if not mobile:
+            errors['mobile'] = "Mobile number is required."
+        elif not re.match(r"^\d{10}$", mobile):
+            errors['mobile'] = "Enter a valid 10-digit mobile number."
+        elif mobile != user.mobile and CustomUser.objects.filter(mobile=mobile).exclude(id=user.id).exists():
+            errors['mobile'] = "This mobile number is already in use."
+
+        if errors:
+            for field, error in errors.items():
+                messages.error(request, error)
+            return redirect('profile')
+
+        
+        if email != user.email:
+            otp = generate_otp()
+            request.session['otp'] = otp
+            request.session['pending_email'] = email
+            send_otp_email(email, otp, purpose="Email Update Verification")
+            print(otp)  
+            messages.info(request, "An OTP has been sent to your new email. Please verify to update.")
+            return render(request, 'profile.html', {
+                'user': user,
+                'user_addresses': Address.objects.filter(user=user),
+                'default_address': Address.objects.filter(user=user, is_default=True).first(),
+                'show_otp_modal': True,
+            })
+
+        user.username = username
+        user.mobile = mobile
         user.save()
+
         selected_address_id = request.POST.get('selected_user')
         if selected_address_id:
             try:
-                # Reset current default
                 Address.objects.filter(user=user, is_default=True).update(is_default=False)
-                # Set new default
                 address = Address.objects.get(id=selected_address_id, user=user)
                 address.is_default = True
                 address.save()
             except Address.DoesNotExist:
-                pass  # silently ignore if someone messes with the form
+                pass
         messages.success(request, "Profile updated successfully.")
         return redirect('profile')
+    return redirect('profile')
+
+
+@cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
+def resend_profile_otp(request):
+    pending_email = request.session.get('pending_email')
+    if not pending_email:
+        messages.error(request, "No pending email found. Please try updating your email again.")
+        return redirect('profile')
+    
+    otp = generate_otp()
+    request.session['otp'] = otp
+    send_otp_email(pending_email, otp, purpose="Email Update Verification")
+    print(otp)  
+    messages.info(request, "A new OTP has been sent to your email.")
     return redirect('profile')
 
     
 
 # Address management section---------------------------------
+
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def address_list(request):
     addresses = Address.objects.filter(user=request.user)
     form = AddressForm()
 
-    # Send data to frontend for JS auto-fill
     address_json_map = {
         str(a.id): {
             'full_name': a.full_name,
@@ -469,26 +556,29 @@ def address_list(request):
     }
     return render(request, 'address_page.html', context)
 
+
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def add_address(request):
     if request.method == 'POST':
         form = AddressForm(request.POST)
         if form.is_valid():
             address = form.save(commit=False)
             address.user = request.user
-            # Handle default address logic
             is_default = not Address.objects.filter(user=request.user, is_default=True).exists()
             address.is_default = is_default
             address.save()
             if is_default:
                 Address.objects.filter(user=request.user).exclude(id=address.id).update(is_default=False)
             next_url = request.GET.get('next', 'address_list')
-            return redirect(next_url)  # Redirect to /checkout/ if next is provided
+            return redirect(next_url)  
     return redirect('address_list')
+
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def update_address(request, pk):
     address = get_object_or_404(Address, pk=pk, user=request.user)
     if request.method == 'POST':
@@ -496,12 +586,13 @@ def update_address(request, pk):
         if form.is_valid():
             form.save()
             next_url = request.GET.get('next', 'address_list')
-            return redirect(next_url)  # Redirect to /checkout/ if next is provided
+            return redirect(next_url)  
     return redirect('address_list')
 
-# Keep delete_address but exclude it from checkout context (no change needed here)
+
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def delete_address(request, pk):
     address = get_object_or_404(Address, pk=pk, user=request.user)
     address.delete()
@@ -510,9 +601,11 @@ def delete_address(request, pk):
 
 
 
-# Cart Management
+# ---------------------------Cart Management------------------------
+
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def add_to_cart(request, product_id):
     product = get_object_or_404(Product, id=product_id)
 
@@ -556,7 +649,6 @@ def add_to_cart(request, product_id):
         return redirect('product_detail', product_id=product.id)
 
     cart, _ = Cart.objects.get_or_create(user=request.user)
-
     cart_item, created = CartItem.objects.get_or_create(
         cart=cart,
         product=product,
@@ -586,6 +678,7 @@ def add_to_cart(request, product_id):
 
     return redirect('cart_view')
 
+
 def get_sizes(request, color_variant_id):
     size_stocks = ProductSizeStock.objects.filter(color_variant_id=color_variant_id).values('id', 'size')
     sizes = [{'id': ss['id'], 'size_display': dict(ProductSizeStock.SIZE_CHOICES).get(ss['size'], ss['size'])} for ss in size_stocks]
@@ -595,6 +688,7 @@ def get_sizes(request, color_variant_id):
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @no_cache_view
+@never_cache
 def cart_view(request):
     cart = Cart.objects.filter(user=request.user).first()
     cart_items = cart.items.select_related('product', 'color_variant', 'size_stock').prefetch_related(
@@ -602,28 +696,22 @@ def cart_view(request):
         'product__color_variants__size_stocks'
     ).all() if cart else []
 
-    total_subtotal = Decimal('0')  # Based on original price * quantity
+    total_subtotal = Decimal('0')  
     total_discount = Decimal('0')
     has_unavailable_items = False
     taxes = Decimal('0')
-    TAX_RATE = Decimal('0.05')  # 5% tax rate
+    TAX_RATE = Decimal('0.05')  
 
     for item in cart_items:
-        # Calculate subtotal based on original price
         item.subtotal = item.quantity * item.product.price
         total_subtotal += item.subtotal
-        
-        # Get product image and color variant
         item.color_variant = item.color_variant
         item.image = item.color_variant.images.first().image.url if item.color_variant.images.exists() else item.product.thumbnail.url if item.product.thumbnail else ''
-        
-        # Check stock and availability
         item.size_stock = item.size_stock
         item.stock = item.size_stock.quantity
         item.max_quantity = min(item.stock, 5)
         item.size_display = item.size_stock.get_size_display()
 
-        # Check if item is unavailable
         if (item.product.is_deleted or not item.product.is_active or 
             item.product.category.is_deleted or not item.product.category.is_active or 
             item.quantity > item.stock):
@@ -632,7 +720,6 @@ def cart_view(request):
         else:
             item.is_available = True
 
-        # Calculate savings (discount) for each item
         if item.product.discount_price and item.product.discount_price < item.product.price:
             item_savings = (item.product.price - item.product.discount_price) * item.quantity
             item.savings = item_savings
@@ -640,9 +727,7 @@ def cart_view(request):
         else:
             item.savings = Decimal('0')
 
-    # Calculate taxes (5% of subtotal based on original price)
     taxes = total_subtotal * TAX_RATE
-    # Calculate final total (subtotal + taxes - total_discount)
     final_total = total_subtotal + taxes - total_discount
 
     return render(request, 'cart.html', {
@@ -654,8 +739,10 @@ def cart_view(request):
         'has_unavailable_items': has_unavailable_items,
     })
 
+
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def update_cart_quantity(request, cart_item_id):
     cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
     
@@ -685,16 +772,11 @@ def update_cart_quantity(request, cart_item_id):
 
         cart_item.quantity = new_quantity
         cart_item.save()
-
-        # Recalculate subtotal based on original price
         subtotal = new_quantity * cart_item.product.price
-        # Calculate savings (discount) for the updated quantity
         savings = (cart_item.product.price - (cart_item.product.discount_price or cart_item.product.price)) * new_quantity if cart_item.product.discount_price and cart_item.product.discount_price < cart_item.product.price else Decimal('0')
-
-        # Recalculate cart totals
         cart = cart_item.cart
         cart_items = cart.items.select_related('product', 'size_stock').all()
-        new_cart_total = sum(item.quantity * item.product.price for item in cart_items)  # Subtotal based on original price
+        new_cart_total = sum(item.quantity * item.product.price for item in cart_items)  
         new_total_discount = sum((item.product.price - (item.product.discount_price or item.product.price)) * item.quantity for item in cart_items if item.product.discount_price and item.product.discount_price < item.product.price)
         new_taxes = new_cart_total * Decimal('0.05')
         new_total = new_cart_total + new_taxes - new_total_discount
@@ -718,6 +800,7 @@ def update_cart_quantity(request, cart_item_id):
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def remove_from_cart(request, cart_item_id):
     cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
     product_name = cart_item.product.name
@@ -728,9 +811,10 @@ def remove_from_cart(request, cart_item_id):
     return redirect('cart_view')
 
 
-# Wishlist Management
+
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def wishlist_view(request):
     wishlist_items = Wishlist.objects.filter(user=request.user).select_related('color_variant__product')
     size_map = {}
@@ -739,7 +823,7 @@ def wishlist_view(request):
             color_variant=item.color_variant, quantity__gt=0
         ).values('id', 'size', 'quantity')
         size_map[item.color_variant.id] = [
-            {'id': s['id'], 'size': s['size'], 'display': s['size']}  # Use raw size for display
+            {'id': s['id'], 'size': s['size'], 'display': s['size']}  
             for s in sizes
         ]
 
@@ -751,29 +835,26 @@ def wishlist_view(request):
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def add_to_wishlist(request, color_variant_id):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
     color_variant = get_object_or_404(ProductColorVariant, id=color_variant_id, product__is_active=True, product__is_deleted=False)
 
-    # Check product/category availability
     if not color_variant.product.category.is_active or color_variant.product.category.is_deleted:
         if is_ajax:
             return JsonResponse({'success': False, 'message': 'This product is unavailable.'}, status=400)
         messages.error(request, 'This product is unavailable.')
         return redirect('product_detail', product_id=color_variant.product.id)
 
-    # Toggle wishlist item
     wishlist_item = Wishlist.objects.filter(user=request.user, color_variant=color_variant).first()
     if wishlist_item:
-        # Item exists, remove it
         wishlist_item.delete()
         message = f"{color_variant.product.name} ({color_variant.name}) removed from wishlist."
         if is_ajax:
             return JsonResponse({'success': True, 'added': False, 'message': message})
         messages.success(request, message)
     else:
-        # Add new item
         Wishlist.objects.create(user=request.user, color_variant=color_variant)
         message = f"{color_variant.product.name} ({color_variant.name}) added to wishlist."
         if is_ajax:
@@ -786,6 +867,7 @@ def add_to_wishlist(request, color_variant_id):
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def remove_from_wishlist(request, wishlist_id):
     item = get_object_or_404(Wishlist, id=wishlist_id, user=request.user)
     product_name = item.color_variant.product.name
@@ -796,6 +878,7 @@ def remove_from_wishlist(request, wishlist_id):
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def add_to_cart_from_wishlist(request):
     if request.method == 'POST':
         color_variant_id = request.POST.get('color_variant_id')
@@ -863,16 +946,14 @@ def add_to_cart_from_wishlist(request):
 
 
 # ------------checkout view---------------------------------------------------
+
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def checkout_view(request):
     user = request.user
-
-    # Fetch all addresses for the user
     addresses = Address.objects.filter(user=user)
     default_address = addresses.filter(is_default=True).first()
-
-    # Fetch cart and cart items
     try:
         cart = Cart.objects.get(user=user)
         cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
@@ -880,7 +961,6 @@ def checkout_view(request):
         cart = None
         cart_items = []
 
-    # Price calculations
     subtotal = 0
     total_discount = 0
     total_quantity = 0
@@ -897,8 +977,8 @@ def checkout_view(request):
         total_discount += item_discount
         total_quantity += quantity
 
-    shipping_cost = 0  # Free shipping
-    taxes = subtotal * Decimal('0.05')  # 5% tax
+    shipping_cost = 0  
+    taxes = subtotal * Decimal('0.05')  
     final_total = subtotal - total_discount + shipping_cost + taxes
 
     context = {
@@ -917,42 +997,31 @@ def checkout_view(request):
 
 
 
-import logging
-
-# Set up logging
-logger = logging.getLogger(__name__)
 
 @login_required
+@never_cache
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 def place_order(request):
     if request.method == 'POST':
-        # Get form data
+
         address_id = request.POST.get('selected_address')
         payment_method = request.POST.get('payment_method')
         logger.debug(f"Form data: selected_address={address_id}, payment_method={payment_method}")
 
-        # Validate address and payment method
         if not address_id or not payment_method:
             messages.error(request, "Please select address and payment method.")
             logger.error("Missing address_id or payment_method")
             return redirect('checkout')
 
-        # Get the address
         address = get_object_or_404(Address, id=address_id, user=request.user)
         logger.debug(f"Address found: {address}")
-
-        # Get the user's cart
         cart = get_object_or_404(Cart, user=request.user)
         cart_items = CartItem.objects.filter(cart=cart)
         logger.debug(f"Cart items: {[(item.product.name, item.size_stock.size, item.quantity) for item in cart_items]}")
-
-        # Check if cart is empty
         if not cart_items.exists():
             messages.error(request, "Your cart is empty.")
             logger.error("Cart is empty")
             return redirect('cart_view')
-
-        # Calculate totals
         subtotal = Decimal('0.00')
         discount = Decimal('0.00')
         for item in cart_items:
@@ -961,20 +1030,16 @@ def place_order(request):
             subtotal += original_price * item.quantity
             discount += (original_price - item_discount_price) * item.quantity
 
-        tax_rate = Decimal('0.05')  # 5% tax; adjust as needed
+        tax_rate = Decimal('0.05')  
         tax = (subtotal - discount) * tax_rate
-        shipping_cost = Decimal('0.00')  # Free shipping
+        shipping_cost = Decimal('0.00')  
         total_amount = (subtotal - discount) + tax + shipping_cost
-
         logger.debug(f"Calculated: subtotal={subtotal}, discount={discount}, tax={tax}, shipping={shipping_cost}, total={total_amount}")
-
-        # Validate COD for orders above ₹100000
         if payment_method == 'cod' and total_amount > Decimal('100000'):
             messages.error(request, "Cash on Delivery not available for orders above ₹100000.")
             logger.error("COD not allowed for total > ₹100000")
             return redirect('checkout')
 
-        # Check stock availability for each item
         for item in cart_items:
             size_stock = item.size_stock
             logger.debug(f"Stock check for {item.product.name} (Size {size_stock.size}): {size_stock.quantity}")
@@ -983,14 +1048,10 @@ def place_order(request):
                 logger.error(f"Insufficient stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} < {item.quantity}")
                 return redirect('cart_view')
 
-        # Create order and update stock atomically
         try:
             with transaction.atomic():
-                # Generate unique order_id
                 unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
                 logger.debug(f"Generated order_id: {unique_order_id}")
-
-                # Create Order with calculated fields
                 order = Order.objects.create(
                     user=request.user,
                     address=address,
@@ -1004,26 +1065,22 @@ def place_order(request):
                     status='pending'
                 )
                 logger.debug(f"Order created: {order.order_id}")
-
-                # Create OrderItems and reduce stock
                 for item in cart_items:
                     size_stock = item.size_stock
                     logger.debug(f"Reducing stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} -> {size_stock.quantity - item.quantity}")
                     size_stock.quantity -= item.quantity
                     size_stock.save()
-
                     OrderItem.objects.create(
                         order=order,
                         product=item.product,
-                        color_variant=item.color_variant,  # Ensure color_variant is set
+                        color_variant=item.color_variant,  
                         size=size_stock.size,
                         quantity=item.quantity,
                         price=item.product.discount_price or item.product.price,
-                        discount_price=item.product.discount_price  # Set if applicable
+                        discount_price=item.product.discount_price  
                     )
                     logger.debug(f"OrderItem created for {item.product.name} (Color: {item.color_variant}, Size: {size_stock.size}, Qty: {item.quantity})")
 
-                # Clear cart
                 cart_items.delete()
                 logger.debug("Cart cleared")
 
@@ -1039,6 +1096,7 @@ def place_order(request):
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @no_cache_view
+@never_cache
 def order_success(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     return render(request, 'order_success.html', {'order': order})
@@ -1046,19 +1104,14 @@ def order_success(request, order_id):
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def orders_list_view(request):
     user = request.user
     query = request.GET.get('q', '').strip()
     sort = request.GET.get('sort', 'latest')
-
-    # Filter orders belonging to the user
     orders = Order.objects.filter(user=user)
-
-    # Search by product name
     if query:
         orders = orders.filter(items__product__name__icontains=query).distinct()
-
-    # Sort mapping
     sort_options = {
         'latest': '-created_at',
         'oldest': 'created_at',
@@ -1067,12 +1120,9 @@ def orders_list_view(request):
     }
     sort_by = sort_options.get(sort, '-created_at')
     orders = orders.order_by(sort_by)
-
-    # Pagination
-    paginator = Paginator(orders, 5)  # 5 orders per page
+    paginator = Paginator(orders, 5)  
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-
     context = {
         'orders': page_obj,
         'query': query,
@@ -1082,6 +1132,7 @@ def orders_list_view(request):
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def download_invoice(request, order_id):
     try:
         order = Order.objects.get(id=order_id, user=request.user)
@@ -1107,11 +1158,10 @@ def download_invoice(request, order_id):
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     items = order.items.select_related('product').all()
-
-    # Price calculations (for verification, but use model fields where possible)
     subtotal = Decimal('0.00')
     total_discount = Decimal('0.00')
     total_quantity = 0
@@ -1128,24 +1178,22 @@ def order_detail(request, order_id):
         total_discount += item_discount
         total_quantity += quantity
 
-    # Use model fields for accuracy and consistency with stored values
+    
     shipping_cost = order.shipping_cost
     taxes = order.tax
     final_total = order.total_amount
 
-    # Prepare progress tracker data
     steps = ["Pending", "Confirmed", "Shipped", "Out for Delivery", "Delivered", "Returned", "Cancelled"]
     status_map = ["pending", "confirmed", "shipped", "out_for_delivery", "delivered", "returned", "cancelled"]
     icons = ["shopping-cart", "truck", "arrow-right-circle", "check-circle", "refresh", "x-circle", "x-circle"]
     current_step = status_map.index(order.status.lower()) if order.status.lower() in status_map else 0
 
-    # Precompute step data with statuses
     progress_data = []
     for index in range(len(steps)):
         status = "completed" if index < current_step else "current" if index == current_step else "future"
         progress_data.append({
             'step': steps[index],
-            'icon': icons[index],  # Ensure exact match with template conditions
+            'icon': icons[index],  
             'status': status
         })
 
@@ -1164,13 +1212,12 @@ def order_detail(request, order_id):
 
 
 
-import logging
 
-logger = logging.getLogger(__name__)
 
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @require_POST
 @login_required
+@never_cache
 def cancel_order(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     item_id = request.POST.get('item_id')
@@ -1231,7 +1278,7 @@ def cancel_order(request, order_id):
                     wallet = order.user.wallet
                     WalletService.add_balance(wallet, refund_amount, f"Refund for Order {order.order_id}", order)
                     if order.payment_status == 'paid':
-                        order.payment_status = 'pending'  # Reset after refund
+                        order.payment_status = 'pending'  
                         order.save()
                     messages.success(request, f"{'Item' if item_id else 'Order'} cancelled and ₹{refund_amount} refunded.")
                 except Exception as e:
@@ -1250,6 +1297,7 @@ def cancel_order(request, order_id):
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @require_POST
 @login_required
+@never_cache
 def return_order(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     item_id = request.POST.get('item_id')
@@ -1274,7 +1322,6 @@ def return_order(request, order_id):
                     item.return_reason = reason
                     item.return_requested_at = timezone.now()
                     item.save()
-                    # Stock update (optional, typically done on acceptance)
                     logger.info(f"Return request submitted for item {item.id} in order {order.order_id}")
                 else:
                     messages.error(request, f"Item {item_id} cannot be returned: already {item.status}.")
@@ -1289,9 +1336,8 @@ def return_order(request, order_id):
                     item.save()
                     logger.info(f"Return request submitted for item {item.id} in order {order.order_id}")
 
-            # Update order status if any item is return_requested
             if order.items.filter(status='return_requested').exists() and order.status not in ['returned', 'cancelled']:
-                order.status = 'return request'  # Custom state, adjust as needed
+                order.status = 'return request'  
                 order.save()
             messages.success(request, "Return request submitted for verification.")
 
@@ -1308,13 +1354,10 @@ def process_return_request(request, order_id):
 
     if order.payment_status == "Paid" and order.return_status == "Accepted":
         wallet, created = Wallet.objects.get_or_create(user=order.user)
-
-        # Refund the amount
         refund_amount = Decimal(order.total_price)
         wallet.balance += refund_amount
         wallet.save()
 
-        # Create transaction
         WalletTransaction.objects.create(
             wallet=wallet,
             order=order,
@@ -1323,7 +1366,6 @@ def process_return_request(request, order_id):
             description="Refund for returned order"
         )
 
-        # Update order/payment status
         order.payment_status = "Refunded"
         order.save()
 
@@ -1336,21 +1378,19 @@ def process_return_request(request, order_id):
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def wallet_page(request):
     wallet, created = Wallet.objects.get_or_create(user=request.user)
     transactions = wallet.transactions.all().order_by('-created_at')
     return render(request, "wallet.html", {"wallet": wallet, "transactions": transactions})
 
 
-from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.forms import PasswordChangeForm
-from allauth.socialaccount.models import SocialAccount
 
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
 def change_password(request):
-    # Check if user is Google authenticated
     if SocialAccount.objects.filter(user=request.user, provider='google').exists():
         return render(request, "change_password.html", {"is_google_user": True})
 
@@ -1358,9 +1398,9 @@ def change_password(request):
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             user = form.save()
-            update_session_auth_hash(request, user)  # Keeps user logged in
+            update_session_auth_hash(request, user)  
             messages.success(request, "Password updated successfully.")
-            return redirect('change_password')  # Redirect to avoid resubmission
+            return redirect('change_password')  
         else:
             messages.error(request, "Please correct the errors below.")
     else:

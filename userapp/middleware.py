@@ -6,10 +6,15 @@ from django.urls import reverse
 
 from django.utils.cache import add_never_cache_headers
 
-class NoCacheMiddleware(MiddlewareMixin):
+
+
+class NoCacheForAuthenticatedMiddleware(MiddlewareMixin):
     def process_response(self, request, response):
-        add_never_cache_headers(response)
+        # If user is authenticated, prevent caching
+        if request.user.is_authenticated:
+            add_never_cache_headers(response)
         return response
+
 
     
 class BlockedUserMiddleware:
