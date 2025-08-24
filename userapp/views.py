@@ -56,7 +56,7 @@ def user_signup(request):
         confirm_password = request.POST.get('confirm_password', '')
         errors = {}
 
-        # Basic validations
+        
         if not username:
             errors['username'] = "Username is required."
         elif len(username) < 4:
@@ -90,7 +90,7 @@ def user_signup(request):
                 'mobile': mobile,
             })
 
-        # Send OTP and store session
+        
         otp = str(random.randint(100000, 999999))
         request.session['otp'] = otp
         request.session['signup_data'] = {
@@ -255,10 +255,9 @@ def user_home(request):
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
 def user_product_list(request):
-    # Base queryset: exclude blocked/unlisted products
+    
     products = Product.objects.filter(is_deleted=False, is_active=True).prefetch_related('color_variants', 'color_variants__size_stocks')
 
-    # Get min and max prices for dynamic range
     price_range = products.aggregate(
         min_price=Min(Coalesce(F('discount_price'), F('price'))),
         max_price=Max(Coalesce(F('discount_price'), F('price')))
@@ -266,7 +265,6 @@ def user_product_list(request):
     min_price = price_range['min_price'] or 0
     max_price = price_range['max_price'] or 10000
 
-    # Check stock availability for each product
     products = products.annotate(
         has_stock=ExpressionWrapper(
             Case(
@@ -278,14 +276,12 @@ def user_product_list(request):
         )
     ).filter(has_stock=1).distinct()
 
-    # Search
     query = request.GET.get('search', '').strip()
     if query:
         products = products.filter(
             Q(name__icontains=query) | Q(description__icontains=query)
         ).distinct()
 
-    # Filters
     category_ids = request.GET.getlist('category')
     brand_id = request.GET.get('brand')
     size_list = request.GET.getlist('size')
@@ -312,7 +308,7 @@ def user_product_list(request):
         display_price=Coalesce(F('discount_price'), F('price'), output_field=FloatField())
     ).filter(display_price__gte=price_min, display_price__lte=price_max).distinct()
 
-    # Sort
+    
     sort_by = request.GET.get('sort', 'name_asc')
     sort_mapping = {
         'price_asc': 'display_price',
@@ -321,13 +317,11 @@ def user_product_list(request):
         'name_desc': '-name',
     }
     products = products.order_by(sort_mapping.get(sort_by, 'name')).distinct()
-
-    # Pagination
-    paginator = Paginator(products, 8)  # 8 products per page
+    
+    paginator = Paginator(products, 8)  
     page_number = request.GET.get('page')
     products_page = paginator.get_page(page_number)
 
-    # Clear filters (redirect to base URL)
     if 'clear' in request.GET:
         return redirect('userproduct_list')
 
@@ -382,7 +376,7 @@ def product_detail(request, product_id):
     for variant in color_variants:
         variant.size_stocks_data = [
             {
-                'id': stock.id,  # Added to match template's size_stock_id
+                'id': stock.id,  
                 'size': stock.size,
                 'quantity': stock.quantity,
                 'display': stock.size  
@@ -410,7 +404,7 @@ def product_detail(request, product_id):
 @never_cache
 def profile_view(request):
     user = request.user
-    user_addresses = Address.objects.filter(user=user)  # Only current user
+    user_addresses = Address.objects.filter(user=user)  
     default_address = user_addresses.filter(is_default=True).first()
 
     return render(request, 'profile.html', {
@@ -1031,7 +1025,7 @@ def place_order(request):
             discount += (original_price - item_discount_price) * item.quantity
 
         tax_rate = Decimal('0.05')  
-        tax = (subtotal - discount) * tax_rate
+        tax = subtotal * tax_rate
         shipping_cost = Decimal('0.00')  
         total_amount = (subtotal - discount) + tax + shipping_cost
         logger.debug(f"Calculated: subtotal={subtotal}, discount={discount}, tax={tax}, shipping={shipping_cost}, total={total_amount}")
