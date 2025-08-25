@@ -713,15 +713,11 @@ logger = logging.getLogger(__name__)
 
 @superuser_required
 def admin_order_list(request):
-    # Get query parameters
     search_query = request.GET.get('q', '')
-    sort_by = request.GET.get('sort', '-created_at')  # Default: desc by date
+    sort_by = request.GET.get('sort', '-created_at')  
     filter_status = request.GET.get('status', '')
-
-    # Base queryset
     orders = Order.objects.all()
 
-    # Search by order_id or user details
     if search_query:
         orders = orders.filter(
             Q(order_id__icontains=search_query) |
@@ -729,18 +725,16 @@ def admin_order_list(request):
             Q(user__email__icontains=search_query)
         )
 
-    # Filter by status
     if filter_status:
         orders = orders.filter(status=filter_status)
 
-    # Sort
+    
     if sort_by in ['created_at', '-created_at', 'status', '-status']:
         orders = orders.order_by(sort_by)
     else:
-        orders = orders.order_by('-created_at')  # Fallback
+        orders = orders.order_by('-created_at')  
 
-    # Pagination
-    paginator = Paginator(orders, 4)  # 10 orders per page
+    paginator = Paginator(orders, 4)  
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
@@ -785,7 +779,7 @@ def update_order_status(request, order_id):
             order.status = new_status
             if new_status == 'delivered':
                 order.delivered_at = timezone.now()
-                if order.payment_status == 'pending':  # Set to paid for all payment methods
+                if order.payment_status == 'pending':  
                     order.payment_status = 'paid'
             elif new_status == 'cancelled':
                 order.cancelled_at = timezone.now()
@@ -802,7 +796,7 @@ def update_order_status(request, order_id):
                         )
                         wallet.balance += refund_amount
                         wallet.save()
-                        order.payment_status = 'pending'  # Reset after refund
+                        order.payment_status = 'pending'  
                         logger.info(f"Refunded ₹{refund_amount} for cancelled order {order.order_id}")
                     except Exception as e:
                         logger.error(f"Refund failed for order {order.order_id}: {str(e)}")
@@ -811,11 +805,10 @@ def update_order_status(request, order_id):
                 order.returned_at = timezone.now()
                 order.delivered_at = None
                 order.cancelled_at = None
-                # Ensure all items are return_accepted before setting to 'returned'
                 if not order.items.filter(status='return_accepted').exists():
                     messages.error(request, "Cannot set to 'returned' unless all items are return accepted.")
                     return redirect('admin_order_detail', order_id=order.id)
-                # Process refund and update payment status
+                
                 if order.payment_status == 'paid':
                     try:
                         wallet = order.user.wallet
@@ -829,7 +822,7 @@ def update_order_status(request, order_id):
                         )
                         wallet.balance += refund_amount
                         wallet.save()
-                        order.payment_status = 'pending'  # Use 'pending' or add 'refunded' to PAYMENT_STATUS_CHOICES
+                        order.payment_status = 'pending'  
                         logger.info(f"Refunded ₹{refund_amount} for returned order {order.order_id}")
                     except Exception as e:
                         logger.error(f"Refund failed for order {order.order_id}: {str(e)}")
@@ -856,20 +849,42 @@ logger = logging.getLogger(__name__)
 def return_accept(request, item_id):
     item = get_object_or_404(OrderItem, id=item_id)
     order = item.order
+
     if item.status != 'return_requested':
         messages.warning(request, "Invalid return request status.")
         return redirect('admin_order_detail', order_id=order.id)
 
     try:
         with transaction.atomic():
+            
             item.status = 'return_accepted'
             item.is_return_approved = True
             item.is_return_rejected = False
             item.save()
 
-            # Refund to wallet
             if order.payment_status == 'paid':
-                refund_amount = (item.discount_price or item.price) * item.quantity
+                
+                item_price = (item.discount_price or item.price) * item.quantity
+                total_items_price = sum(
+                    (oi.discount_price or oi.price) * oi.quantity
+                    for oi in order.items.all()
+                )
+
+                tax_amount = 0
+                if order.tax and total_items_price > 0:
+                    tax_amount = (item_price / total_items_price) * order.tax
+
+                shipping_amount = 0
+                if order.shipping_cost:
+                    if not order.items.exclude(status='return_accepted').exists():
+                        shipping_amount = order.shipping_cost
+                    else:
+                        
+                        shipping_amount = 0  
+
+                refund_amount = item_price + tax_amount + shipping_amount
+
+                
                 wallet = order.user.wallet
                 WalletTransaction.objects.create(
                     wallet=wallet,
@@ -880,10 +895,11 @@ def return_accept(request, item_id):
                 )
                 wallet.balance += refund_amount
                 wallet.save()
-                messages.success(request, f"Return request accepted. ₹{refund_amount} refunded to user's wallet.")
-                logger.info(f"Refunded ₹{refund_amount} to wallet for {order.user.username} (Order {order.order_id})")
 
-            # Update stock
+                messages.success(request, f"Return request accepted. ₹{refund_amount:.2f} refunded to user's wallet.")
+                logger.info(f"Refunded ₹{refund_amount:.2f} to wallet for {order.user.username} (Order {order.order_id})")
+
+            
             if item.color_variant and item.size:
                 try:
                     size_stock = ProductSizeStock.objects.get(color_variant=item.color_variant, size=item.size)
@@ -894,19 +910,20 @@ def return_accept(request, item_id):
                     logger.error(f"Stock not found for {item.color_variant}, {item.size}")
                     messages.warning(request, "Return accepted, but stock not updated: variant/size not found.")
 
-            # Update order status and payment status if all items are returned or cancelled
+            
             if not order.items.filter(status__in=['active', 'return_requested']).exists():
                 order.status = 'returned'
                 order.returned_at = timezone.now()
-                if order.payment_status == 'paid':  # Update payment status to Refunded if paid
-                    order.payment_status = 'pending'  # Reset to pending after refund (adjust as needed)
+                order.payment_status = 'pending'  
                 order.save()
                 logger.info(f"Order {order.order_id} status updated to 'returned'")
 
     except Exception as e:
         logger.error(f"Error processing return acceptance for item {item.id}: {str(e)}")
         messages.error(request, f"Error processing return request: {str(e)}")
+
     return redirect('admin_order_detail', order_id=order.id)
+
 
 
 

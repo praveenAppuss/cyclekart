@@ -111,12 +111,12 @@ ACCOUNT_SIGNUP_REDIRECT_URL = '/user_home/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/user_login/'
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-SESSION_COOKIE_AGE = 60 * 30  # 30 min
+SESSION_COOKIE_AGE = 60 * 30  
 SESSION_SAVE_EVERY_REQUEST = True
 
 
 
-ACCOUNT_EMAIL_VERIFICATION = 'none'  # Google handles it
+ACCOUNT_EMAIL_VERIFICATION = 'none'  
 
 # ------------------ Email Settings ------------------
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

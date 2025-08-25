@@ -124,14 +124,14 @@ class OrderItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
-    is_return_requested = models.BooleanField(default=False)  # Added
-    is_return_approved = models.BooleanField(default=False)  # Added
-    is_return_rejected = models.BooleanField(default=False)  # Added
-    is_cancelled = models.BooleanField(default=False)  # Added
-    return_reason = models.TextField(blank=True, null=True)  # Added
-    cancel_reason = models.TextField(blank=True, null=True)  # Added
-    return_rejected_reason = models.TextField(blank=True, null=True)  # Added
-    return_requested_at = models.DateTimeField(blank=True, null=True)  # Added
+    is_return_requested = models.BooleanField(default=False)  
+    is_return_approved = models.BooleanField(default=False)  
+    is_return_rejected = models.BooleanField(default=False)  
+    is_cancelled = models.BooleanField(default=False)  
+    return_reason = models.TextField(blank=True, null=True)  
+    cancel_reason = models.TextField(blank=True, null=True)  
+    return_rejected_reason = models.TextField(blank=True, null=True)  
+    return_requested_at = models.DateTimeField(blank=True, null=True)  
 
     def __str__(self):
         return f"{self.quantity} x {self.product.name}"
