@@ -27,8 +27,8 @@ class BlockedUserMiddleware:
         if user.is_authenticated and not user.is_superuser:
             if user.is_blocked:
                 logout(request)
-                messages.error(request, "Your account has been blocked by admin.")
-                return redirect(reverse('login'))
+                messages.error(request, "Your account has been blocked by admin.",extra_tags='login')
+                return redirect(reverse('user_login'))
 
         response = self.get_response(request)
         return response

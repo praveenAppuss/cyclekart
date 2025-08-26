@@ -205,7 +205,7 @@ def user_login(request):
             return render(request, 'user_login.html', {'errors': errors})
 
         if user.is_blocked:
-            messages.error(request, "Your account is currently suspended.")
+            messages.error(request, "Your account is currently suspended.",extra_tags='login')
         else:
             login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             request.session.set_expiry(300)

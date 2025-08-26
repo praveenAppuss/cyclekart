@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login,logout
 from django.views.decorators.cache import never_cache
@@ -7,7 +8,7 @@ from django.views.decorators.http import require_POST
 from django.db.models import Q,Sum
 from django.core.paginator import Paginator
 from userapp.services import WalletService
-from userapp.models import CustomUser, Order, OrderItem, ReturnRequest, WalletTransaction
+from userapp.models import CustomUser, Order, OrderItem, ReturnRequest, Wallet, WalletTransaction
 from django.utils.text import slugify
 from adminapp.models import Product, Category, Brand, ProductColorVariant, ProductImage,ProductSizeStock
 import base64
@@ -17,6 +18,9 @@ import logging
 from django.db import transaction
 from django.http import HttpResponseBadRequest, HttpResponseServerError
 from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
 
 def superuser_required(view_func):
     return user_passes_test(lambda u: u.is_authenticated and u.is_superuser, login_url='admin_login')(view_func)
@@ -81,6 +85,7 @@ def user_list(request):
         'query': query,
         'page_obj': page_obj,
     })
+
 
 @superuser_required
 @never_cache
@@ -300,10 +305,6 @@ def product_list(request):
 
 
 
-
-
-logger = logging.getLogger(__name__)
-
 @superuser_required
 @never_cache
 def add_product(request):
@@ -347,7 +348,7 @@ def add_product(request):
             'stocks': stocks,
         }
 
-        # Validation
+        
         logger.debug(f"Validation: name={name}, category_id={category_id}, colors={colors}, images={len(cropped_images)}, stocks={stocks}")
         if Product.objects.filter(name__iexact=name).exists():
             errors['name'] = "Product with this name already exists."
@@ -386,7 +387,7 @@ def add_product(request):
                 'existing_images': [],
             })
 
-        # Create Product within transaction
+        
         logger.info(f"Creating product: {name}")
         try:
             with transaction.atomic():
@@ -400,7 +401,7 @@ def add_product(request):
                     description=description
                 )
 
-                # Process each variant
+                
                 image_index = 0
                 stock_index = 0
                 for i, color in enumerate(colors):
@@ -410,7 +411,7 @@ def add_product(request):
                         hex_code=color_hex_map.get(color, '#000000')
                     )
 
-                    # Associate all sizes with stocks for this variant
+                    
                     for size in size_choices:
                         stock_value = int(stocks[stock_index]) if stock_index < len(stocks) and stocks[stock_index].isdigit() else 0
                         logger.debug(f"Saving stock for {color} - {size}: {stock_value}")
@@ -421,7 +422,7 @@ def add_product(request):
                         )
                         stock_index += 1
 
-                    # Associate images for this variant
+                    
                     image_count = min(3, len(cropped_images) - image_index)
                     for _ in range(image_count):
                         if image_index < len(cropped_images):
@@ -432,7 +433,7 @@ def add_product(request):
                                 file_name = f"{uuid.uuid4()}.{ext}"
                                 image_file = ContentFile(base64.b64decode(img_data), name=file_name)
                                 new_img = ProductImage.objects.create(color_variant=color_variant, image=image_file)
-                                if i == 0 and _ == 0:  # First image of first variant as thumbnail
+                                if i == 0 and _ == 0:  
                                     product.thumbnail = new_img.image
                                     product.save()
                             except Exception as e:
@@ -493,7 +494,7 @@ def edit_product(request, product_id):
     errors = {}
     old = {}
 
-    # Prepare existing data for rendering
+    
     color_variants = product.color_variants.all()
     existing_images = {variant.id: list(ProductImage.objects.filter(color_variant=variant)) for variant in color_variants}
     stock_map = {}
@@ -529,7 +530,7 @@ def edit_product(request, product_id):
             'stocks': stocks,
         }
 
-        # Validation
+        
         logger.debug(f"POST data: {dict(request.POST)}")
         if Product.objects.filter(name__iexact=name).exclude(id=product_id).exists() and name != product.name:
             errors['name'] = "Another product with this name already exists."
@@ -544,7 +545,7 @@ def edit_product(request, product_id):
         expected_stock_count = len(colors) * len(size_choices)
         if len(stocks) != expected_stock_count:
             errors['stocks'] = f"Expected {expected_stock_count} stock entries (for {len(colors)} colors × {len(size_choices)} sizes), got {len(stocks)}."
-        # Image validation: check existing + new images per variant
+        
         variant_image_counts = {}
         variant_image_map = {}
         for i, color in enumerate(colors):
@@ -578,7 +579,7 @@ def edit_product(request, product_id):
                 'old': old,
             })
 
-        # Update Product within transaction
+        
         logger.info(f"Updating product: {name}")
         try:
             with transaction.atomic():
@@ -591,7 +592,7 @@ def edit_product(request, product_id):
                 product.discount_price = discount_price
                 product.save()
 
-                # Delete existing color variants and recreate
+                
                 ProductColorVariant.objects.filter(product=product).delete()
                 image_index = 0
                 stock_index = 0
@@ -602,7 +603,7 @@ def edit_product(request, product_id):
                         hex_code=color_hex_map.get(color, '#000000')
                     )
 
-                    # Associate all sizes with stocks for this variant
+                    
                     for size in size_choices:
                         stock_value = int(stocks[stock_index]) if stock_index < len(stocks) and stocks[stock_index].isdigit() else 0
                         logger.debug(f"Saving stock for {color} - {size}: {stock_value}")
@@ -613,7 +614,7 @@ def edit_product(request, product_id):
                         )
                         stock_index += 1
 
-                    # Associate images for this variant
+                    
                     new_images = variant_image_map.get(color, [])
                     if new_images:
                         ProductImage.objects.filter(color_variant=color_variant).delete()
@@ -631,7 +632,7 @@ def edit_product(request, product_id):
                                 logger.error(f"Image saving error for variant {color}: {str(e)}")
                                 raise
                     else:
-                        # Retain existing images if no new ones uploaded
+                        
                         existing_imgs = existing_images.get(next((v.id for v in color_variants if v.name == color), None), [])
                         for img in existing_imgs:
                             ProductImage.objects.create(
@@ -709,7 +710,7 @@ def toggle_product_status(request, product_id):
 
 
 # ------------------------ordermanagement--------------------------------------#
-logger = logging.getLogger(__name__)
+
 
 @superuser_required
 def admin_order_list(request):
@@ -840,9 +841,7 @@ def update_order_status(request, order_id):
 
     return redirect('admin_order_detail', order_id=order.id)
 
-import logging
 
-logger = logging.getLogger(__name__)
 
 @superuser_required
 @require_POST
@@ -862,30 +861,26 @@ def return_accept(request, item_id):
             item.is_return_rejected = False
             item.save()
 
+            
             if order.payment_status == 'paid':
-                
                 item_price = (item.discount_price or item.price) * item.quantity
                 total_items_price = sum(
                     (oi.discount_price or oi.price) * oi.quantity
                     for oi in order.items.all()
                 )
 
-                tax_amount = 0
+                
+                tax_amount = Decimal('0.00')
                 if order.tax and total_items_price > 0:
                     tax_amount = (item_price / total_items_price) * order.tax
 
-                shipping_amount = 0
+                shipping_amount = Decimal('0.00')
                 if order.shipping_cost:
                     if not order.items.exclude(status='return_accepted').exists():
                         shipping_amount = order.shipping_cost
-                    else:
-                        
-                        shipping_amount = 0  
 
-                refund_amount = item_price + tax_amount + shipping_amount
-
-                
-                wallet = order.user.wallet
+                refund_amount = item_price + tax_amount + shipping_amount                
+                wallet, _ = Wallet.objects.get_or_create(user=order.user)
                 WalletTransaction.objects.create(
                     wallet=wallet,
                     order=order,
@@ -893,13 +888,12 @@ def return_accept(request, item_id):
                     transaction_type='credit',
                     description=f"Refund for return of {item.product.name} (Order {order.order_id})"
                 )
-                wallet.balance += refund_amount
+                wallet.balance =(wallet.balance or Decimal('0.00'))+ refund_amount
                 wallet.save()
 
                 messages.success(request, f"Return request accepted. ₹{refund_amount:.2f} refunded to user's wallet.")
                 logger.info(f"Refunded ₹{refund_amount:.2f} to wallet for {order.user.username} (Order {order.order_id})")
 
-            
             if item.color_variant and item.size:
                 try:
                     size_stock = ProductSizeStock.objects.get(color_variant=item.color_variant, size=item.size)
@@ -910,7 +904,6 @@ def return_accept(request, item_id):
                     logger.error(f"Stock not found for {item.color_variant}, {item.size}")
                     messages.warning(request, "Return accepted, but stock not updated: variant/size not found.")
 
-            
             if not order.items.filter(status__in=['active', 'return_requested']).exists():
                 order.status = 'returned'
                 order.returned_at = timezone.now()
@@ -923,7 +916,6 @@ def return_accept(request, item_id):
         messages.error(request, f"Error processing return request: {str(e)}")
 
     return redirect('admin_order_detail', order_id=order.id)
-
 
 
 

@@ -1,5 +1,7 @@
 from allauth.account.signals import user_signed_up
 from django.dispatch import receiver
+from django.db.models.signals import post_save
+from userapp.models import Wallet,CustomUser
 
 @receiver(user_signed_up)
 def handle_google_signup(request, user, **kwargs):
@@ -35,3 +37,8 @@ def handle_google_signup(request, user, **kwargs):
         recipient_list=[user.email],
         fail_silently=False,
     )
+
+@receiver(post_save, sender=CustomUser)
+def create_wallet_for_user(sender, instance, created, **kwargs):
+    if created:  
+        Wallet.objects.get_or_create(user=instance)
