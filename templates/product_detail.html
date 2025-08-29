@@ -2,20 +2,9 @@
 {% load static %}
 
 {% block content %}
-<!-- Toast message container -->
-<div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
-  {% if messages %}
-    {% for message in messages %}
-      <div class="toast px-4 py-2 rounded-lg shadow-md text-white text-sm
-                  {% if message.tags == 'success' %}bg-green-600
-                  {% elif message.tags == 'error' %}bg-red-600
-                  {% elif message.tags == 'warning' %}bg-yellow-500
-                  {% else %}bg-blue-600{% endif %} transition-opacity duration-300">
-        {{ message }}
-      </div>
-    {% endfor %}
-  {% endif %}
-</div>
+<!-- Include SweetAlert2 CSS and JS -->
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <div class="min-h-screen bg-gray-100">
   <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
@@ -142,11 +131,11 @@
           <div>
             <h3 class="text-sm font-medium text-gray-700 mb-2">Quantity</h3>
             <div class="flex items-center gap-4">
-              <button id="decreaseQty" disabled class="w-8 h-8 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
+              <button id="decreaseQty" disabled class="w-6 h-6 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
                       aria-label="Decrease quantity">-</button>
-              <input type="text" id="quantity" class="w-12 h-8 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <input type="text" id="quantity" class="w-10 h-6 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
                      value="1" readonly>
-              <button id="increaseQty" disabled class="w-8 h-8 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
+              <button id="increaseQty" disabled class="w-6 h-6 bg-gray-200 text-gray-600 rounded-full flex items-center justify-center hover:bg-gray-300 transition-colors"
                       aria-label="Increase quantity">+</button>
             </div>
           </div>
@@ -433,26 +422,29 @@
             wishlistedVariants.splice(wishlistedVariants.indexOf(selectedColorVariantId), 1);
           }
           updateWishlistButton();
-          showToast(data.message, data.added ? "success" : "info");
+          showSweetAlert(data.message, data.added ? "success" : "info");
         } else {
-          showToast(data.message, "error");
+          showSweetAlert(data.message, "error");
         }
       } catch (error) {
-        showToast("An error occurred. Please try again.", "error");
+        showSweetAlert("An error occurred. Please try again.", "error");
       }
     });
 
-    // Show toast message
-    function showToast(message, type) {
-      const toast = document.createElement("div");
-      toast.className = `toast px-4 py-2 rounded-lg shadow-md text-white text-sm transition-opacity duration-300
-                         ${type === "success" ? "bg-green-600" : type === "error" ? "bg-red-600" : "bg-blue-600"}`;
-      toast.textContent = message;
-      document.getElementById("toast-container").appendChild(toast);
-      setTimeout(() => {
-        toast.classList.add("opacity-0");
-        setTimeout(() => toast.remove(), 300);
-      }, 3000);
+    // Show SweetAlert message
+    function showSweetAlert(message, type) {
+      Swal.fire({
+        text: message,
+        icon: type,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+        customClass: {
+          popup: 'swal2-small'
+        }
+      });
     }
 
     // Image zoom functionality
@@ -537,12 +529,20 @@
     updateWishlistButton();
     updateStockAndButtons();
 
-    // Auto-hide toast messages
-    setTimeout(() => {
-      const toasts = document.querySelectorAll(".toast");
-      toasts.forEach(toast => toast.classList.add("opacity-0"));
-      setTimeout(() => toasts.forEach(toast => toast.remove()), 300);
-    }, 3000);
+    // Auto-hide initial messages (if any)
+    {% if messages %}
+      {% for message in messages %}
+        showSweetAlert("{{ message }}", "{{ message.tags }}");
+      {% endfor %}
+    {% endif %}
   });
 </script>
+
+<style>
+  .swal2-small {
+    width: 300px !important;
+    padding: 10px !important;
+    font-size: 14px !important;
+  }
+</style>
 {% endblock %}

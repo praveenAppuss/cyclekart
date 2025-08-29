@@ -174,6 +174,7 @@ def verify_otp(request):
 
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
+@no_cache_view
 def user_login(request):
     if request.user.is_authenticated:
         return redirect('user_home')
@@ -213,8 +214,9 @@ def user_login(request):
 
     return render(request, 'user_login.html')
 
-
+@cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
+@no_cache_view
 def resend_otp(request):
     signup_data = request.session.get('signup_data')
     if not signup_data:
@@ -670,7 +672,7 @@ def add_to_cart(request, product_id):
         color_variant__name=color_variant.name
     ).delete()
 
-    return redirect('cart_view')
+    return redirect('product_detail',product_id=product.id)
 
 
 def get_sizes(request, color_variant_id):
