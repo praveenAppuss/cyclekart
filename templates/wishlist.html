@@ -25,7 +25,10 @@
               <p class="text-sm text-gray-500 mt-1">Added On: {{ item.added_at|date:"n/j/Y" }}</p>
 
               {% if item.color_variant.product.is_deleted or not item.color_variant.product.is_active or not item.color_variant.product.category.is_active %}
-                <span class="text-red-500 text-sm font-medium">Unavailable</span>
+                <button onclick="showUnavailableAlert('{{ item.color_variant.product.name }}')"
+                        class="text-sm text-blue-600 hover:underline mt-1 cursor-not-allowed opacity-50">
+                  Add to Cart
+                </button>
               {% else %}
                 <button onclick="openSizeModal('{{ item.color_variant.id }}', '{{ item.color_variant.product.name }}', '{{ item.color_variant.name }}')"
                         class="text-sm text-blue-600 hover:underline mt-1">
@@ -33,9 +36,12 @@
                 </button>
               {% endif %}
 
-              <form method="POST" action="{% url 'remove_from_wishlist' item.id %}" class="inline ml-2">
+              <form method="POST" action="{% url 'remove_from_wishlist' item.id %}" class="inline ml-2" id="removeForm_{{ item.id }}">
                 {% csrf_token %}
-                <button type="submit" class="text-sm text-red-600 hover:underline">
+                <button type="button" class="text-sm text-red-600 hover:underline remove-wishlist-btn" 
+                        data-wishlist-id="{{ item.id }}" 
+                        data-item-name="{{ item.color_variant.product.name }} ({{ item.color_variant.name }})"
+                        onclick="openRemoveModal(this)">
                   × Remove
                 </button>
               </form>
@@ -63,13 +69,14 @@
 </div>
 
 <!-- Modal for size selection -->
-<div id="sizeModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50">
+<div id="sizeModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50">
   <div class="bg-white rounded-lg p-6 w-80 text-center relative">
     <h3 class="text-lg font-semibold mb-4" id="modalTitle">Select Size</h3>
-    <form method="POST" action="{% url 'add_to_cart_from_wishlist' %}">
+    <form method="POST" action="{% url 'add_to_cart_from_wishlist' %}" onsubmit="return validateSizeSelection()">
       {% csrf_token %}
       <input type="hidden" name="color_variant_id" id="modalColorVariantId">
       <input type="hidden" name="size_stock_id" id="selectedSizeStockId">
+      <input type="hidden" name="quantity" value="1">
       <p class="mb-3 text-sm text-gray-600">Please select your size:</p>
       <div class="flex justify-center gap-3 mb-4" id="sizeOptions"></div>
       <div class="flex justify-between">
@@ -81,6 +88,19 @@
   </div>
 </div>
 
+<!-- Modal for remove confirmation -->
+<div id="removeModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50">
+  <div class="bg-white rounded-lg p-6 w-80 text-center relative">
+    <h3 class="text-lg font-semibold mb-4" id="removeModalTitle">Confirm Removal</h3>
+    <p class="mb-4 text-sm text-gray-600" id="removeModalMessage">Are you sure you want to remove this product from your wishlist?</p>
+    <div class="flex justify-between">
+      <button type="button" onclick="closeRemoveModal()" class="text-gray-500 px-4 py-2 border rounded">Cancel</button>
+      <button type="button" onclick="confirmRemove()" class="bg-red-600 text-white px-4 py-2 rounded" id="confirmRemoveBtn">OK</button>
+    </div>
+    <button onclick="closeRemoveModal()" class="absolute top-2 right-3 text-gray-400 hover:text-black text-xl">×</button>
+  </div>
+</div>
+
 <!-- SweetAlert for wishlist messages -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
@@ -89,19 +109,45 @@
       {% for message in messages %}
         {% if 'wishlist' in message.tags %}
           Swal.fire({
-            icon: '{{ message.tags|cut:"wishlist" }}',
+            icon: 'success',
             title: '{{ message|escapejs }}',
-            timer: 2000,
-            showConfirmButton: false
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1500,
+            timerProgressBar: true,
+            customClass: {
+              popup: 'swal2-toast'
+            }
+          });
+        {% elif 'success' in message.tags %}
+          Swal.fire({
+            icon: 'success',
+            title: 'Item added to cart',
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 1500,
+            timerProgressBar: true,
+            customClass: {
+              popup: 'swal2-toast'
+            }
           });
         {% endif %}
       {% endfor %}
     {% endif %}
-  });
-</script>
 
-<!-- Modal JS -->
-<script>
+    // Handle remove button click with confirmation modal
+    let currentWishlistId = null;
+    document.querySelectorAll('.remove-wishlist-btn').forEach(btn => {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        currentWishlistId = this.getAttribute('data-wishlist-id');
+        openRemoveModal(this);
+      });
+    });
+  });
+
   function openSizeModal(colorVariantId, productName, colorName) {
     document.getElementById("modalColorVariantId").value = colorVariantId;
     document.getElementById("modalTitle").textContent = `Select Size - ${productName} (${colorName})`;
@@ -110,10 +156,23 @@
     const sizes = sizesData[colorVariantId] || [];
     const sizeOptions = document.getElementById("sizeOptions");
     sizeOptions.innerHTML = '';
+
     if (sizes.length === 0) {
-      sizeOptions.innerHTML = '<p class="text-sm text-red-600">No sizes available</p>';
-      return;
+      Swal.fire({
+        icon: 'warning',
+        title: 'This product is out of stock',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        customClass: {
+          popup: 'swal2-toast'
+        }
+      });
+      return; // Prevent modal from opening
     }
+
     sizes.forEach(size => {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -141,6 +200,84 @@
         btn.classList.add("bg-slate-800", "text-white");
       }
     });
+  }
+
+  function validateSizeSelection() {
+    const selectedSizeStockId = document.getElementById("selectedSizeStockId").value;
+    if (!selectedSizeStockId) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Please select a size',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        customClass: {
+          popup: 'swal2-toast'
+        }
+      });
+      return false;
+    }
+
+    const sizesData = {{ sizes|safe }};
+    const colorVariantId = document.getElementById("modalColorVariantId").value;
+    const sizes = sizesData[colorVariantId] || [];
+    const selectedSize = sizes.find(size => size.id === parseInt(selectedSizeStockId));
+    if (selectedSize && selectedSize.quantity === 0) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'The selected size is not available',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        customClass: {
+          popup: 'swal2-toast'
+        }
+      });
+      return false;
+    }
+    return true;
+  }
+
+  function showUnavailableAlert(productName) {
+    Swal.fire({
+      icon: 'error',
+      title: `${productName} is unavailable`,
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 1500,
+      timerProgressBar: true,
+      customClass: {
+        popup: 'swal2-toast'
+      }
+    });
+  }
+
+  // Remove confirmation modal functions
+  function openRemoveModal(element) {
+    const wishlistId = element.getAttribute('data-wishlist-id');
+    const itemName = element.getAttribute('data-item-name');
+    document.getElementById("removeModal").classList.remove("hidden");
+    document.getElementById("removeModalTitle").textContent = "Confirm Removal";
+    document.getElementById("removeModalMessage").textContent = `Are you sure you want to remove ${itemName}?`;
+    document.getElementById("confirmRemoveBtn").onclick = () => confirmRemove(wishlistId);
+  }
+
+  function closeRemoveModal() {
+    document.getElementById("removeModal").classList.add("hidden");
+  }
+
+  function confirmRemove(wishlistId) {
+    const form = document.getElementById(`removeForm_${wishlistId}`);
+    if (form) {
+      form.submit();
+      closeRemoveModal();
+      // Removed frontend SweetAlert to rely only on backend message
+    }
   }
 </script>
 {% endblock %}
