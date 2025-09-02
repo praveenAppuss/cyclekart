@@ -68,13 +68,7 @@
               {% endfor %}
               <span class="text-indigo-600">(0 Reviews)</span>
             </div>
-            {% with color_variants.first as first_variant %}
-              {% if first_variant.has_stock %}
-                <span class="text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs font-medium">In Stock</span>
-              {% else %}
-                <span class="text-red-600 bg-red-50 px-2 py-1 rounded-full text-xs font-medium">Out of Stock</span>
-              {% endif %}
-            {% endwith %}
+            <span id="stockStatus" class="text-xs font-medium px-2 py-1 rounded-full"></span>
           </div>
 
           <!-- Price -->
@@ -261,6 +255,7 @@
       {
         id: {{ variant.id }},
         name: "{{ variant.name }}",
+        hasStock: {{ variant.has_stock|yesno:"true,false" }},
         images: [{% for image in variant.images.all %}"{{ image.image.url }}"{% if not forloop.last %},{% endif %}{% endfor %}],
         sizes: [
           {% for size_stock in variant.size_stocks.all %}
@@ -296,6 +291,7 @@
     const wishlistForm = document.getElementById("wishlistForm");
     const wishlistBtn = document.getElementById("wishlistBtn");
     const wishlistIcon = document.getElementById("wishlistIcon");
+    const stockStatus = document.getElementById("stockStatus");
 
     let selectedColorVariantId = singleColorVariantInput ? parseInt(singleColorVariantInput.value) : (colorVariants.length > 0 ? colorVariants[0].id : null);
     let selectedSizeStockId = null;
@@ -352,6 +348,7 @@
         changeImage(variant.images[0]);
       }
       updateSizeOptions(selectedColorVariantId);
+      updateStockStatus();
       updateWishlistButton();
       updateStockAndButtons();
     }
@@ -367,6 +364,20 @@
       qtyInput.value = 1;
       formQty.value = 1;
       updateStockAndButtons();
+    }
+
+    // Update stock status
+    function updateStockStatus() {
+      const variant = colorVariants.find(v => v.id === selectedColorVariantId);
+      if (variant) {
+        if (variant.hasStock) {
+          stockStatus.textContent = "In Stock";
+          stockStatus.className = "text-green-600 bg-green-50 px-2 py-1 rounded-full text-xs font-medium";
+        } else {
+          stockStatus.textContent = "Out of Stock";
+          stockStatus.className = "text-red-600 bg-red-50 px-2 py-1 rounded-full text-xs font-medium";
+        }
+      }
     }
 
     // Update button states
@@ -526,6 +537,7 @@
         updateSizeOptions(selectedColorVariantId);
       }
     }
+    updateStockStatus();
     updateWishlistButton();
     updateStockAndButtons();
 
