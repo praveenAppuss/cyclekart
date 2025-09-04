@@ -1354,12 +1354,16 @@ def process_return_request(request, order_id):
         wallet.balance += refund_amount
         wallet.save()
 
+        
+        unique_txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
+
         WalletTransaction.objects.create(
             wallet=wallet,
             order=order,
             amount=refund_amount,
             transaction_type="credit",
-            description="Refund for returned order"
+            description="Refund for returned order",
+            transaction_id=unique_txn_id
         )
 
         order.payment_status = "Refunded"
@@ -1370,6 +1374,7 @@ def process_return_request(request, order_id):
         messages.error(request, "Return request is not eligible for refund.")
 
     return redirect("wallet_page")
+
 
 
 @login_required

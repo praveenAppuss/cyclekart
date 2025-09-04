@@ -855,13 +855,11 @@ def return_accept(request, item_id):
 
     try:
         with transaction.atomic():
-            
             item.status = 'return_accepted'
             item.is_return_approved = True
             item.is_return_rejected = False
             item.save()
 
-            
             if order.payment_status == 'paid':
                 item_price = (item.discount_price or item.price) * item.quantity
                 total_items_price = sum(
@@ -869,7 +867,6 @@ def return_accept(request, item_id):
                     for oi in order.items.all()
                 )
 
-                
                 tax_amount = Decimal('0.00')
                 if order.tax and total_items_price > 0:
                     tax_amount = (item_price / total_items_price) * order.tax
@@ -881,14 +878,20 @@ def return_accept(request, item_id):
 
                 refund_amount = item_price + tax_amount + shipping_amount                
                 wallet, _ = Wallet.objects.get_or_create(user=order.user)
+
+                # Generate unique transaction ID
+                unique_txn_id = f"TXN-{uuid.uuid4().hex[:8].upper()}"
+
                 WalletTransaction.objects.create(
                     wallet=wallet,
                     order=order,
                     amount=refund_amount,
                     transaction_type='credit',
-                    description=f"Refund for return of {item.product.name} (Order {order.order_id})"
+                    description=f"Refund for return of {item.product.name} (Order {order.order_id})",
+                    transaction_id=unique_txn_id
                 )
-                wallet.balance =(wallet.balance or Decimal('0.00'))+ refund_amount
+
+                wallet.balance = (wallet.balance or Decimal('0.00')) + refund_amount
                 wallet.save()
 
                 messages.success(request, f"Return request accepted. ₹{refund_amount:.2f} refunded to user's wallet.")
@@ -916,6 +919,7 @@ def return_accept(request, item_id):
         messages.error(request, f"Error processing return request: {str(e)}")
 
     return redirect('admin_order_detail', order_id=order.id)
+
 
 
 

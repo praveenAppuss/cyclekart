@@ -35,7 +35,7 @@
                 <tbody>
                     {% for t in transactions %}
                     <tr class="border-b">
-                        <td class="px-4 py-2">{{ t.id }}</td>
+                        <td class="px-4 py-2">{{ t.transaction_id }}</td>
                         <td class="px-4 py-2">{{ t.created_at|date:"d M Y" }}</td>
                         <td class="px-4 py-2 {% if t.transaction_type == 'credit' %}text-green-600{% else %}text-red-600{% endif %}">
                             ₹{{ t.amount }}
