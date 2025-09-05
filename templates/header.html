@@ -27,14 +27,10 @@
 
       <!-- Desktop Nav -->
       <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-700">
-        <a href="{% url 'user_home'  %}" class="hover:text-blue-700">Home</a>
-
-        <a href="{% url 'userproduct_list'  %}" class="hover:text-blue-700">Explore All</a>
-        
-
+        <a href="{% url 'user_home' %}" class="hover:text-blue-700">Home</a>
+        <a href="{% url 'userproduct_list' %}" class="hover:text-blue-700">Explore All</a>
         <a href="#" class="hover:text-blue-700">About</a>
         <a href="#" class="hover:text-blue-700">Contact</a>
-
         {% if user.is_authenticated %}
           <a href="{% url 'user_logout' %}" class="text-red-500 hover:text-red-700">Logout</a>
         {% endif %}
@@ -42,27 +38,53 @@
 
       <!-- Search Bar + Icons -->
       <div class="flex items-center gap-4">
-        <form method="GET" action="/search/" class="relative hidden md:block">
+        <form method="GET" action="{% url 'userproduct_list' %}" class="relative hidden md:block">
           <input
             type="text" name="q"
             placeholder="Search products"
-            class="pl-8 pr-4 py-1 border border-gray-300 rounded-full text-sm focus:outline-none"
+            value="{{ query|default:'' }}"
+            class="pl-8 pr-10 py-1 border border-gray-300 rounded-full text-sm focus:outline-none"
           />
-          <span class="absolute left-2 top-1.5 text-gray-400">🔍</span>
+          <svg class="absolute left-2 top-1.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"></path>
+          </svg>
+          {% if query %}
+            <a href="{% url 'userproduct_list' %}?clear=true" class="absolute right-2 top-1.5 h-4 w-4 text-gray-400 hover:text-gray-600">
+              <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </a>
+          {% endif %}
         </form>
 
-        <a href="{% url 'wishlist' %}" title="Wishlist">🤍</a>
-        <a href="{%url 'cart_view' %}" title="Cart">🛒</a>
-        <a href="{% url 'profile' %}" title="Account">👤</a>
+        <a href="{% url 'wishlist' %}" title="Wishlist">
+          <svg class="h-5 w-5 text-gray-700 hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+          </svg>
+        </a>
+        <a href="{% url 'cart_view' %}" title="Cart">
+          <svg class="h-5 w-5 text-gray-700 hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+          </svg>
+        </a>
+        <a href="{% url 'profile' %}" title="Account">
+          <svg class="h-5 w-5 text-gray-700 hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+          </svg>
+        </a>
 
         <!-- Hamburger for Mobile -->
-        <button class="md:hidden focus:outline-none" onclick="toggleMenu()">☰</button>
+        <button class="md:hidden focus:outline-none" onclick="toggleMenu()">
+          <svg class="h-6 w-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+        </button>
       </div>
     </div>
 
     <!-- Mobile Menu -->
     <div id="mobileMenu" class="md:hidden hidden bg-white border-t border-gray-200 px-6 py-4 text-sm font-medium text-gray-700">
-      <a href="{% url 'user_home'  %}" class="block py-1">Home</a>
+      <a href="{% url 'user_home' %}" class="block py-1">Home</a>
       <a href="#" class="block py-1">Category</a>
       <a href="#" class="block py-1">Brand</a>
       <a href="#" class="block py-1">About</a>
@@ -73,13 +95,13 @@
     </div>
   </header>
 
- <!-- ✅ PAGE CONTENT -->
-<main class="pb-0">
-  {% block content %}{% endblock content %}
-</main>
+  <!-- ✅ PAGE CONTENT -->
+  <main class="pb-0">
+    {% block content %}{% endblock content %}
+  </main>
 
   <!-- 🌙 FOOTER -->
-  <footer class="bg-white border-t ">
+  <footer class="bg-white border-t">
     <div class="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 sm:grid-cols-4 gap-6 text-sm text-gray-700">
       <div>
         <h2 class="font-bold text-base mb-2">CycleKart</h2>
