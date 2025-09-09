@@ -768,7 +768,7 @@ def update_order_status(request, order_id):
     if new_status not in dict(Order.STATUS_CHOICES):
         logger.error(f"Invalid status {new_status} for order {order.order_id}")
         messages.error(request, "Invalid status selected.")
-        return redirect('adminapp:admin_order_detail', order_id=order.id)
+        return redirect('admin_order_detail', order_id=order.id)
 
     if order.status == 'cancelled':
         logger.warning(f"Attempted to update status of cancelled order {order.order_id}")

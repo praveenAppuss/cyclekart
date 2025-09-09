@@ -5,7 +5,8 @@
 <div class="min-h-screen bg-gray-100 px-4 py-8">
     <div class="max-w-7xl mx-auto">
         <h2 class="text-3xl font-bold mb-6">Order Details - {{ order.order_id }}</h2>
-        <a href="{% url 'admin_order_list' %}" class="text-blue-600 hover:text-blue-800 mb-6 inline-block">&larr; Back to Orders</a>
+        <a href="{% url 'admin_order_list' %}" class="text-blue-600 hover:text-blue-800 mb-6 inline-block">&larr; Back
+            to Orders</a>
 
         <!-- Order Information -->
         <div class="bg-white p-6 rounded-xl shadow-md mb-8">
@@ -39,9 +40,10 @@
                             {{ order.get_status_display }}
                         </span>
                     </p>
-                    {% if order.delivered_at %}<p><strong>Delivered At:</strong> {{ order.delivered_at|date:"m/d/Y H:i" }}</p>{% endif %}
-                    {% if order.cancelled_at %}<p><strong>Cancelled At:</strong> {{ order.cancelled_at|date:"m/d/Y H:i" }}</p>{% endif %}
-                    {% if order.returned_at %}<p><strong>Returned At:</strong> {{ order.returned_at|date:"m/d/Y H:i" }}</p>{% endif %}
+                    {% if order.delivered_at %}<p><strong>Delivered At:</strong> {{ order.delivered_at|date:"m/d/Y H:i"}}</p>{% endif %}
+                    {% if order.cancelled_at %}<p><strong>Cancelled At:</strong> {{ order.cancelled_at|date:"m/d/Y H:i"}}</p>{% endif %}
+                    {% if order.returned_at %}<p><strong>Returned At:</strong> {{ order.returned_at|date:"m/d/Y H:i" }}
+                    </p>{% endif %}
                     {% if order.cancel_reason %}<p><strong>Cancel Reason:</strong> {{ order.cancel_reason }}</p>{% endif %}
                     {% if order.return_reason %}<p><strong>Return Reason:</strong> {{ order.return_reason }}</p>{% endif %}
                 </div>
@@ -54,11 +56,12 @@
                         <label for="status" class="block text-sm font-medium text-gray-700">Status</label>
                         <select name="status" id="status" class="w-full border rounded-md p-2 text-sm">
                             {% for status_value, status_label in order.STATUS_CHOICES %}
-                                <option value="{{ status_value }}" {% if order.status == status_value %}selected{% endif %}>{{ status_label }}</option>
+                            <option value="{{ status_value }}" {% if order.status == status_value %}selected{% endif %}>{{status_label }}</option>
                             {% endfor %}
                         </select>
                     </div>
-                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Update Status</button>
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Update
+                        Status</button>
                 </form>
             </div>
         </div>
@@ -82,7 +85,8 @@
                     <tbody class="divide-y divide-gray-200">
                         {% for item in items %}
                         <tr>
-                            <td class="px-3 py-2"><img class="w-14 object-cover rounded-md border" src="{{item.product.thumbnail.url}}" alt=""></td>
+                            <td class="px-3 py-2"><img class="w-14 object-cover rounded-md border"
+                                    src="{{item.product.thumbnail.url}}" alt=""></td>
                             <td class="px-3 py-2 text-sm text-gray-500">{{ item.color_variant.name|default:"-" }}</td>
                             <td class="px-3 py-2 text-sm text-gray-500">{{ item.size|default:"-" }}</td>
                             <td class="px-3 py-2 text-sm text-gray-500">{{ item.quantity }}</td>
@@ -98,28 +102,31 @@
                                 </span>
                             </td>
                             <td class="px-6 py-4 text-sm">
-    {% if item.status == 'return_requested' %}
-        <form method="POST" action="{% url 'return_accept' item.id %}" class="inline">
-            {% csrf_token %}
-            <button type="submit" class="text-green-600 hover:text-green-800 mr-2">Accept</button>
-        </form>
-        <form method="POST" action="{% url 'return_reject' item.id %}" class="inline">
-            {% csrf_token %}
-            <button type="submit" class="text-red-600 hover:text-red-800">Reject</button>
-        </form>
-    {% elif item.status == 'return_accepted' %}
-        <span class="text-green-600">Accepted</span>
-    {% elif item.status == 'return_rejected' %}
-        <span class="text-red-600">Rejected</span>
-        {% if item.return_rejected_reason %}<br><small class="text-muted">{{ item.return_rejected_reason }}</small>{% endif %}
-    {% else %}
-        <span class="text-gray-500">N/A</span>
-    {% endif %}
-</td>
+                                {% if item.status == 'return_requested' %}
+                                <form method="POST" action="{% url 'return_accept' item.id %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                        class="text-green-600 hover:text-green-800 mr-2">Accept</button>
+                                </form>
+                                <form method="POST" action="{% url 'return_reject' item.id %}" class="inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="text-red-600 hover:text-red-800">Reject</button>
+                                </form>
+                                {% elif item.status == 'return_accepted' %}
+                                <span class="text-green-600">Accepted</span>
+                                {% elif item.status == 'return_rejected' %}
+                                <span class="text-red-600">Rejected</span>
+                                {% if item.return_rejected_reason %}<br><small class="text-muted">{{
+                                    item.return_rejected_reason }}</small>{% endif %}
+                                {% else %}
+                                <span class="text-gray-500">N/A</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="px-6 py-4 text-sm text-gray-500 text-center">No items in this order.</td>
+                            <td colspan="7" class="px-6 py-4 text-sm text-gray-500 text-center">No items in this order.
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -131,12 +138,13 @@
         <div class="bg-white p-6 rounded-xl shadow-md mb-8">
             <h3 class="text-lg font-semibold mb-4 border-b pb-2">Order Summary</h3>
             <div class="text-sm text-gray-700 space-y-2">
-                <div class="flex justify-between"><span>Subtotal</span><span>₹{{ order.subtotal|floatformat:2 }}</span></div>
+                <div class="flex justify-between"><span>Subtotal</span><span>₹{{ order.subtotal|floatformat:2 }}</span>
+                </div>
                 <div class="flex justify-between text-green-600"><span>Discount</span><span>- ₹{{ order.discount|floatformat:2 }}</span></div>
                 <div class="flex justify-between"><span>Tax</span><span>₹{{ order.tax|floatformat:2 }}</span></div>
-                <div class="flex justify-between"><span>Shipping</span><span>₹{{ order.shipping_cost|floatformat:2 }}</span></div>
+                <div class="flex justify-between"><span>Shipping</span><span>₹{{ order.shipping_cost|floatformat:2}}</span></div>
                 <hr class="my-2">
-                <div class="flex justify-between font-semibold text-lg"><span>Total</span><span>₹{{ order.total_amount|floatformat:2 }}</span></div>
+                <div class="flex justify-between font-semibold text-lg"><span>Total</span><span>₹{{order.total_amount|floatformat:2 }}</span></div>
             </div>
         </div>
 
@@ -145,19 +153,19 @@
         <script>
             document.addEventListener('DOMContentLoaded', () => {
                 {% for message in messages %}
-                    Swal.fire({
-                        toast: true,
-                        position: 'top-end',
-                        icon: '{{ message.tags }}' === 'success' ? 'success' : '{{ message.tags }}' === 'error' ? 'error' : 'warning',
-                        title: '{{ message }}',
-                        showConfirmButton: false,
-                        timer: 3000,
-                        timerProgressBar: true,
-                        didOpen: (toast) => {
-                            toast.addEventListener('mouseenter', Swal.stopTimer);
-                            toast.addEventListener('mouseleave', Swal.resumeTimer);
-                        }
-                    });
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: '{{ message.tags }}' === 'success' ? 'success' : '{{ message.tags }}' === 'error' ? 'error' : 'warning',
+                    title: '{{ message }}',
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                        toast.addEventListener('mouseenter', Swal.stopTimer);
+                        toast.addEventListener('mouseleave', Swal.resumeTimer);
+                    }
+                });
                 {% endfor %}
             });
         </script>

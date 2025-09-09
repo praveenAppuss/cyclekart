@@ -30,7 +30,7 @@
                 <div>
                     <h3 class="font-semibold text-lg">{{ item.product.name }}</h3>
                     <p class="text-sm text-gray-700">Size: {{ item.size|default:"-" }} | Quantity: {{ item.quantity }}</p>
-                    <p class="text-sm text-gray-700 font-medium mt-1">₹{{ item.price|floatformat:2 }}</p>
+                    <p class="text-sm text-gray-700 font-medium mt-1">₹{{ item.product.price|floatformat:2 }}</p>
 
                     <!-- Order Status & ETA -->
                     <div class="flex items-center gap-4 mt-2">
