@@ -129,7 +129,12 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    // No toast initialization needed anymore
+    // Render Django messages as SweetAlert Toasts
+    {% if messages %}
+      {% for message in messages %}
+        showToast("{{ message|escapejs }}", "{{ message.tags }}");
+      {% endfor %}
+    {% endif %}
   });
 
   function openRemoveModal(itemId) {
@@ -160,41 +165,22 @@
     });
 
     if (type === "success") {
-      Toast.fire({
-        icon: 'success',
-        title: message,
-        customClass: {
-          popup: 'animated fadeInDown'
-        }
-      });
+      Toast.fire({ icon: 'success', title: message });
     } else if (type === "error") {
-      Toast.fire({
-        icon: 'error',
-        title: message,
-        customClass: {
-          popup: 'animated fadeInDown'
-        }
-      });
-    } else { // warning
-      Toast.fire({
-        icon: 'warning',
-        title: message,
-        customClass: {
-          popup: 'animated fadeInDown'
-        }
-      });
+      Toast.fire({ icon: 'error', title: message });
+    } else {
+      Toast.fire({ icon: 'warning', title: message });
     }
   }
 
   async function updateQuantity(itemId, action) {
     const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
     const quantityDisplay = itemElement.querySelector('.quantity-display');
-    const unitPriceDisplay = itemElement.querySelector('[data-unit-price]'); // Reference to the fixed price
+    const unitPriceDisplay = itemElement.querySelector('[data-unit-price]');
     const incrementBtn = itemElement.querySelector('.increment-btn');
     const decrementBtn = itemElement.querySelector('.decrement-btn');
     const maxQuantity = parseInt(incrementBtn.dataset.maxQuantity || 5);
 
-    // Prevent action if buttons are disabled
     if ((action === 'increment' && incrementBtn.disabled) || (action === 'decrement' && decrementBtn.disabled)) {
       return;
     }
@@ -213,23 +199,22 @@
       const data = await response.json();
       if (data.success) {
         quantityDisplay.textContent = data.quantity;
-        // Do not update unitPriceDisplay, keep it fixed
         showToast(data.message, 'success');
 
-        // Update button states
         const newQuantity = data.quantity;
         incrementBtn.disabled = newQuantity >= maxQuantity;
         decrementBtn.disabled = newQuantity <= 1;
+
         incrementBtn.classList.toggle('bg-gray-300', newQuantity >= maxQuantity);
         incrementBtn.classList.toggle('cursor-not-allowed', newQuantity >= maxQuantity);
         incrementBtn.classList.toggle('bg-gray-200', newQuantity < maxQuantity);
         incrementBtn.classList.toggle('hover:bg-gray-300', newQuantity < maxQuantity);
+
         decrementBtn.classList.toggle('bg-gray-300', newQuantity <= 1);
         decrementBtn.classList.toggle('cursor-not-allowed', newQuantity <= 1);
         decrementBtn.classList.toggle('bg-gray-200', newQuantity > 1);
         decrementBtn.classList.toggle('hover:bg-gray-300', newQuantity > 1);
 
-        // Update order summary
         document.querySelector('[data-cart-total]').textContent = `₹${data.cart_total.toFixed(0)}`;
         document.querySelector('[data-total-discount]').textContent = `-₹${data.total_discount.toFixed(0)}`;
         document.querySelector('[data-taxes]').textContent = `₹${data.taxes.toFixed(2)}`;
