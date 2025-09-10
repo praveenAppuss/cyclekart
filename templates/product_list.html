@@ -60,18 +60,15 @@
         <tr class="border-b hover:bg-gray-50">
           <td class="py-2 px-3">{{ forloop.counter }}</td>
           <td class="py-2 px-3">
-            {% if product.thumbnail %}
-            <img src="{{ product.thumbnail.url }}" alt="Thumbnail" class="w-10 h-10 object-cover rounded border" />
-            {% else %}
-            {% with product.color_variants.first as variant %}
-              {% if variant and variant.images.first %}
-              <img src="{{ variant.images.first.image.url }}" alt="Product Image"
-                class="w-10 h-10 object-cover rounded border" />
+            {% with first_variant=product.color_variants.first %}
+              {% if product.thumbnail and product.thumbnail.url %}
+                <img src="{{ product.thumbnail.url }}" alt="Thumbnail" class="w-10 h-10 object-cover rounded border" />
+              {% elif first_variant and first_variant.images.first %}
+                <img src="{{ first_variant.images.first.image.url }}" alt="Product Image" class="w-10 h-10 object-cover rounded border" />
               {% else %}
-              <span class="text-gray-400">No Image</span>
+                <img src="{% static 'images/placeholder.jpg' %}" alt="No Image" class="w-10 h-10 object-cover rounded border" />
               {% endif %}
             {% endwith %}
-            {% endif %}
           </td>
           <td class="py-2 px-3 font-medium text-gray-800">{{ product.name }}</td>
           <td class="py-2 px-3 text-gray-600">{{ product.stock_summary }}</td>
@@ -115,17 +112,16 @@
       <li><a href="?page={{ page_obj.previous_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">‹ Prev</a></li>
       {% endif %}
       {% for num in page_obj.paginator.page_range %}
-  {% if num == 1 or num == page_obj.paginator.num_pages or num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
-    {% if num == page_obj.number %}
-      <li><span class="px-3 py-1 bg-blue-600 text-white rounded">{{ num }}</span></li>
-    {% else %}
-      <li><a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">{{ num }}</a></li>
-    {% endif %}
-  {% elif num == page_obj.number|add:"-3" or num == page_obj.number|add:"3" %}
-    <li><span class="px-2">...</span></li>
-  {% endif %}
-{% endfor %}
-
+        {% if num == 1 or num == page_obj.paginator.num_pages or num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+          {% if num == page_obj.number %}
+            <li><span class="px-3 py-1 bg-blue-600 text-white rounded">{{ num }}</span></li>
+          {% else %}
+            <li><a href="?page={{ num }}{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">{{ num }}</a></li>
+          {% endif %}
+        {% elif num == page_obj.number|add:"-3" or num == page_obj.number|add:"3" %}
+          <li><span class="px-2">...</span></li>
+        {% endif %}
+      {% endfor %}
       {% if page_obj.number < page_obj.paginator.num_pages %}
       <li><a href="?page={{ page_obj.next_page_number }}{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">Next ›</a></li>
       <li><a href="?page={{ page_obj.paginator.num_pages }}{% if query %}&q={{ query }}{% endif %}" class="px-2 py-1 border rounded hover:bg-gray-100">Last »</a></li>

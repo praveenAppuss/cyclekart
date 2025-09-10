@@ -472,7 +472,6 @@ def add_product(request):
 
 
 
-
 @superuser_required
 @never_cache
 def edit_product(request, product_id):
@@ -595,6 +594,7 @@ def edit_product(request, product_id):
                 # Delete existing variants
                 ProductColorVariant.objects.filter(product=product).delete()
                 stock_index = 0
+                first_image = None
                 for i, color in enumerate(colors):
                     color_variant = ProductColorVariant.objects.create(
                         product=product,
@@ -623,9 +623,8 @@ def edit_product(request, product_id):
                                 file_name = f"{uuid.uuid4()}.{ext}"
                                 image_file = ContentFile(base64.b64decode(img_data), name=file_name)
                                 new_img = ProductImage.objects.create(color_variant=color_variant, image=image_file)
-                                if i == 0 and not product.thumbnail:
-                                    product.thumbnail = new_img.image
-                                    product.save()
+                                if i == 0 and not first_image:
+                                    first_image = new_img.image
                             except Exception as e:
                                 logger.error(f"Image saving error for variant {color}: {str(e)}")
                                 raise
@@ -633,13 +632,16 @@ def edit_product(request, product_id):
                         # Copy existing images for unchanged variants
                         existing_imgs = existing_images.get(next((v.id for v in color_variants if v.name == color), None), [])
                         for img in existing_imgs:
-                            ProductImage.objects.create(
+                            new_img = ProductImage.objects.create(
                                 color_variant=color_variant,
                                 image=img.image
                             )
-                        if existing_imgs and i == 0 and not product.thumbnail:
-                            product.thumbnail = existing_imgs[0].image
-                            product.save()
+                            if i == 0 and not first_image:
+                                first_image = new_img.image
+
+                # Update thumbnail to the first image of the first variant, or None if no variants
+                product.thumbnail = first_image
+                product.save()
 
             logger.info(f"Product {name} updated successfully with {len(colors)} variants")
             messages.success(request, "Product updated successfully.")
