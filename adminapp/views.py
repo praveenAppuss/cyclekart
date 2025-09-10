@@ -494,7 +494,7 @@ def edit_product(request, product_id):
     errors = {}
     old = {}
 
-    
+    # Prepare existing data
     color_variants = product.color_variants.all()
     existing_images = {variant.id: list(ProductImage.objects.filter(color_variant=variant)) for variant in color_variants}
     stock_map = {}
@@ -517,7 +517,6 @@ def edit_product(request, product_id):
         discount_price = request.POST.get('discount_price', str(product.discount_price) if product.discount_price else None)
         colors = request.POST.getlist('colors[]')
         stocks = request.POST.getlist('stocks[]')
-        cropped_images = request.POST.getlist('cropped_images[]')
 
         old = {
             'name': name,
@@ -530,7 +529,7 @@ def edit_product(request, product_id):
             'stocks': stocks,
         }
 
-        
+        # Validation
         logger.debug(f"POST data: {dict(request.POST)}")
         if Product.objects.filter(name__iexact=name).exclude(id=product_id).exists() and name != product.name:
             errors['name'] = "Another product with this name already exists."
@@ -549,10 +548,11 @@ def edit_product(request, product_id):
         variant_image_counts = {}
         variant_image_map = {}
         for i, color in enumerate(colors):
+            new_images = request.POST.getlist(f'cropped_images_{i}[]')
             variant_id = next((v.id for v in color_variants if v.name == color), None)
             existing_count = len(existing_images.get(variant_id, [])) if variant_id else 0
-            new_images = [img for img in cropped_images if img and i * 3 <= cropped_images.index(img) < (i + 1) * 3]
-            variant_image_counts[color] = len(new_images) if new_images else existing_count
+            len_new = len(new_images)
+            variant_image_counts[color] = len_new if len_new > 0 else existing_count
             variant_image_map[color] = new_images
             if variant_image_counts[color] < 3:
                 errors['images'] = f"Color {color} has only {variant_image_counts[color]} images; at least 3 required per variant."
@@ -579,7 +579,7 @@ def edit_product(request, product_id):
                 'old': old,
             })
 
-        
+        # Update product
         logger.info(f"Updating product: {name}")
         try:
             with transaction.atomic():
@@ -592,9 +592,8 @@ def edit_product(request, product_id):
                 product.discount_price = discount_price
                 product.save()
 
-                
+                # Delete existing variants
                 ProductColorVariant.objects.filter(product=product).delete()
-                image_index = 0
                 stock_index = 0
                 for i, color in enumerate(colors):
                     color_variant = ProductColorVariant.objects.create(
@@ -603,7 +602,7 @@ def edit_product(request, product_id):
                         hex_code=color_hex_map.get(color, '#000000')
                     )
 
-                    
+                    # Save stocks
                     for size in size_choices:
                         stock_value = int(stocks[stock_index]) if stock_index < len(stocks) and stocks[stock_index].isdigit() else 0
                         logger.debug(f"Saving stock for {color} - {size}: {stock_value}")
@@ -614,10 +613,9 @@ def edit_product(request, product_id):
                         )
                         stock_index += 1
 
-                    
+                    # Save images
                     new_images = variant_image_map.get(color, [])
-                    if new_images:
-                        ProductImage.objects.filter(color_variant=color_variant).delete()
+                    if len(new_images) > 0:
                         for img_str in new_images:
                             try:
                                 format, img_data = img_str.split(';base64,')
@@ -632,7 +630,7 @@ def edit_product(request, product_id):
                                 logger.error(f"Image saving error for variant {color}: {str(e)}")
                                 raise
                     else:
-                        
+                        # Copy existing images for unchanged variants
                         existing_imgs = existing_images.get(next((v.id for v in color_variants if v.name == color), None), [])
                         for img in existing_imgs:
                             ProductImage.objects.create(
