@@ -531,10 +531,7 @@ def resend_profile_otp(request):
 def address_list(request):
     addresses = Address.objects.filter(user=request.user)
     form = AddressForm()
-
-    # Try to consume session-selected id (one-time). If not present, fallback to None.
     selected_id = request.session.pop('selected_address_id', None)
-
     address_json_map = {
         str(a.id): {
             'full_name': a.full_name,
@@ -572,11 +569,8 @@ def add_address(request):
 
             if is_default:
                 Address.objects.filter(user=request.user).exclude(id=address.id).update(is_default=False)
-
-            # Store the newly created address id in session so the next page can select it
             request.session['selected_address_id'] = address.id
 
-            # Redirect as before (next if present) — session persists across redirect
             next_url = request.GET.get('next')
             if next_url:
                 return redirect(f"{next_url}?new_address_id={address.id}")
@@ -593,9 +587,7 @@ def update_address(request, pk):
         form = AddressForm(request.POST, instance=address)
         if form.is_valid():
             form.save()
-            # Keep the updated address selected after redirect
             request.session['selected_address_id'] = address.id
-
             next_url = request.GET.get('next')
             if next_url:
                 return redirect(f"{next_url}?new_address_id={address.id}")
@@ -609,7 +601,6 @@ def update_address(request, pk):
 def delete_address(request, pk):
     address = get_object_or_404(Address, pk=pk, user=request.user)
     address.delete()
-    # If the deleted id was stored as selected, remove it from session
     if request.session.get('selected_address_id') == pk:
         request.session.pop('selected_address_id', None)
     return redirect('address_list')
