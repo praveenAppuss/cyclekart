@@ -253,9 +253,10 @@
         const select = document.getElementById("addressDropdown");
         const option = select.selectedOptions[0];
         if (!option) return;
+
         const addressId = option.value;
         document.getElementById("addressForm").action = `/addresses/update/${addressId}/?next=/checkout/`;
-        document.getElementById("hiddenAddressId").value = addressId; // Update hidden input
+        document.getElementById("hiddenAddressId").value = addressId;
 
         document.getElementById("full_name").value = option.dataset.full_name;
         document.getElementById("mobile").value = option.dataset.mobile;
@@ -267,10 +268,19 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
-        if (document.getElementById("addressDropdown")) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const newAddressId = urlParams.get('new_address_id');
+        const dropdown = document.getElementById("addressDropdown");
+
+        if (dropdown) {
+            if (newAddressId) {
+                // Select the newly added address
+                dropdown.value = newAddressId;
+            }
             fillAddressForm();
         }
-        lucide.createIcons();  // Icon init
+
+        lucide.createIcons();
 
         // Client-side validation for Place Order form
         document.getElementById('checkoutForm').addEventListener('submit', function (e) {
@@ -278,11 +288,12 @@
             const paymentMethod = document.querySelector('input[name="payment_method"]:checked');
             if (!addressId || !paymentMethod) {
                 e.preventDefault();
-                toggleModal('validationModal'); // Show validation modal instead of alert
+                toggleModal('validationModal');
             }
         });
     });
 </script>
+
 
 <script src="https://unpkg.com/lucide@latest"></script>
 {% endblock %}

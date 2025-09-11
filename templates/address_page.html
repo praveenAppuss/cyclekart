@@ -30,7 +30,11 @@
           data-state="{{ address.state }}"
           data-pin_code="{{ address.pin_code }}"
           data-country="{{ address.country }}"
-          {% if forloop.first %}selected{% endif %}>
+          {% if selected_id == address.id %}
+            selected
+          {% elif not selected_id and forloop.first %}
+            selected
+          {% endif %}>
           {{ address.full_name }}
         </option>
         {% endfor %}
@@ -163,7 +167,7 @@
     document.getElementById("country").value = option.dataset.country;
   }
 
-  // Automatically fill the first address if available
+  // Automatically fill the first (or selected) address if available
   document.addEventListener('DOMContentLoaded', function () {
     if (document.getElementById("addressDropdown")) {
       fillAddressForm();
