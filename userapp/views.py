@@ -734,8 +734,10 @@ def cart_view(request):
         else:
             item.savings = Decimal('0')
 
-    taxes = total_subtotal * TAX_RATE
-    final_total = total_subtotal + taxes - total_discount
+    taxable_amount = total_subtotal - total_discount
+    taxes = taxable_amount * TAX_RATE
+    final_total = taxable_amount + taxes
+
 
     return render(request, 'cart.html', {
         'cart_items': cart_items,
@@ -985,8 +987,9 @@ def checkout_view(request):
         total_quantity += quantity
 
     shipping_cost = 0  
-    taxes = subtotal * Decimal('0.05')  
-    final_total = subtotal - total_discount + shipping_cost + taxes
+    taxamount = subtotal -total_discount 
+    taxes=taxamount*Decimal('0.05') 
+    final_total = taxamount+shipping_cost + taxes
 
     context = {
         'addresses': addresses,
@@ -1009,96 +1012,111 @@ def checkout_view(request):
 @never_cache
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 def place_order(request):
-    if request.method == 'POST':
+    if request.method != 'POST':
+        return redirect('checkout')
 
-        address_id = request.POST.get('selected_address')
-        payment_method = request.POST.get('payment_method')
-        logger.debug(f"Form data: selected_address={address_id}, payment_method={payment_method}")
+    # --- Get form data ---
+    address_id = request.POST.get('selected_address')
+    payment_method = request.POST.get('payment_method')
+    logger.debug(f"Form data: selected_address={address_id}, payment_method={payment_method}")
 
-        if not address_id or not payment_method:
-            messages.error(request, "Please select address and payment method.")
-            logger.error("Missing address_id or payment_method")
-            return redirect('checkout')
+    if not address_id or not payment_method:
+        messages.error(request, "Please select address and payment method.")
+        logger.error("Missing address_id or payment_method")
+        return redirect('checkout')
 
-        address = get_object_or_404(Address, id=address_id, user=request.user)
-        logger.debug(f"Address found: {address}")
-        cart = get_object_or_404(Cart, user=request.user)
-        cart_items = CartItem.objects.filter(cart=cart)
-        logger.debug(f"Cart items: {[(item.product.name, item.size_stock.size, item.quantity) for item in cart_items]}")
-        if not cart_items.exists():
-            messages.error(request, "Your cart is empty.")
-            logger.error("Cart is empty")
+    # --- Fetch related objects ---
+    address = get_object_or_404(Address, id=address_id, user=request.user)
+    cart = get_object_or_404(Cart, user=request.user)
+    cart_items = cart.items.select_related('product', 'color_variant', 'size_stock').all()
+
+    if not cart_items.exists():
+        messages.error(request, "Your cart is empty.")
+        logger.error("Cart is empty")
+        return redirect('cart_view')
+
+    # --- Calculate subtotal, discount, tax, total ---
+    subtotal = Decimal('0.00')
+    discount = Decimal('0.00')
+
+    for item in cart_items:
+        original_price = item.product.price
+        item_discount_price = item.product.discount_price or original_price
+        subtotal += original_price * item.quantity
+        discount += (original_price - item_discount_price) * item.quantity
+
+    taxable_amount = subtotal - discount
+    tax_rate = Decimal('0.05')  # 5% tax
+    tax = taxable_amount * tax_rate
+    shipping_cost = Decimal('0.00')
+    total_amount = taxable_amount + tax + shipping_cost
+
+    logger.debug(f"Calculated: subtotal={subtotal}, discount={discount}, tax={tax}, shipping={shipping_cost}, total={total_amount}")
+
+    # --- COD restriction ---
+    if payment_method == 'cod' and total_amount > Decimal('100000'):
+        messages.error(request, "Cash on Delivery not available for orders above ₹100000.")
+        logger.error("COD not allowed for total > ₹100000")
+        return redirect('checkout')
+
+    # --- Stock check ---
+    for item in cart_items:
+        size_stock = item.size_stock
+        logger.debug(f"Stock check for {item.product.name} (Size {size_stock.size}): {size_stock.quantity}")
+        if size_stock.quantity < item.quantity:
+            messages.error(request, f"Insufficient stock for {item.product.name} (Size {size_stock.size}). Available: {size_stock.quantity}")
+            logger.error(f"Insufficient stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} < {item.quantity}")
             return redirect('cart_view')
-        subtotal = Decimal('0.00')
-        discount = Decimal('0.00')
-        for item in cart_items:
-            original_price = item.product.price
-            item_discount_price = item.product.discount_price or original_price
-            subtotal += original_price * item.quantity
-            discount += (original_price - item_discount_price) * item.quantity
 
-        tax_rate = Decimal('0.05')  
-        tax = subtotal * tax_rate
-        shipping_cost = Decimal('0.00')  
-        total_amount = (subtotal - discount) + tax + shipping_cost
-        logger.debug(f"Calculated: subtotal={subtotal}, discount={discount}, tax={tax}, shipping={shipping_cost}, total={total_amount}")
-        if payment_method == 'cod' and total_amount > Decimal('100000'):
-            messages.error(request, "Cash on Delivery not available for orders above ₹100000.")
-            logger.error("COD not allowed for total > ₹100000")
-            return redirect('checkout')
+    # --- Place order in atomic transaction ---
+    try:
+        with transaction.atomic():
+            unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
+            logger.debug(f"Generated order_id: {unique_order_id}")
 
-        for item in cart_items:
-            size_stock = item.size_stock
-            logger.debug(f"Stock check for {item.product.name} (Size {size_stock.size}): {size_stock.quantity}")
-            if size_stock.quantity < item.quantity:
-                messages.error(request, f"Insufficient stock for {item.product.name} (Size {size_stock.size}). Available: {size_stock.quantity}")
-                logger.error(f"Insufficient stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} < {item.quantity}")
-                return redirect('cart_view')
+            order = Order.objects.create(
+                user=request.user,
+                address=address,
+                payment_method=payment_method,
+                order_id=unique_order_id,
+                subtotal=subtotal,
+                discount=discount,
+                tax=tax,
+                shipping_cost=shipping_cost,
+                total_amount=total_amount,
+                status='pending'
+            )
+            logger.debug(f"Order created: {order.order_id}")
 
-        try:
-            with transaction.atomic():
-                unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
-                logger.debug(f"Generated order_id: {unique_order_id}")
-                order = Order.objects.create(
-                    user=request.user,
-                    address=address,
-                    payment_method=payment_method,
-                    order_id=unique_order_id,
-                    subtotal=subtotal,
-                    discount=discount,
-                    tax=tax,
-                    shipping_cost=shipping_cost,
-                    total_amount=total_amount,
-                    status='pending'
+            # --- Create order items and reduce stock safely ---
+            for item in cart_items:
+                size_stock = item.size_stock
+                size_stock.quantity = F('quantity') - item.quantity
+                size_stock.save(update_fields=['quantity'])
+                
+                OrderItem.objects.create(
+                    order=order,
+                    product=item.product,
+                    color_variant=item.color_variant,
+                    size=size_stock.size,
+                    quantity=item.quantity,
+                    price=item.product.discount_price or item.product.price,
+                    discount_price=item.product.discount_price
                 )
-                logger.debug(f"Order created: {order.order_id}")
-                for item in cart_items:
-                    size_stock = item.size_stock
-                    logger.debug(f"Reducing stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} -> {size_stock.quantity - item.quantity}")
-                    size_stock.quantity -= item.quantity
-                    size_stock.save()
-                    OrderItem.objects.create(
-                        order=order,
-                        product=item.product,
-                        color_variant=item.color_variant,  
-                        size=size_stock.size,
-                        quantity=item.quantity,
-                        price=item.product.discount_price or item.product.price,
-                        discount_price=item.product.discount_price  
-                    )
-                    logger.debug(f"OrderItem created for {item.product.name} (Color: {item.color_variant}, Size: {size_stock.size}, Qty: {item.quantity})")
+                logger.debug(f"OrderItem created for {item.product.name} (Color: {item.color_variant}, Size: {size_stock.size}, Qty: {item.quantity})")
 
-                cart_items.delete()
-                logger.debug("Cart cleared")
+            # --- Clear cart ---
+            cart_items.delete()
+            logger.debug("Cart cleared")
 
-                return redirect('order_success', order_id=order.id)
-        except Exception as e:
-            logger.error(f"Order creation failed: {str(e)}", exc_info=True)
-            messages.error(request, f"An error occurred while placing the order: {str(e)}")
-            return redirect('checkout')
-    return redirect('checkout')
+            return redirect('order_success', order_id=order.id)
 
+    except Exception as e:
+        logger.error(f"Order creation failed: {str(e)}", exc_info=True)
+        messages.error(request, f"An error occurred while placing the order: {str(e)}")
+        return redirect('checkout')
 
+#-----------------------------OrderManagement------------------------------------#
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
@@ -1137,31 +1155,64 @@ def orders_list_view(request):
     }
     return render(request, 'orders_list.html', context)
 
+
+
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
 def download_invoice(request, order_id):
-    try:
-        order = Order.objects.get(id=order_id, user=request.user)
-        if order.status == 'cancelled':
-            return HttpResponse("Cannot download invoice for cancelled order", status=400)
-    except Order.DoesNotExist:
-        return HttpResponse("Order not found", status=404)
+    order = get_object_or_404(Order, id=order_id, user=request.user)
+    if order.status == 'cancelled':
+        messages.error(request, "Cannot download invoice for a cancelled order.")
+        return redirect('orders_list')
 
-    template_path = 'invoice_template.html'
-    context = {'order': order}
+    all_items = order.items.all()
+    active_items = all_items.exclude(status='cancelled')
 
+    if not active_items:
+        subtotal = Decimal('0.00')
+        adjusted_discount = Decimal('0.00')
+        tax = Decimal('0.00')
+        total_amount = Decimal('0.00')
+    else:
+        total_original_amount = sum(Decimal(str(item.product.price)) * item.quantity for item in all_items)
+        if total_original_amount == 0:
+            total_original_amount = Decimal('0.01')  
+
+        order_discount = order.discount or Decimal('0.00')
+        item_discounts = {}
+        for item in all_items:
+            item_total = Decimal(str(item.product.price)) * item.quantity
+            item_discount = (item_total / total_original_amount) * order_discount
+            item_discounts[item.id] = item_discount
+
+        subtotal = sum(Decimal(str(item.product.price)) * item.quantity for item in active_items)
+        adjusted_discount = sum(item_discounts[item.id] for item in active_items if item.id in item_discounts)
+        taxable_amount = subtotal - adjusted_discount
+        tax = taxable_amount * Decimal('0.05') 
+        total_amount = taxable_amount + tax
+    
+    context = {
+        'order': order,
+        'all_items': all_items,  
+        'subtotal': subtotal,
+        'discount': adjusted_discount,
+        'tax': tax,
+        'total_amount': total_amount,
+    }
+    template = get_template('invoice_template.html')
+    html = template.render(context)
+    
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename=invoice_{order.order_id}.pdf'
-
-    template = get_template(template_path)
-    html = template.render(context)
-
     pisa_status = pisa.CreatePDF(html, dest=response)
-
     if pisa_status.err:
-        return HttpResponse('Error generating invoice PDF', status=500)
+        messages.error(request, "Error generating invoice PDF. Please try again.")
+        return redirect('order_detail', order_id=order.id)
+
     return response
+
+
 
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
@@ -1285,7 +1336,7 @@ def cancel_order(request, order_id):
                     wallet = order.user.wallet
                     WalletService.add_balance(wallet, refund_amount, f"Refund for Order {order.order_id}", order)
                     if order.payment_status == 'paid':
-                        order.payment_status = 'pending'  
+                        order.payment_status = 'refunded'  
                         order.save()
                     messages.success(request, f"{'Item' if item_id else 'Order'} cancelled and ₹{refund_amount} refunded.")
                 except Exception as e:

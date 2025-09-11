@@ -85,6 +85,7 @@ class Order(models.Model):
         ('pending', 'Pending'),
         ('paid', 'Paid'),
         ('failed', 'Failed'),
+        ('refunded','Refunded'),
     ]
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='orders')

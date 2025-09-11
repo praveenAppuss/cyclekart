@@ -61,7 +61,7 @@
                             <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Failed</span>
                         {% elif order.status|lower == 'delivered' and order.payment_status == 'paid' %}
                             <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Paid</span>
-                        {% elif order.status|lower == 'returned' and order.payment_status == 'paid' and item.status|lower == 'return_accepted' %}
+                        {% elif order.status|lower == 'returned' and order.payment_status == 'refunded' and item.status|lower == 'return_accepted' %}
                             <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>
                         {% elif order.payment_status == 'paid' and order.status|lower == 'cancelled' %}
                             <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>

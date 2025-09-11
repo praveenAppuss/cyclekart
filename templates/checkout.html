@@ -122,7 +122,7 @@
                         </div>
                         <div class="text-sm font-semibold">
                             {% if item.product.discount_price %}
-                                ₹{{ item.product.discount_price|floatformat:2 }}
+                                ₹{{ item.product.price|floatformat:2 }}
                             {% else %}
                                 ₹{{ item.product.price|mul:item.quantity|floatformat:2 }}
                             {% endif %}

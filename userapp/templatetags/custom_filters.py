@@ -8,3 +8,9 @@ def mul(value, arg):
         return float(value) * float(arg)
     except (ValueError, TypeError):
         return ''
+
+
+
+@register.filter
+def has_cancelled_items(items):
+    return any(item.status == 'cancelled' for item in items)

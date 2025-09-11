@@ -797,7 +797,7 @@ def update_order_status(request, order_id):
                         )
                         wallet.balance += refund_amount
                         wallet.save()
-                        order.payment_status = 'pending'  
+                        order.payment_status = 'refunded'  
                         logger.info(f"Refunded ₹{refund_amount} for cancelled order {order.order_id}")
                     except Exception as e:
                         logger.error(f"Refund failed for order {order.order_id}: {str(e)}")
@@ -823,7 +823,7 @@ def update_order_status(request, order_id):
                         )
                         wallet.balance += refund_amount
                         wallet.save()
-                        order.payment_status = 'pending'  
+                        order.payment_status = 'returned'  
                         logger.info(f"Refunded ₹{refund_amount} for returned order {order.order_id}")
                     except Exception as e:
                         logger.error(f"Refund failed for order {order.order_id}: {str(e)}")
@@ -910,7 +910,7 @@ def return_accept(request, item_id):
             if not order.items.filter(status__in=['active', 'return_requested']).exists():
                 order.status = 'returned'
                 order.returned_at = timezone.now()
-                order.payment_status = 'pending'  
+                order.payment_status = 'refunded'  
                 order.save()
                 logger.info(f"Order {order.order_id} status updated to 'returned'")
 

@@ -2,13 +2,12 @@
 {% load custom_filters %}
 
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Invoice - {{ order.order_id }}</title>
     <style>
         @page {
-            margin: 0.25in; /* Reduced margin to fit content */
+            margin: 0.25in;
         }
         body {
             font-family: DejaVu Sans, sans-serif;
@@ -17,99 +16,88 @@
             background-color: #ffffff;
         }
         .invoice-container {
-            max-width: 700px; /* Reduced width to save space */
+            max-width: 700px;
             margin: 0 auto;
             border: 1px solid #cccccc;
-            padding: 10px; /* Reduced padding */
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+            padding: 10px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
         .header {
-            border-bottom: 2px solid #003087; /* Thinner border */
+            border-bottom: 2px solid #003087;
             padding-bottom: 10px;
             margin-bottom: 10px;
         }
         .header h1 {
-            font-size: 18pt; /* Reduced font size */
+            font-size: 18pt;
             color: #003087;
             font-weight: bold;
         }
         .header h2 {
-            font-size: 14pt; /* Reduced font size */
+            font-size: 14pt;
             font-weight: bold;
             color: #1a202c;
         }
         .header p {
-            font-size: 8pt; /* Reduced font size */
+            font-size: 8pt;
             color: #4a5568;
         }
-        .details-table {
+        .details-table, .items-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 10px;
         }
-        .details-table th {
+        .details-table th, .items-table th {
             background-color: #edf2f7;
             border-bottom: 1px solid #cbd5e0;
-            padding: 5px; /* Reduced padding */
+            padding: 5px;
             text-align: left;
             font-weight: bold;
             color: #2d3748;
-            font-size: 9pt; /* Reduced font size */
+            font-size: 9pt;
         }
-        .details-table td {
+        .details-table td, .items-table td {
             border-bottom: 1px solid #e2e8f0;
-            padding: 3px 5px; /* Reduced padding */
+            padding: 3px 5px;
             vertical-align: top;
-            font-size: 9pt; /* Reduced font size */
+            font-size: 9pt;
         }
-        .items-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
-        }
-        .items-table th {
-            background-color: #edf2f7;
-            border-bottom: 1px solid #cbd5e0;
-            padding: 5px; /* Reduced padding */
-            text-align: left;
-            font-weight: bold;
-            color: #2d3748;
-            font-size: 9pt; /* Reduced font size */
-        }
-        .items-table td {
-            border-bottom: 1px solid #e2e8f0;
-            padding: 3px 5px; /* Reduced padding */
-            vertical-align: top;
-            font-size: 9pt; /* Reduced font size */
+        .items-table .canceled {
+            color: #a0aec0;
+            text-decoration: line-through;
         }
         .summary {
-            border-top: 1px solid #cbd5e0; /* Thinner border */
-            padding-top: 5px; /* Reduced padding */
+            border-top: 1px solid #cbd5e0;
+            padding-top: 5px;
             text-align: right;
         }
         .summary .total {
-            font-size: 12pt; /* Reduced font size */
+            font-size: 12pt;
             font-weight: bold;
             color: #1a202c;
         }
         .summary p {
-            font-size: 8pt; /* Reduced font size */
+            font-size: 8pt;
             color: #4a5568;
-            margin: 1px 0; /* Reduced margin */
+            margin: 1px 0;
         }
         .footer {
             text-align: center;
-            padding-top: 10px; /* Reduced padding */
+            padding-top: 10px;
             border-top: 1px solid #e2e8f0;
             color: #4a5568;
-            font-size: 8pt; /* Reduced font size */
+            font-size: 8pt;
+        }
+        .note {
+            font-size: 8pt;
+            color: #e53e3e;
+            margin-top: 5px;
         }
     </style>
 </head>
 
 <body>
     <div class="invoice-container">
-        <!-- Header -->
+        
         <div class="header">
             <div>
                 <h1>CycleKart</h1>
@@ -122,7 +110,7 @@
             </div>
         </div>
 
-        <!-- Details Table -->
+        
         <div>
             <table class="details-table">
                 <tr>
@@ -145,7 +133,7 @@
             </table>
         </div>
 
-        <!-- Items Table -->
+        
         <div>
             <table class="items-table">
                 <thead>
@@ -156,44 +144,62 @@
                         <th style="text-align: center;">Qty</th>
                         <th style="text-align: right;">Price</th>
                         <th style="text-align: right;">Total</th>
+                        <th style="text-align: center;">Status</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% if order.items.all %}
-                        {% for item in order.items.all %}
-                        <tr>
+                    {% if all_items %}
+                        {% for item in all_items %}
+                        <tr {% if item.status == 'cancelled' %}class="canceled"{% endif %}>
                             <td>{{ forloop.counter }}</td>
                             <td>{{ item.product.name }}</td>
                             <td style="text-align: center;">{{ item.size|default:"-" }}</td>
                             <td style="text-align: center;">{{ item.quantity }}</td>
-                            <td style="text-align: right;">{{ item.price|floatformat:2 }}</td>
-                            <td style="text-align: right;">{{ item.quantity|mul:item.price|floatformat:2 }}</td>
+                            <td style="text-align: right;">
+                                {% if item.status == 'cancelled' %}0.00{% else %}{{ item.product.price|floatformat:2 }}{% endif %}
+                            </td>
+                            <td style="text-align: right;">
+                                {% if item.status == 'cancelled' %}0.00{% else %}{{ item.quantity|mul:item.product.price|floatformat:2 }}{% endif %}
+                            </td>
+                            <td style="text-align: center;">{{ item.get_status_display }}</td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="6" style="text-align: center; padding: 5px;">No items found for this order.</td>
+                            <td colspan="7" style="text-align: center; padding: 5px;">No items found for this order.</td>
                         </tr>
                     {% endif %}
                 </tbody>
             </table>
+            {% if all_items|has_cancelled_items %}
+                <p class="note">Note: Canceled items are listed for reference but do not contribute to the total amount.</p>
+            {% endif %}
         </div>
 
-        <!-- Summary -->
         <div class="summary">
-            <div class="total" style="display: flex; justify-content: space-between;">
-                <span>Total:</span>
-                <span>{{ order.total_amount|floatformat:2 }}</span>
-            </div>
-            <p>Payment Method: {{ order.get_payment_method_display }}</p>
-            <p>Status: {{ order.get_status_display }}</p>
-        </div>
-
+    <div style="display: flex; justify-content: space-between;">
+        <span>Subtotal:</span>
+        <span>{{ subtotal|floatformat:2 }}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between;">
+        <span>Discount:</span>
+        <span>{{ discount|floatformat:2 }}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between;">
+        <span>Tax (5%):</span>
+        <span>{{ tax|floatformat:2 }}</span>
+    </div>
+    <div class="total" style="display: flex; justify-content: space-between;">
+        <span>Total:</span>
+        <span>{{ total_amount|floatformat:2 }}</span>
+    </div>
+    <p>Payment Method: {{ order.get_payment_method_display }}</p>
+    <p>Status: {{ order.get_status_display }}</p>
+</div>
         <!-- Footer -->
         <div class="footer">
             <p>Thank you for shopping with CycleKart!</p>
         </div>
     </div>
 </body>
-
 </html>
