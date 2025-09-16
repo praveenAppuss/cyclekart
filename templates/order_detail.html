@@ -4,16 +4,19 @@
 {% block content %}
 <div class="min-h-screen bg-slate-50 px-4 py-8">
     <div class="max-w-5xl mx-auto">
+        
         <h2 class="text-xl font-bold mb-2">Order Tracking - {{ order.order_id }}</h2>
         <p class="text-xs text-gray-600 mb-6">Track your order status and delivery information for Order #{{ order.order_id }}</p>
 
-        <!-- Cancel Entire Order Button and Invoice Download -->
+        
         <div class="mb-6 text-right space-x-2">
-            {% if order.status|lower in 'pending processing shipped' %}
-                <button onclick="openModal('cancel', null)" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
-                    Cancel Entire Order
-                </button>
-            {% endif %}
+            {% if order_status_lower in cancellable_statuses %}
+    <button onclick="openModal('cancel', null)" class="bg-red-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-red-600">
+        Cancel Entire Order
+    </button>
+{% endif %}
+
+
             {% if order.payment_status == 'paid' and order.status|lower != 'cancelled' %}
                 <a href="{% url 'download_invoice' order.id %}" class="bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded hover:bg-blue-600">
                     Download Invoice (PDF)
@@ -21,7 +24,7 @@
             {% endif %}
         </div>
 
-        <!-- Order Cards for Each Item -->
+        
         {% for item in items %}
         <div class="bg-white p-4 rounded-xl shadow-md mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center">
             <div class="flex items-start gap-4">
@@ -32,7 +35,7 @@
                     <p class="text-sm text-gray-700">Size: {{ item.size|default:"-" }} | Quantity: {{ item.quantity }}</p>
                     <p class="text-sm text-gray-700 font-medium mt-1">₹{{ item.product.price|floatformat:2 }}</p>
 
-                    <!-- Order Status & ETA -->
+                    
                     <div class="flex items-center gap-4 mt-2">
                         {% if item.status|lower == 'cancelled' %}
                             <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Cancelled</span>
@@ -52,23 +55,26 @@
                         <span class="text-sm text-gray-600">Expected by {{ order.created_at|date:"d/m/Y" }}</span>
                     </div>
 
-                    <!-- Payment Status -->
+                    
+                    
                     <div class="mt-1">
                         <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Payment Status:</span>
+                    
                         {% if order.payment_status == 'pending' %}
                             <span class="bg-yellow-100 text-yellow-800 text-xs font-medium px-2 py-1 rounded-full">Pending</span>
+                    
                         {% elif order.payment_status == 'failed' %}
                             <span class="bg-red-100 text-red-700 text-xs font-medium px-2 py-1 rounded-full">Failed</span>
-                        {% elif order.status|lower == 'delivered' and order.payment_status == 'paid' %}
+                    
+                        {% elif order.payment_status == 'paid' and order.status|lower != 'cancelled' %}
                             <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Paid</span>
-                        {% elif order.status|lower == 'returned' and order.payment_status == 'refunded' and item.status|lower == 'return_accepted' %}
+                    
+                        {% elif order.payment_status == 'refunded' %}
                             <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>
-                        {% elif order.payment_status == 'paid' and order.status|lower == 'cancelled' %}
-                            <span class="bg-gray-100 text-gray-600 text-xs font-medium px-2 py-1 rounded-full">Refunded</span>
-                        {% elif order.payment_status == 'paid' %}
-                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">Paid</span>
+                    
                         {% endif %}
                     </div>
+
                 </div>
             </div>
 
@@ -95,7 +101,7 @@
         <p class="text-gray-600 text-center">No items in this order.</p>
         {% endfor %}
 
-        <!-- Order Status Tracker -->
+        
         <div class="mb-6">
             <h4 class="font-semibold mb-4 text-lg text-gray-800">Order Progress</h4>
             <div class="relative flex items-center justify-between text-sm font-medium bg-white p-6 rounded-xl shadow-lg">
@@ -153,7 +159,7 @@
             </div>
         </div>
 
-        <!-- Delivery & Summary Cards -->
+        
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="bg-white p-4 rounded-xl shadow-md">
                 <h4 class="font-semibold text-lg mb-2">Delivery Address</h4>
@@ -180,7 +186,7 @@
     </div>
 </div>
 
-<!-- Action Modal -->
+
 <div id="actionModal" class="fixed inset-0 bg-black bg-opacity-40 z-50 hidden items-center justify-center">
     <div class="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
         <h3 id="modalTitle" class="text-lg font-semibold mb-2"></h3>
@@ -207,7 +213,7 @@
     </div>
 </div>
 
-<!-- SweetAlert2 CDN -->
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     function openModal(action, itemId) {
@@ -238,7 +244,7 @@
         document.getElementById('reason').value = '';
     }
 
-    // Form Submission Validation
+    
     document.getElementById('actionForm').addEventListener('submit', (e) => {
         const reason = document.getElementById('reason').value.trim();
         const action = document.getElementById('modalAction').value;
@@ -248,7 +254,7 @@
         }
     });
 
-    // Display Django messages as SweetAlert2 toasts
+    
     document.addEventListener('DOMContentLoaded', () => {
         {% for message in messages %}
             Swal.fire({

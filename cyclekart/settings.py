@@ -12,6 +12,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
+
+# ------------------Razorpay---------------------
+RAZORPAY_KEY_ID = config("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = config("RAZORPAY_KEY_SECRET")
+
+SECURE_CROSS_ORIGIN_OPENER_POLICY="same-origin-allow-popups"
+
+
 ALLOWED_HOSTS = []
 
 # ------------------ Installed Apps ------------------
@@ -118,6 +126,8 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 
 ACCOUNT_EMAIL_VERIFICATION = 'none'  
+
+
 
 # ------------------ Email Settings ------------------
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

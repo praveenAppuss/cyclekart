@@ -7,8 +7,7 @@
 
         <!-- Breadcrumb -->
         <div class="text-md text-gray-500 mb-6">
-            <span class="text-black font-bold">Checkout</span>  
-            
+            <span class="text-black font-bold">Checkout</span>  
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
@@ -71,17 +70,19 @@
                 <p class="text-red-500 text-sm">No address found. Add a new one to continue.</p>
                 {% endif %}
 
-                <!-- Combined Form for Payment Methods and Place Order -->
+                
                 <form id="checkoutForm" method="post" action="{% url 'place_order' %}">
                     {% csrf_token %}
-                    <!-- Hidden input for selected address ID -->
+                    
                     <input type="hidden" name="selected_address" id="hiddenAddressId" value="{% if addresses %}{{ addresses.0.id }}{% endif %}">
 
-                    <!-- Payment Methods -->
+                    
                     <div class="mt-9 border-0 shadow rounded p-4">
                         <h2 class="text-base font-semibold mb-2">Payment Methods</h2>
                         <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
                         <div class="space-y-3 text-sm">
+
+                            
                             <label class="flex items-center gap-2 text-sm">
                                 {% if final_total > 100000 %}
                                 <input type="radio" disabled class="accent-blue-600">
@@ -94,21 +95,35 @@
                                 <span>Cash on Delivery</span>
                                 {% endif %}
                             </label>
+
+                            
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="radio" name="payment_method" value="wallet" class="accent-blue-600">
+                                <i data-lucide="wallet" class="w-4 h-4 text-gray-600"></i>
+                                <span>Wallet</span>
+                            </label>
+
+                            
+                            <label class="flex items-center gap-2 text-sm">
+                                <input type="radio" name="payment_method" value="razorpay" class="accent-blue-600">
+                                <i data-lucide="credit-card" class="w-4 h-4 text-gray-600"></i>
+                                <span>Pay Online (Razorpay)</span>
+                            </label>
                         </div>
                     </div>
 
-                    <!-- Place Order Button -->
+                    
                     <button type="submit" class="w-full bg-gray-900 text-white py-2 rounded-lg font-semibold hover:bg-gray-800 mt-6">
                         Place Order
                     </button>
                 </form>
             </div>
 
-            <!-- RIGHT: Order Summary -->
+           
             <div class="bg-white rounded-xl p-6 shadow h-fit sticky top-20">
                 <h3 class="text-lg font-semibold text-slate-800 mb-4">Your Order</h3>
 
-                <!-- Cart Items List -->
+                
                 <div class="space-y-4 mb-4">
                     {% for item in cart_items %}
                     <div class="flex items-center justify-between">
@@ -131,7 +146,7 @@
                     {% endfor %}
                 </div>
 
-                <!-- Totals -->
+                
                 <div class="space-y-2 text-sm text-slate-700">
                     <div class="flex justify-between">
                         <span>Subtotal:</span>
@@ -156,14 +171,14 @@
                     </div>
                 </div>
 
-                <!-- Edit Cart Button -->
+                
                 <div class="mt-6">
                     <a href="{% url 'cart_view' %}" class="w-full inline-block bg-gray-200 text-gray-800 py-2 px-4 rounded-lg text-center text-sm font-medium hover:bg-gray-300">
                         Edit Cart
                     </a>
                 </div>
 
-                <!-- Coupon -->
+                
                 <div class="mt-6 text-sm">
                     <p class="mb-2 text-slate-600">(Have a Coupon?) <a href="#" class="text-blue-500 underline">View Coupons</a></p>
                     <div class="flex">
@@ -177,7 +192,7 @@
     </div>
 </div>
 
-<!-- Modal for Adding Address -->
+
 <div id="addModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
     <div class="bg-white rounded p-6 w-full max-w-xl relative">
         <button onclick="toggleModal('addModal')" class="absolute top-2 right-4 text-xl">✖</button>
@@ -201,31 +216,7 @@
     </div>
 </div>
 
-<!-- Modal for Adding Address -->
-<div id="addModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
-    <div class="bg-white rounded p-6 w-full max-w-xl relative">
-        <button onclick="toggleModal('addModal')" class="absolute top-2 right-4 text-xl">✖</button>
-        <h3 class="text-lg font-bold mb-4">Add New Address</h3>
-        <form method="post" action="{% url 'add_address' %}?next=/checkout/">
-            {% csrf_token %}
-            <div class="grid grid-cols-2 gap-4">
-                <input name="full_name" placeholder="Full Name" required class="border p-2 rounded">
-                <input name="mobile" placeholder="Mobile" required class="border p-2 rounded">
-                <input name="address_line" placeholder="Street/Area" required class="border p-2 rounded">
-                <input name="district" placeholder="District" required class="border p-2 rounded">
-                <input name="state" placeholder="State" required class="border p-2 rounded">
-                <input name="pin_code" placeholder="Pincode" required class="border p-2 rounded">
-                <input name="country" placeholder="Country" required class="border p-2 rounded">
-            </div>
-            <div class="mt-4 flex justify-end gap-2">
-                <button type="button" onclick="toggleModal('addModal')" class="px-4 py-2 border rounded">Cancel</button>
-                <button type="submit" class="bg-black text-white px-4 py-2 rounded">Save Address</button>
-            </div>
-        </form>
-    </div>
-</div>
 
-<!-- Modal for Validation Error -->
 <div id="validationModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
     <div class="bg-white rounded p-6 w-full max-w-md text-center relative">
         <button onclick="toggleModal('validationModal')" class="absolute top-2 right-4 text-xl">✖</button>
@@ -235,7 +226,7 @@
     </div>
 </div>
 
-<!-- Scripts -->
+
 <script>
     function toggleModal(modalId) {
         const modal = document.getElementById(modalId);
@@ -293,7 +284,6 @@
         });
     });
 </script>
-
 
 <script src="https://unpkg.com/lucide@latest"></script>
 {% endblock %}
