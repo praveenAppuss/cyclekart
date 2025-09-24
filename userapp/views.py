@@ -1335,7 +1335,7 @@ def orders_list_view(request):
 def download_invoice(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     if order.status == 'cancelled':
-        messages.error(request, "Cannot download invoice for a cancelled order.")
+        messages.error(request, "Cannot download invoice for a cancelled order.",extra_tags="orders_list")
         return redirect('orders_list')
 
     all_items = order.items.all()
