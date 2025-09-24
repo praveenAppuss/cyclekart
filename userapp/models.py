@@ -119,7 +119,12 @@ class OrderItem(models.Model):
         ('return_accepted', 'Return Accepted'),
         ('return_rejected', 'Return Rejected'),
     ]
-
+    PAYMENT_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('paid', 'Paid'),
+        ('refunded', 'Refunded'),
+        ('failed', 'Failed'),
+    ]
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
     color_variant = models.ForeignKey(ProductColorVariant, on_delete=models.SET_NULL, null=True, blank=True)
@@ -128,6 +133,7 @@ class OrderItem(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2)
     discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='pending')  
     is_return_requested = models.BooleanField(default=False)  
     is_return_approved = models.BooleanField(default=False)  
     is_return_rejected = models.BooleanField(default=False)  

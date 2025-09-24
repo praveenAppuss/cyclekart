@@ -1080,8 +1080,11 @@ def place_order(request):
                 tax=tax,
                 shipping_cost=shipping_cost,
                 total_amount=total_amount,
-                status='pending'
+                status='pending'  
             )
+
+            
+            initial_payment_status = 'pending' if payment_method == 'cod' else 'paid'
 
             for item in cart_items:
                 size_stock = item.size_stock
@@ -1095,7 +1098,8 @@ def place_order(request):
                     size=size_stock.size,
                     quantity=item.quantity,
                     price=item.product.discount_price or item.product.price,
-                    discount_price=item.product.discount_price
+                    discount_price=item.product.discount_price,
+                    payment_status=initial_payment_status  
                 )
 
             if payment_method == 'cod':
@@ -1134,6 +1138,7 @@ def place_order(request):
                     "payment_capture": "1"
                 })
                 order.razorpay_order_id = razorpay_order['id']
+                order.payment_status = 'pending'  
                 order.save()
 
                 return render(request, "razorpay_checkout.html", {
@@ -1153,7 +1158,6 @@ def place_order(request):
         logger.error(f"Order creation failed: {str(e)}", exc_info=True)
         messages.error(request, "An error occurred while placing the order.")
         return redirect('checkout')
-
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -1204,6 +1208,7 @@ def payment_handler(request):
             order.razorpay_signature = razorpay_signature
             order.payment_status = "paid"
             order.status = "confirmed"
+            order.items.update(payment_status='paid')
             order.save()
             logger.info(f"Payment successful for order {order.order_id}")
 
@@ -1476,6 +1481,9 @@ def cancel_order(request, order_id):
                 item.status = 'cancelled'
                 item.is_cancelled = True
                 item.cancel_reason = reason if reason else None
+            
+                if order.payment_method in ['wallet', 'razorpay']:
+                    item.payment_status = 'refunded'
                 item.save()
                 logger.info(f"Item {item.id} cancelled for order {order.order_id}")
 
@@ -1499,15 +1507,14 @@ def cancel_order(request, order_id):
                     tax_amount = (item_price / total_items_price) * order.tax
                 refund_amount += item_price + tax_amount
 
-            if order.shipping_cost and not order.items.exclude(status='cancelled').exists():
-                refund_amount += order.shipping_cost
-
             if not order.items.filter(status='active').exists():
                 order.status = 'cancelled'
                 order.cancelled_at = timezone.now()
                 order.cancel_reason = reason if reason else None
                 order.save()
                 logger.info(f"Order {order.order_id} status updated to 'cancelled'")
+            else:
+                order.save()
 
             if refund_amount > 0 and order.payment_method in ['wallet', 'razorpay']:
                 wallet, _ = Wallet.objects.get_or_create(user=order.user)
@@ -1524,11 +1531,9 @@ def cancel_order(request, order_id):
 
                 wallet.balance = (wallet.balance or Decimal('0.00')) + refund_amount
                 wallet.save()
-                order.payment_status = 'refunded'
-                order.save()
-
-                messages.success(request, f"{'Item' if item_id else 'Order'} cancelled and ₹{refund_amount} refunded to wallet.")
-                logger.info(f"Refunded ₹{refund_amount} to wallet for order {order.order_id}")
+                formatted_refund_amount = "{:.2f}".format(refund_amount)
+                messages.success(request, f"{'Item' if item_id else 'Order'} cancelled and ₹{formatted_refund_amount} refunded to wallet.")
+                logger.info(f"Refunded ₹{formatted_refund_amount} to wallet for order {order.order_id}")
             else:
                 messages.success(request, f"{'Item' if item_id else 'Order'} cancelled successfully.")
 
@@ -1537,8 +1542,6 @@ def cancel_order(request, order_id):
         messages.error(request, f"Error cancelling {'item' if item_id else 'order'}: {str(e)}")
 
     return redirect('order_detail', order_id=order.id)
-
-
 
 
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
