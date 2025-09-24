@@ -54,6 +54,39 @@
                     {% endfor %}
                 </tbody>
             </table>
+
+            <!-- Pagination -->
+            {% if transactions.has_other_pages %}
+            <div class="mt-4 flex justify-center">
+                <nav aria-label="Page navigation">
+                    <ul class="inline-flex -space-x-px">
+                        {% if transactions.has_previous %}
+                        <li>
+                            <a href="?page=1" class="px-3 py-2 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700">First</a>
+                        </li>
+                        <li>
+                            <a href="?page={{ transactions.previous_page_number }}" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700">&laquo; Previous</a>
+                        </li>
+                        {% endif %}
+
+                        {% for num in transactions.paginator.page_range %}
+                        <li>
+                            <a href="?page={{ num }}" class="px-3 py-2 leading-tight {% if transactions.number == num %}text-blue-600 bg-blue-50{% else %}text-gray-500 bg-white{% endif %} border border-gray-300 hover:bg-gray-100 hover:text-gray-700">{{ num }}</a>
+                        </li>
+                        {% endfor %}
+
+                        {% if transactions.has_next %}
+                        <li>
+                            <a href="?page={{ transactions.next_page_number }}" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700">Next &raquo;</a>
+                        </li>
+                        <li>
+                            <a href="?page={{ transactions.paginator.num_pages }}" class="px-3 py-2 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700">Last</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

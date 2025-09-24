@@ -3,19 +3,19 @@
 
 {% block content %}
 <div class="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-    <!-- Sidebar -->
+    
     {% include 'sidebar.html' %}
 
-    <!-- Orders Section -->
+    
     <div class="flex-1 px-4 py-10 sm:px-8">
         <div class="max-w-5xl mx-auto flex flex-col h-full">
             
-            <!-- Header, Search and Sort -->
+            
             <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
                 <h2 class="text-2xl font-semibold text-gray-800">Orders</h2>
 
                 <div class="flex items-center gap-2">
-                    <!-- Search Form -->
+                    
                     <form method="get" id="searchSortForm" class="flex gap-2">
                         <input type="text" name="q" placeholder="Search orders..." value="{{ query }}"
                                class="border border-gray-300 rounded-md px-3 py-1 text-sm w-48" />
@@ -31,7 +31,7 @@
                         {% endif %}
                     </form>
 
-                    <!-- Sort Dropdown -->
+                    
                     <select class="border rounded-md px-2 py-1 text-sm text-gray-600" onchange="submitSort(this)">
                         <option value="newest" {% if sort == "newest" or not sort %}selected{% endif %}>Sort by newest</option>
                         <option value="oldest" {% if sort == "oldest" %}selected{% endif %}>Sort by oldest</option>
@@ -43,17 +43,17 @@
             <p class="text-sm text-gray-600 mb-2">Results for "<strong>{{ query }}</strong>"</p>
             {% endif %}
 
-            <!-- Scrollable Orders Container -->
+            
             <div class="overflow-y-auto space-y-4 pr-2" style="max-height: 70vh;">
                 {% if orders %}
                 {% for order in orders %}
                 <div class="bg-white shadow rounded-lg p-4">
                     <div class="flex flex-col sm:flex-row justify-between gap-4">
-                        <!-- Thumbnail and Info -->
+                        
                         {% with first_item=order.items.first %}
                         {% if first_item %}
                         <div class="flex gap-4">
-                            <img src="{{ first_item.product.thumbnail.url }}" alt="Product Image"
+                            <img src="{% if first_item.color_variant and first_item.color_variant.images.first %}{{ first_item.color_variant.images.first.image.url }}{% else %}{{ first_item.product.thumbnail.url }}{% endif %}" alt="Product Image"
                                  class="w-20 h-20 rounded-md object-cover border" />
                             <div>
                                 <h3 class="font-semibold text-lg text-gray-800">{{ first_item.product.name }}</h3>
@@ -104,6 +104,39 @@
                 {% endif %}
             </div>
 
+            <!-- Pagination -->
+            {% if orders.has_other_pages %}
+            <div class="mt-4 flex justify-center">
+                <nav aria-label="Page navigation">
+                    <ul class="inline-flex -space-x-px">
+                        {% if orders.has_previous %}
+                        <li>
+                            <a href="?page=1&q={{ query|urlencode }}&sort={{ sort }}" class="px-3 py-2 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700">First</a>
+                        </li>
+                        <li>
+                            <a href="?page={{ orders.previous_page_number }}&q={{ query|urlencode }}&sort={{ sort }}" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700">&laquo; Previous</a>
+                        </li>
+                        {% endif %}
+
+                        {% for num in orders.paginator.page_range %}
+                        <li>
+                            <a href="?page={{ num }}&q={{ query|urlencode }}&sort={{ sort }}" class="px-3 py-2 leading-tight {% if orders.number == num %}text-blue-600 bg-blue-50{% else %}text-gray-500 bg-white{% endif %} border border-gray-300 hover:bg-gray-100 hover:text-gray-700">{{ num }}</a>
+                        </li>
+                        {% endfor %}
+
+                        {% if orders.has_next %}
+                        <li>
+                            <a href="?page={{ orders.next_page_number }}&q={{ query|urlencode }}&sort={{ sort }}" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700">Next &raquo;</a>
+                        </li>
+                        <li>
+                            <a href="?page={{ orders.paginator.num_pages }}&q={{ query|urlencode }}&sort={{ sort }}" class="px-3 py-2 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700">Last</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+
             <!-- Continue Shopping -->
             <div class="flex justify-center mt-6">
                 <a href="{% url 'userproduct_list' %}"
@@ -124,7 +157,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        // ✅ Django messages -> SweetAlert
+        
         {% if messages %}
             {% for message in messages %}
                 {% if "orders_list" in message.tags %}

@@ -21,6 +21,7 @@ from django.conf import settings
 from django.db import transaction, IntegrityError
 from django.contrib.auth import BACKEND_SESSION_KEY
 import random
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models.functions import Coalesce
 from django.views.decorators.http import require_http_methods
 from django.core.paginator import Paginator
@@ -1586,9 +1587,6 @@ def return_order(request, order_id):
                     item.save()
                     logger.info(f"Return request submitted for item {item.id} in order {order.order_id}")
 
-            if order.items.filter(status='return_requested').exists() and order.status not in ['returned', 'cancelled']:
-                order.status = 'return request'  
-                order.save()
             messages.success(request, "Return request submitted for verification.")
 
     except Exception as e:
@@ -1628,13 +1626,26 @@ def process_return_request(request, order_id):
 
 
 
+
 @login_required
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
 def wallet_page(request):
     wallet, created = Wallet.objects.get_or_create(user=request.user)
     transactions = wallet.transactions.all().order_by('-created_at')
-    return render(request, "wallet.html", {"wallet": wallet, "transactions": transactions})
+    paginator = Paginator(transactions, 8) 
+    page_number = request.GET.get('page')
+    try:
+        transactions_page = paginator.get_page(page_number)
+    except PageNotAnInteger:
+        transactions_page = paginator.page(1)
+    except EmptyPage:
+        transactions_page = paginator.page(paginator.num_pages)
+
+    return render(request, "wallet.html", {
+        "wallet": wallet,
+        "transactions": transactions_page,  
+    })
 
 
 
