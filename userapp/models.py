@@ -9,6 +9,14 @@ class CustomUser(AbstractUser):
     is_blocked = models.BooleanField(default=False)
     date_joined = models.DateTimeField(auto_now_add=True)
     profile_image = models.ImageField(upload_to='profile_images/', null=True, blank=True)
+    referral_code = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    referred_by = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='referrals')
+
+    def save(self, *args, **kwargs):
+        if not self.referral_code:
+            import uuid
+            self.referral_code = str(uuid.uuid4())[:8].upper()  
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.username

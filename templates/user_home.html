@@ -2,7 +2,6 @@
 {% load static %}
 
 {% block content %}
-
 <!-- Hero Section -->
 <section class="bg-gray-100 py-10 px-6">
   <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
@@ -37,7 +36,7 @@
             <span class="text-lg font-bold text-gray-900">₹{{ product.discount_price|floatformat:0 }}</span>
             <span class="text-base text-red-500 line-through ml-2">₹{{ product.price|floatformat:0 }}</span>
           {% else %}
-            <span class="text-lg font-bold text-gray-900">₹{{ product.price|floatformat:0 }}</span>
+            <span class="text-lg font-bold text-gray-900">₹{{ price|floatformat:0 }}</span>
           {% endif %}
         </div>
       </a>
@@ -54,5 +53,4 @@
   <p class="text-lg mb-6">Discover eco-friendly rides for health and travel.</p>
   <a href="{% url 'userproduct_list' %}" class="inline-block bg-white text-blue-600 py-2 px-5 rounded hover:bg-gray-200 transition">Explore Now</a>
 </section>
-
-{% endblock content %}
+{% endblock %}

@@ -1670,3 +1670,72 @@ def change_password(request):
         form = PasswordChangeForm(request.user)
 
     return render(request, "change_password.html", {"form": form, "is_google_user": False})
+
+
+# -----------------Referral view---------------------------------#
+
+@login_required
+def referral_view(request):
+    referrals = request.user.referrals.all().order_by('-date_joined')
+    context = {
+        'referrals': referrals,
+    }
+    return render(request, 'referral.html', context)
+
+
+@login_required
+def apply_referral(request):
+    if request.method == 'POST':
+        referral_code = request.POST.get('referral_code')
+        user = request.user
+
+        if user.referred_by:
+            messages.error(request, 'You have already used a referral code.')
+            return redirect('user_home')
+
+        try:
+            referrer = CustomUser.objects.get(referral_code=referral_code)
+            if referrer == user:
+                messages.error(request, 'You cannot use your own referral code.')
+                return redirect('user_home')
+        except CustomUser.DoesNotExist:
+            messages.error(request, 'Invalid referral code.')
+            return redirect('user_home')
+
+        try:
+            with transaction.atomic():
+                user.referred_by = referrer
+                user.save()
+                referee_wallet, _ = Wallet.objects.get_or_create(user=user)
+                referee_wallet.balance += 100
+                referee_wallet.save()
+
+                WalletTransaction.objects.create(
+                    wallet=referee_wallet,
+                    transaction_id=f"TXN-{uuid.uuid4().hex[:8].upper()}",
+                    amount=100,
+                    transaction_type='credit',
+                    description=f"Referral reward from {referrer.username}"
+                )
+
+                referrer_wallet, _ = Wallet.objects.get_or_create(user=referrer)
+                referrer_wallet.balance += 100
+                referrer_wallet.save()
+
+                WalletTransaction.objects.create(
+                    wallet=referrer_wallet,
+                    transaction_id=f"TXN-{uuid.uuid4().hex[:8].upper()}",
+                    amount=100,
+                    transaction_type='credit',
+                    description=f"Referral reward for inviting {user.username}"
+                )
+
+                messages.success(request, 'Referral applied! ₹100 credited to your wallet.')
+                return redirect('user_home')
+        except Exception as e:
+            messages.error(request, f'Error applying referral: {str(e)}')
+            return redirect('user_home')
+
+    messages.error(request, 'Invalid request method.')
+    return redirect('user_home')
+    

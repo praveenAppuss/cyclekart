@@ -41,5 +41,8 @@ urlpatterns = [
     path("wallet/", views.wallet_page, name="wallet_page"),
     path("orders/<int:order_id>/refund/", views.process_return_request, name="process_return_request"),
     path("password/", views.change_password, name="change_password"),
+    path('referral/', views.referral_view, name='referral'),
+    path('apply-referral/', views.apply_referral, name='apply_referral'),
+    
 
 ]

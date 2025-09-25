@@ -4,12 +4,72 @@
   <meta charset="UTF-8">
   <title>CycleKart</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script> <!-- Lucide Icon Library -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    .swal2-popup {
+      padding: 0.5rem 1rem !important;
+      font-size: 0.875rem !important;
+      min-height: 2.5rem !important;
+    }
+    .swal2-title {
+      font-size: 0.875rem !important;
+      margin: 0 !important;
+    }
+    .swal2-html-container {
+      font-size: 0.75rem !important;
+      padding: 0 !important;
+    }
+  </style>
   <script defer>
+    // Initialize Lucide icons
+    document.addEventListener('DOMContentLoaded', function() {
+      lucide.createIcons();
+    });
+
     // Toggle mobile menu
     function toggleMenu() {
       const menu = document.getElementById('mobileMenu');
       menu.classList.toggle('hidden');
     }
+
+    // Toggle referral modal
+    function toggleReferralModal() {
+      const modal = document.getElementById('referralModal');
+      if (modal) {
+        modal.classList.toggle('hidden');
+      }
+    }
+
+    // Display Django messages with SweetAlert2 (only referral messages on homepage)
+    document.addEventListener('DOMContentLoaded', function() {
+      const currentPage = document.getElementById('current-page').value;
+      const messages = document.querySelectorAll('.django-message');
+      messages.forEach(function(message) {
+        // Show SweetAlert only for referral messages on homepage
+        if (currentPage === 'user_home' && message.textContent.toLowerCase().includes('referral')) {
+          Swal.fire({
+            icon: message.classList.contains('success') ? 'success' : 'error',
+            title: message.classList.contains('success') ? 'Success!' : 'Error!',
+            text: message.textContent,
+            position: 'bottom-end', // Right bottom corner
+            showConfirmButton: false,
+            timer: 2000, // 2 seconds fade
+            toast: true,
+            customClass: {
+              popup: 'rounded-lg shadow-lg',
+            },
+            background: message.classList.contains('success') ? '#f0fdf4' : '#fef2f2',
+            color: message.classList.contains('success') ? '#15803d' : '#b91c1c',
+            timerProgressBar: true,
+            didOpen: (toast) => {
+              toast.addEventListener('mouseenter', Swal.stopTimer);
+              toast.addEventListener('mouseleave', Swal.resumeTimer);
+            }
+          });
+        }
+      });
+    });
   </script>
   {% load static %}
 </head>
@@ -21,7 +81,6 @@
 
       <!-- Logo -->
       <a href="/" class="flex items-center gap-2">
-        <!-- <img src="{% static 'images/logo.png' %}" alt="CycleKart" class="h-8"> -->
         <span class="text-2xl font-bold text-gray-800">CycleKart</span>
       </a>
 
@@ -87,6 +146,13 @@
           {% endif %}
         </a>
 
+        <!-- Referral Gift Icon (Homepage Only) -->
+        {% if request.resolver_match.url_name == 'user_home' and user.is_authenticated %}
+          <button onclick="toggleReferralModal()" title="Apply Referral Code" class="relative">
+            <i data-lucide="gift" class="w-6 h-6 text-amber-300 hover:scale-110 transition-transform"></i>
+          </button>
+        {% endif %}
+
         <!-- Account -->
         <a href="{% url 'profile' %}" title="Account">
           <svg class="h-5 w-5 text-gray-700 hover:text-blue-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -115,14 +181,50 @@
         <a href="{% url 'user_logout' %}" class="block py-1 text-red-500">Logout</a>
       {% endif %}
     </div>
+
+    <!-- Referral Modal (Homepage Only) -->
+    {% if request.resolver_match.url_name == 'user_home' and user.is_authenticated %}
+      <div id="referralModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold text-gray-900">Apply Referral Code</h2>
+            <button onclick="toggleReferralModal()" class="text-gray-500 hover:text-gray-700">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+          </div>
+          <form id="referralForm" action="{% url 'apply_referral' %}" method="POST">
+            {% csrf_token %}
+            <div class="mb-4">
+              <label for="referral_code" class="block text-sm font-medium text-gray-700">Referral Code</label>
+              <input type="text" id="referral_code" name="referral_code" class="mt-1 block w-full border border-gray-300 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter referral code" required>
+            </div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors">Apply Code</button>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Hidden input to pass current page to JavaScript -->
+    <input type="hidden" id="current-page" value="{{ request.resolver_match.url_name }}">
+
+    <!-- Django Messages for SweetAlert2 -->
+    {% if messages %}
+      <div style="display: none;">
+        {% for message in messages %}
+          <div class="django-message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
   </header>
 
-  <!-- ✅ PAGE CONTENT -->
+  <!-- PAGE CONTENT -->
   <main class="pb-0">
     {% block content %}{% endblock content %}
   </main>
 
-  <!-- 🌙 FOOTER -->
+  <!-- FOOTER -->
   <footer class="bg-dark border-t">
     <div class="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 sm:grid-cols-4 gap-6 text-sm text-gray-700">
       <div>
@@ -158,6 +260,5 @@
       © 2025 CycleKart. All rights reserved.
     </div>
   </footer>
-
 </body>
 </html>
