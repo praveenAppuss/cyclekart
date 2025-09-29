@@ -1,4 +1,6 @@
+from datetime import datetime
 from decimal import Decimal
+import re
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login,logout
 from django.views.decorators.cache import never_cache
@@ -8,7 +10,7 @@ from django.views.decorators.http import require_POST
 from django.db.models import Q,Sum
 from django.core.paginator import Paginator
 from userapp.services import WalletService
-from userapp.models import CustomUser, Order, OrderItem, ReturnRequest, Wallet, WalletTransaction
+from userapp.models import Coupon, CustomUser, Order, OrderItem, ReturnRequest, Wallet, WalletTransaction
 from django.utils.text import slugify
 from adminapp.models import Product, Category, Brand, ProductColorVariant, ProductImage,ProductSizeStock
 import base64
@@ -954,3 +956,196 @@ def return_reject(request, item_id):
         logger.error(f"Error processing return rejection for item {item.id}: {str(e)}")
         messages.error(request, f"Error processing return request: {str(e)}")
     return redirect('admin_order_detail', order_id=order.id)
+
+
+# ------------------------coupon management---------------------------#
+
+@superuser_required
+def coupon_list(request):
+    coupons = Coupon.objects.filter(is_deleted=False).order_by('-valid_to')
+    paginator = Paginator(coupons, 6)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, 'coupon_list.html', {'coupons': page_obj})
+
+@superuser_required
+def add_coupon(request):
+    if request.method == 'POST':
+        code = request.POST.get('code', '').strip()
+        discount_amount = request.POST.get('discount_amount', '').strip()
+        minimum_order_amount = request.POST.get('minimum_order_amount', '').strip()
+        valid_from = request.POST.get('valid_from', '').strip()
+        valid_to = request.POST.get('valid_to', '').strip()
+        active = request.POST.get('active') == 'on'
+        error = {}
+
+        if not code:
+            error['code'] = 'Coupon code is required.'
+        elif re.fullmatch(r'_+', code):
+            error['code'] = 'Coupon code cannot be only underscores.'
+        elif code.isdigit():
+            error['code'] = 'Coupon code cannot be only digits.'
+        elif not re.match(r'^[A-Za-z0-9_-]+$', code):
+            error['code'] = 'Coupon code can only contain letters, numbers, dashes, and underscores.'
+        elif Coupon.objects.filter(code=code).exists():
+            error['code'] = 'Coupon code already exists.'
+
+        if not discount_amount:
+            error['discount_amount'] = 'Discount amount is required.'
+        else:
+            try:
+                discount_amount = float(discount_amount)
+                if discount_amount <= 0:
+                    error['discount_amount'] = 'Discount must be greater than zero.'
+            except ValueError:
+                error['discount_amount'] = 'Discount must be a number.'
+
+        if not minimum_order_amount:
+            error['minimum_order_amount'] = 'Minimum order amount is required.'
+        else:
+            try:
+                minimum_order_amount = float(minimum_order_amount)
+                if minimum_order_amount <= 0:
+                    error['minimum_order_amount'] = 'Minimum order must be greater than zero.'
+            except ValueError:
+                error['minimum_order_amount'] = 'Minimum order must be a number.'
+
+        date_format = '%Y-%m-%d'
+        try:
+            valid_from_date = datetime.strptime(valid_from, date_format)
+            valid_from_date = timezone.make_aware(valid_from_date)
+        except ValueError:
+            error['valid_from'] = 'Invalid start date format (YYYY-MM-DD).'
+
+        try:
+            valid_to_date = datetime.strptime(valid_to, date_format)
+            valid_to_date = timezone.make_aware(valid_to_date)
+        except ValueError:
+            error['valid_to'] = 'Invalid end date format (YYYY-MM-DD).'
+
+        if 'valid_from' not in error and 'valid_to' not in error:
+            if valid_to_date < valid_from_date:
+                error['valid_to'] = 'End date cannot be before start date.'
+
+        if not error:
+            Coupon.objects.create(
+                code=code,
+                discount_amount=discount_amount,
+                minimum_order_amount=minimum_order_amount,
+                valid_from=valid_from_date,
+                valid_to=valid_to_date,
+                active=active
+            )
+            messages.success(request, 'Coupon created successfully.')
+            return redirect('coupon_list')
+        else:
+            return render(request, 'add_coupon.html', {'error': error, 'form': {
+                'code': code,
+                'discount_amount': discount_amount,
+                'minimum_order_amount': minimum_order_amount,
+                'valid_from': valid_from,
+                'valid_to': valid_to,
+                'active': active
+            }})
+
+    return render(request, 'add_coupon.html')
+
+@superuser_required
+def edit_coupon(request, coupon_id):
+    coupon = get_object_or_404(Coupon, id=coupon_id)
+    if request.method == 'POST':
+        code = request.POST.get('code', '').strip()
+        discount_amount = request.POST.get('discount_amount', '').strip()
+        minimum_order_amount = request.POST.get('minimum_order_amount', '').strip()
+        valid_from = request.POST.get('valid_from', '').strip()
+        valid_to = request.POST.get('valid_to', '').strip()
+        active = request.POST.get('active') == 'on'
+        error = {}
+
+        if Coupon.objects.exclude(id=coupon_id).filter(code__iexact=code).exists():
+            error['code'] = 'This coupon code already exists.'
+        if not code:
+            error['code'] = 'Coupon code is required.'
+        elif re.fullmatch(r'_+', code):
+            error['code'] = "Coupon code can't be only underscores."
+        elif code.isdigit():
+            error['code'] = "Coupon code can't be only digits."
+        elif not re.match(r'^[A-Za-z0-9_-]+$', code):
+            error['code'] = 'Coupon code can only contain letters, numbers, dashes, and underscores.'
+
+        if not discount_amount:
+            error['discount_amount'] = 'Discount amount is required.'
+        else:
+            try:
+                discount_amount = float(discount_amount)
+                if discount_amount <= 0:
+                    error['discount_amount'] = 'Discount amount must be greater than zero.'
+            except ValueError:
+                error['discount_amount'] = 'Discount amount must be a number.'
+
+        if not minimum_order_amount:
+            error['minimum_order_amount'] = 'Minimum order amount is required.'
+        else:
+            try:
+                minimum_order_amount = float(minimum_order_amount)
+                if minimum_order_amount <= 0:
+                    error['minimum_order_amount'] = 'Minimum order amount must be greater than zero.'
+            except ValueError:
+                error['minimum_order_amount'] = 'Minimum order amount must be a number.'
+
+        date_format = '%Y-%m-%d'
+        try:
+            valid_from_date = datetime.strptime(valid_from, date_format)
+            valid_from_date = timezone.make_aware(valid_from_date)
+        except ValueError:
+            error['valid_from'] = 'Invalid start date format (YYYY-MM-DD).'
+
+        try:
+            valid_to_date = datetime.strptime(valid_to, date_format)
+            valid_to_date = timezone.make_aware(valid_to_date)
+        except ValueError:
+            error['valid_to'] = 'Invalid end date format (YYYY-MM-DD).'
+
+        if 'valid_from' not in error and 'valid_to' not in error:
+            if valid_to_date < valid_from_date:
+                error['valid_to'] = 'End date cannot be before start date.'
+
+        if not error:
+            coupon.code = code
+            coupon.discount_amount = discount_amount
+            coupon.minimum_order_amount = minimum_order_amount
+            coupon.valid_from = valid_from_date
+            coupon.valid_to = valid_to_date
+            coupon.active = active
+            coupon.save()
+            messages.success(request, 'Coupon updated successfully.')
+            return redirect('coupon_list')
+        else:
+            return render(request, 'add_coupon.html', {'error': error, 'form': {
+                'coupon_id': coupon_id,
+                'code': code,
+                'discount_amount': discount_amount,
+                'minimum_order_amount': minimum_order_amount,
+                'valid_from': valid_from,
+                'valid_to': valid_to,
+                'active': active
+            }})
+
+    form = {
+        'coupon_id': coupon.id,
+        'code': coupon.code,
+        'discount_amount': coupon.discount_amount,
+        'minimum_order_amount': coupon.minimum_order_amount,
+        'valid_from': coupon.valid_from.date().strftime('%Y-%m-%d') if coupon.valid_from else '',
+        'valid_to': coupon.valid_to.date().strftime('%Y-%m-%d') if coupon.valid_to else '',
+        'active': coupon.active
+    }
+    return render(request, 'add_coupon.html', {'form': form})
+
+@superuser_required
+def delete_coupon(request, coupon_id):
+    coupon = get_object_or_404(Coupon, id=coupon_id, is_deleted=False)
+    coupon.is_deleted = True
+    coupon.save()
+    messages.success(request, f"Coupon '{coupon.code}' has been deleted successfully.")
+    return redirect('coupon_list')

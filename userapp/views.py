@@ -2,6 +2,7 @@ import datetime
 from django.utils import timezone
 from django.views.decorators.cache import cache_control
 from dotenv import get_key
+import pytz
 from .otp import generate_otp, send_otp_email
 from decimal import Decimal
 import razorpay
@@ -29,7 +30,7 @@ from django.shortcuts import get_object_or_404
 from django.contrib.messages import get_messages
 from django.contrib import messages
 from adminapp.models import Product,Category,Brand,ProductSizeStock,ProductColorVariant
-from userapp.models import CustomUser,Address,Cart,CartItem, ReturnRequest,Wishlist,Order,OrderItem,Wallet,WalletTransaction
+from userapp.models import Coupon, CustomUser,Address,Cart,CartItem, ReturnRequest, UsedCoupon,Wishlist,Order,OrderItem,Wallet,WalletTransaction
 import re
 from django.views.decorators.cache import never_cache
 from .utils import no_cache_view,calculate_cart_total
@@ -584,8 +585,12 @@ def add_address(request):
             if next_url:
                 return redirect(f"{next_url}?new_address_id={address.id}")
             return redirect('address_list')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'message': 'Invalid address data. Please check the form.'}, status=400)
+            messages.error(request, 'Invalid address data. Please check the form.')
+            return redirect('address_list')
     return redirect('address_list')
-
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
@@ -601,8 +606,12 @@ def update_address(request, pk):
             if next_url:
                 return redirect(f"{next_url}?new_address_id={address.id}")
             return redirect('address_list')
+        else:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'message': 'Invalid address data. Please check the form.'}, status=400)
+            messages.error(request, 'Invalid address data. Please check the form.')
+            return redirect('address_list')
     return redirect('address_list')
-
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
@@ -965,6 +974,7 @@ def add_to_cart_from_wishlist(request):
 
 # ------------checkout view---------------------------------------------------
 
+
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
@@ -972,6 +982,7 @@ def checkout_view(request):
     user = request.user
     addresses = Address.objects.filter(user=user)
     default_address = addresses.filter(is_default=True).first()
+    
     try:
         cart = Cart.objects.get(user=user)
         cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
@@ -979,26 +990,61 @@ def checkout_view(request):
         cart = None
         cart_items = []
 
-    subtotal = 0
-    total_discount = 0
+    subtotal = Decimal('0')
+    total_discount = Decimal('0')
     total_quantity = 0
+    coupon_discount = Decimal('0')
 
     for item in cart_items:
-        original_price = item.product.price
-        discount_price = item.product.discount_price if item.product.discount_price and item.product.discount_price < original_price else original_price
+        original_price = Decimal(str(item.product.price))
+        discount_price = Decimal(str(item.product.discount_price)) if item.product.discount_price and item.product.discount_price < original_price else original_price
         quantity = item.quantity
-
         item_total = original_price * quantity
         item_discount = (original_price - discount_price) * quantity
-
         subtotal += item_total
         total_discount += item_discount
         total_quantity += quantity
+        logger.debug(f"Item: {item.product.name}, Original: {original_price}, Discount: {discount_price}, Qty: {quantity}, Item Total: {item_total}, Item Discount: {item_discount}")
 
-    shipping_cost = 0  
-    taxamount = subtotal -total_discount 
-    taxes=taxamount*Decimal('0.05') 
-    final_total = taxamount+shipping_cost + taxes
+    shipping_cost = Decimal('0')
+    taxable_amount = subtotal - total_discount  
+    applied_coupon = None
+    coupon_error = None
+
+    if 'applied_coupon_id' in request.session:
+        try:
+            applied_coupon = Coupon.objects.get(id=request.session['applied_coupon_id'], active=True, is_deleted=False)
+            if Decimal(str(applied_coupon.minimum_order_amount)) > taxable_amount:
+                coupon_error = "Minimum order amount not met for this coupon."
+                del request.session['applied_coupon_id']
+                del request.session['coupon_discount']
+                applied_coupon = None
+            else:
+                coupon_discount = Decimal(str(applied_coupon.discount_amount))
+        except Coupon.DoesNotExist:
+            del request.session['applied_coupon_id']
+            del request.session['coupon_discount']
+            applied_coupon = None
+
+    net_taxable_amount = taxable_amount - coupon_discount  
+    taxes = net_taxable_amount * Decimal('0.05')  
+    final_total = net_taxable_amount + shipping_cost + taxes
+    logger.debug(f"Subtotal: {subtotal}, Total Discount: {total_discount}, Coupon Discount: {coupon_discount}, Taxable Amount: {taxable_amount}, Net Taxable Amount: {net_taxable_amount}, Taxes: {taxes}, Final Total: {final_total}")
+
+    current_time = timezone.now()
+    ist = pytz.timezone('Asia/Kolkata')
+    eligible_for_coupons = taxable_amount > Decimal('0')
+    coupons = Coupon.objects.filter(
+        active=True,
+        valid_from__lte=current_time,
+        valid_to__gte=current_time,
+        is_deleted=False
+    ).exclude(used_by__user=user)
+
+    used_coupons = {uc.coupon_id for uc in UsedCoupon.objects.filter(user=user)}
+    coupon_status = {coupon.id: coupon.id in used_coupons for coupon in coupons}
+
+    logger.debug(f"Current time: {current_time} (IST: {current_time.astimezone(ist)}), Taxable Amount: {taxable_amount}, Coupons Count: {coupons.count()}")
 
     context = {
         'addresses': addresses,
@@ -1006,21 +1052,86 @@ def checkout_view(request):
         'cart_items': cart_items,
         'subtotal': subtotal,
         'total_discount': total_discount,
+        'coupon_discount': coupon_discount,
         'shipping_cost': shipping_cost,
+        'taxes': taxes,
         'final_total': final_total,
         'total_quantity': total_quantity,
-        'taxes': taxes,
+        'applied_coupon': applied_coupon,
+        'coupons': coupons,
+        'coupon_error': coupon_error,
+        'eligible_for_coupons': eligible_for_coupons,
+        'taxable_amount': taxable_amount,  
+        'net_taxable_amount': net_taxable_amount,  
+        'coupon_status': coupon_status,
     }
 
     return render(request, 'checkout.html', context)
 
 
+@login_required(login_url='user_login')
+@cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
+def apply_coupon(request):
+    if request.method == 'POST':
+        coupon_code = request.POST.get('coupon_code', '').strip()
+        if not coupon_code:
+            return JsonResponse({'success': False, 'message': 'Please enter a coupon code.'})
+
+        user = request.user
+        try:
+            cart = Cart.objects.get(user=user)
+            cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
+            subtotal = Decimal('0')
+            for item in cart_items:
+                original_price = Decimal(str(item.product.price))
+                discount_price = Decimal(str(item.product.discount_price)) if item.product.discount_price and item.product.discount_price < original_price else original_price
+                quantity = item.quantity
+                item_total = original_price * quantity
+                subtotal += item_total
+            logger.debug(f"Subtotal in apply_coupon: {subtotal}")
+
+            coupon = Coupon.objects.get(
+                code=coupon_code,
+                active=True,
+                valid_from__lte=timezone.now(),
+                valid_to__gte=timezone.now(),
+                is_deleted=False
+            )
+
+            if UsedCoupon.objects.filter(user=user, coupon=coupon).exists():
+                return JsonResponse({'success': False, 'message': 'This coupon has already been used.'})
+
+            min_order_amount = Decimal(str(coupon.minimum_order_amount))
+            logger.debug(f"Minimum order amount: {min_order_amount}")
+            if min_order_amount > subtotal:
+                return JsonResponse({'success': False, 'message': 'Minimum order amount not met for this coupon.'})
+
+            request.session['applied_coupon_id'] = coupon.id  
+            request.session['coupon_discount'] = str(coupon.discount_amount)
+            return JsonResponse({'success': True, 'message': 'Coupon applied successfully!', 'coupon_discount': float(coupon.discount_amount)})
+        except Coupon.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Invalid or expired coupon code.'})
+    return JsonResponse({'success': False, 'message': 'Invalid request method.'})
 
 
+@login_required(login_url='user_login')
+@never_cache
+def remove_coupon(request):
+    if request.method == 'POST':
+        if 'applied_coupon_id' in request.session:  
+            del request.session['applied_coupon_id']
+            del request.session['coupon_discount']
+            return JsonResponse({'success': True, 'message': 'Coupon removed successfully!', 'reload': True})
+        return JsonResponse({'success': False, 'message': 'No coupon applied.'})
+    return JsonResponse({'success': False, 'message': 'Invalid request method.'})
+    
+    
+    
 razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 
 
-@login_required
+@login_required(login_url='user_login')
 @never_cache
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 def place_order(request):
@@ -1043,33 +1154,55 @@ def place_order(request):
         return redirect('cart_view')
 
     subtotal = Decimal('0.00')
-    discount = Decimal('0.00')
+    product_discount = Decimal('0.00')
+    coupon_discount = Decimal('0.00')
+    applied_coupon = None
 
     for item in cart_items:
-        original_price = item.product.price
-        item_discount_price = item.product.discount_price or original_price
+        original_price = Decimal(str(item.product.price))
+        item_discount_price = Decimal(str(item.product.discount_price)) if item.product.discount_price and item.product.discount_price < original_price else original_price
         subtotal += original_price * item.quantity
-        discount += (original_price - item_discount_price) * item.quantity
-        print(f"Item: {item.product.name}, Price: {original_price}, Qty: {item.quantity}, Subtotal Contribution: {original_price * item.quantity}")
+        product_discount += (original_price - item_discount_price) * item.quantity
+        logger.debug(f"Item: {item.product.name}, Price: {original_price}, Qty: {item.quantity}, Subtotal: {original_price * item.quantity}, Discount: {(original_price - item_discount_price) * item.quantity}")
 
-    taxable_amount = subtotal - discount
-    tax = taxable_amount * Decimal('0.05')  
+    if 'applied_coupon_id' in request.session:
+        try:
+            applied_coupon = Coupon.objects.get(
+                id=request.session['applied_coupon_id'],
+                active=True,
+                is_deleted=False,
+                valid_from__lte=timezone.now(),
+                valid_to__gte=timezone.now()
+            )
+            taxable_amount = subtotal - product_discount
+            if Decimal(str(applied_coupon.minimum_order_amount)) <= taxable_amount:
+                coupon_discount = Decimal(str(applied_coupon.discount_amount))
+            else:
+                messages.error(request, "Minimum order amount not met for the applied coupon.")
+                del request.session['applied_coupon_id']
+                applied_coupon = None
+        except Coupon.DoesNotExist:
+            del request.session['applied_coupon_id']
+            applied_coupon = None
+
+    taxable_amount = subtotal - product_discount - coupon_discount  
+    tax = taxable_amount * Decimal('0.05')
     shipping_cost = Decimal('0.00')
     total_amount = taxable_amount + tax + shipping_cost
-    razorpay_amount = int(total_amount * 100)  
+    razorpay_amount = int(total_amount * 100)
+    logger.debug(f"Subtotal: {subtotal}, Product Discount: {product_discount}, Coupon Discount: {coupon_discount}, Tax: {tax}, Total: {total_amount}")
 
     if payment_method == 'cod' and total_amount > Decimal('100000'):
         messages.error(request, "Cash on Delivery not available for orders above ₹100000.")
         return redirect('checkout')
 
-    for item in cart_items:
-        size_stock = item.size_stock
-        if size_stock.quantity < item.quantity:
-            messages.error(request, f"Insufficient stock for {item.product.name} (Size {size_stock.size}).")
-            return redirect('cart_view')
-
     try:
         with transaction.atomic():
+            for item in cart_items:
+                size_stock = item.size_stock
+                if size_stock.quantity < item.quantity:
+                    raise ValueError(f"Insufficient stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} available, {item.quantity} requested")
+
             unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
             order = Order.objects.create(
                 user=request.user,
@@ -1077,19 +1210,22 @@ def place_order(request):
                 payment_method=payment_method,
                 order_id=unique_order_id,
                 subtotal=subtotal,
-                discount=discount,
+                discount=product_discount + coupon_discount,  
                 tax=tax,
                 shipping_cost=shipping_cost,
                 total_amount=total_amount,
-                status='pending'  
+                status='pending'
             )
 
-            
+            if applied_coupon:
+                UsedCoupon.objects.create(user=request.user, coupon=applied_coupon)
+                del request.session['applied_coupon_id']  
+
             initial_payment_status = 'pending' if payment_method == 'cod' else 'paid'
 
             for item in cart_items:
                 size_stock = item.size_stock
-                size_stock.quantity = F('quantity') - item.quantity
+                size_stock.quantity -= item.quantity
                 size_stock.save(update_fields=['quantity'])
 
                 OrderItem.objects.create(
@@ -1100,7 +1236,7 @@ def place_order(request):
                     quantity=item.quantity,
                     price=item.product.discount_price or item.product.price,
                     discount_price=item.product.discount_price,
-                    payment_status=initial_payment_status  
+                    payment_status=initial_payment_status
                 )
 
             if payment_method == 'cod':
@@ -1129,8 +1265,7 @@ def place_order(request):
                     cart.items.all().delete()
                     return redirect('order_success', order_id=order.id)
                 else:
-                    messages.error(request, "Insufficient wallet balance.")
-                    return redirect('checkout')
+                    raise ValueError("Insufficient wallet balance.")
 
             elif payment_method == 'razorpay':
                 razorpay_order = razorpay_client.order.create({
@@ -1139,9 +1274,8 @@ def place_order(request):
                     "payment_capture": "1"
                 })
                 order.razorpay_order_id = razorpay_order['id']
-                order.payment_status = 'pending'  
+                order.payment_status = 'pending'
                 order.save()
-
                 return render(request, "razorpay_checkout.html", {
                     "order": order,
                     "razorpay_order": razorpay_order,
@@ -1152,13 +1286,13 @@ def place_order(request):
                 })
 
             else:
-                messages.error(request, "Invalid payment method selected.")
-                return redirect('checkout')
+                raise ValueError("Invalid payment method selected.")
 
     except Exception as e:
         logger.error(f"Order creation failed: {str(e)}", exc_info=True)
-        messages.error(request, "An error occurred while placing the order.")
+        messages.error(request, f"An error occurred while placing the order: {str(e)}")
         return redirect('checkout')
+    
 
 @csrf_exempt
 @require_http_methods(["POST"])

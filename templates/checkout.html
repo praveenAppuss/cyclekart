@@ -7,7 +7,7 @@
 
         <!-- Breadcrumb -->
         <div class="text-md text-gray-500 mb-6">
-            <span class="text-black font-bold">Checkout</span>  
+            <span class="text-black font-bold">Checkout</span>
         </div>
 
         <div class="grid md:grid-cols-3 gap-8">
@@ -33,7 +33,7 @@
                             data-district="{{ address.district }}" data-state="{{ address.state }}"
                             data-pin_code="{{ address.pin_code }}" data-country="{{ address.country }}"
                             {% if address.is_default %}selected{% endif %}>
-                            {{ address.full_name }} 
+                            {{ address.full_name }}
                         </option>
                         {% endfor %}
                     </select>
@@ -70,19 +70,14 @@
                 <p class="text-red-500 text-sm">No address found. Add a new one to continue.</p>
                 {% endif %}
 
-                
                 <form id="checkoutForm" method="post" action="{% url 'place_order' %}">
                     {% csrf_token %}
-                    
                     <input type="hidden" name="selected_address" id="hiddenAddressId" value="{% if addresses %}{{ addresses.0.id }}{% endif %}">
 
-                    
                     <div class="mt-9 border-0 shadow rounded p-4">
                         <h2 class="text-base font-semibold mb-2">Payment Methods</h2>
                         <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
                         <div class="space-y-3 text-sm">
-
-                            
                             <label class="flex items-center gap-2 text-sm">
                                 {% if final_total > 100000 %}
                                 <input type="radio" disabled class="accent-blue-600">
@@ -95,15 +90,11 @@
                                 <span>Cash on Delivery</span>
                                 {% endif %}
                             </label>
-
-                            
                             <label class="flex items-center gap-2 text-sm">
                                 <input type="radio" name="payment_method" value="wallet" class="accent-blue-600">
                                 <i data-lucide="wallet" class="w-4 h-4 text-gray-600"></i>
                                 <span>Wallet</span>
                             </label>
-
-                            
                             <label class="flex items-center gap-2 text-sm">
                                 <input type="radio" name="payment_method" value="razorpay" class="accent-blue-600">
                                 <i data-lucide="credit-card" class="w-4 h-4 text-gray-600"></i>
@@ -112,18 +103,16 @@
                         </div>
                     </div>
 
-                    
                     <button type="submit" class="w-full bg-gray-900 text-white py-2 rounded-lg font-semibold hover:bg-gray-800 mt-6">
                         Place Order
                     </button>
                 </form>
             </div>
 
-           
+            <!-- RIGHT: Order Summary -->
             <div class="bg-white rounded-xl p-6 shadow h-fit sticky top-20">
                 <h3 class="text-lg font-semibold text-slate-800 mb-4">Your Order</h3>
 
-                
                 <div class="space-y-4 mb-4">
                     {% for item in cart_items %}
                     <div class="flex items-center justify-between">
@@ -131,13 +120,13 @@
                             <img src="{% if item.color_variant and item.color_variant.images.first %}{{ item.color_variant.images.first.image.url }}{% else %}{{ item.product.thumbnail.url }}{% endif %}" class="w-10 h-10 object-cover rounded border"
                                 alt="{{ item.product.name }}" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
                             <div>
-                                <p class="text-xs font-small"> {{ item.size_stock.size }}</p>
+                                <p class="text-xs font-small">{{ item.size_stock.size }}</p>
                                 <p class="text-xs text-gray-500">Qty: {{ item.quantity }}</p>
                             </div>
                         </div>
                         <div class="text-sm font-semibold">
                             {% if item.product.discount_price %}
-                                ₹{{ item.product.price|floatformat:2 }}
+                                ₹{{ item.product.discount_price|mul:item.quantity|floatformat:2 }}
                             {% else %}
                                 ₹{{ item.product.price|mul:item.quantity|floatformat:2 }}
                             {% endif %}
@@ -146,58 +135,127 @@
                     {% endfor %}
                 </div>
 
-                
-                <div class="space-y-2 text-sm text-slate-700">
+                <!-- Price Breakdown -->
+                <div class="space-y-2 text-sm text-slate-700 mt-6">
                     <div class="flex justify-between">
                         <span>Subtotal:</span>
-                        <span>₹{{ subtotal|floatformat:0 }}</span>
+                        <span>₹{{ subtotal|floatformat:2 }}</span>
                     </div>
                     <div class="flex justify-between text-green-600">
-                        <span>Total discount:</span>
-                        <span>-₹{{ total_discount|floatformat:0 }}</span>
+                        <span>Product Discount:</span>
+                        <span>-₹{{ total_discount|floatformat:2 }}</span>
+                    </div>
+                    {% if applied_coupon %}
+                    
+                    <div class="flex justify-between text-green-600">
+                        <span>Coupon Discount :</span>
+                        <span>-₹{{ coupon_discount|floatformat:2 }}</span>
+                    </div>
+                    
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <span>Tax (5%):</span>
+                        <span>₹{{ taxes|floatformat:2 }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span>Shipping:</span>
                         <span>Free</span>
                     </div>
-                    <div class="flex justify-between">
-                        <span>Tax (5%):</span>
-                        <span>₹{{ taxes|floatformat:2 }}</span>
-                    </div>
                     <hr class="my-2">
                     <div class="flex justify-between font-bold text-base text-slate-900">
-                        <span>Total</span>
+                        <span>Total:</span>
                         <span>₹{{ final_total|floatformat:2 }}</span>
                     </div>
                 </div>
 
-                
                 <div class="mt-6">
                     <a href="{% url 'cart_view' %}" class="w-full inline-block bg-gray-200 text-gray-800 py-2 px-4 rounded-lg text-center text-sm font-medium hover:bg-gray-300">
                         Edit Cart
                     </a>
                 </div>
 
-                
-                <div class="mt-6 text-sm">
-                    <p class="mb-2 text-slate-600">(Have a Coupon?) <a href="#" class="text-blue-500 underline">View Coupons</a></p>
-                    <div class="flex">
-                        <input type="text" name="coupon_code" placeholder="Enter Code"
-                            class="w-full px-3 py-2 border rounded-l">
-                        <button class="bg-black text-white px-4 rounded-r">Apply</button>
+                <!-- Coupon Section -->
+                <div class="mt-6 pt-6 border-t">
+                    {% if applied_coupon %}
+                    <div class="bg-gray-100 rounded-md p-3 flex justify-between items-center" id="applied-coupon-section">
+                        <div>
+                            <p class="text-sm font-semibold">COUPONS</p>
+                            <p class="text-xs">1 Coupon applied</p>
+                            <p class="text-xs text-green-600">You saved additional ₹{{ applied_coupon.discount_amount|floatformat:0 }}</p>
+                        </div>
+                        <form method="POST" action="{% url 'remove_coupon' %}" id="remove-coupon-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="coupon_code" value="{{ applied_coupon.code }}">
+                            <button type="submit" class="text-red-600 text-sm border border-red-600 px-3 py-1 rounded hover:bg-red-100">
+                                Remove
+                            </button>
+                        </form>
                     </div>
+                    {% else %}
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="text-sm text-gray-500 italic">
+                            (If you have any coupons)
+                        </div>
+                        <button id="view-coupons" class="text-sm underline cursor-pointer text-gray-500 hover:text-gray-900">
+                            View Coupons
+                        </button>
+                    </div>
+                    <div id="couponDropdown" class="hidden mt-4 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                        <h4 class="text-sm font-semibold text-gray-600 mb-4">Available Coupons</h4>
+                        <ul class="space-y-3">
+                            {% if coupons %}
+                            {% for coupon in coupons %}
+                            <li class="flex items-center justify-between gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition border border-gray-100 {% if coupon_status|get_item:coupon.id %}opacity-50{% endif %}">
+                                <div class="flex-1">
+                                    <p class="font-semibold text-blue-700 text-sm {% if coupon_status|get_item:coupon.id %}line-through text-red-500{% endif %}">{{ coupon.code }}</p>
+                                    <p class="text-xs text-gray-500">₹{{ coupon.discount_amount|floatformat:2 }} off</p>
+                                    <p class="text-xs text-gray-500">Min: ₹{{ coupon.minimum_order_amount|floatformat:2 }}</p>
+                                    <p class="text-xs text-gray-500">Valid till: {{ coupon.valid_to|date:"M d, Y" }}</p>
+                                </div>
+                                {% if taxable_amount >= coupon.minimum_order_amount and not coupon_status|get_item:coupon.id %}
+                                <form method="POST" action="{% url 'apply_coupon' %}" class="coupon-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="coupon_code" value="{{ coupon.code }}">
+                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm">
+                                        Apply
+                                    </button>
+                                </form>
+                                {% elif coupon_status|get_item:coupon.id %}
+                                <span class="text-xs text-red-500">Already Used</span>
+                                {% else %}
+                                <span class="text-xs text-red-500">Not eligible</span>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                            {% else %}
+                            <p class="text-gray-500 text-sm text-center">No active available coupons.</p>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    <!-- Coupon Error Message -->
+                    {% if coupon_error %}
+                    <p class="text-red-500 text-sm mt-2">{{ coupon_error }}</p>
+                    {% endif %}
+                    <!-- Display Django Messages -->
+                    {% if messages %}
+                    {% for message in messages %}
+                    <p class="text-red-500 text-sm mt-2">{{ message }}</p>
+                    {% endfor %}
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-
+<!-- Add Address Modal -->
 <div id="addModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
     <div class="bg-white rounded p-6 w-full max-w-xl relative">
         <button onclick="toggleModal('addModal')" class="absolute top-2 right-4 text-xl">✖</button>
         <h3 class="text-lg font-bold mb-4">Add New Address</h3>
-        <form method="post" action="{% url 'add_address' %}?next=/checkout/">
+        <form method="post" action="{% url 'add_address' %}?next=/checkout/" id="addAddressForm">
             {% csrf_token %}
             <div class="grid grid-cols-2 gap-4">
                 <input name="full_name" placeholder="Full Name" required class="border p-2 rounded">
@@ -216,7 +274,7 @@
     </div>
 </div>
 
-
+<!-- Validation Modal -->
 <div id="validationModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
     <div class="bg-white rounded p-6 w-full max-w-md text-center relative">
         <button onclick="toggleModal('validationModal')" class="absolute top-2 right-4 text-xl">✖</button>
@@ -225,7 +283,6 @@
         <button onclick="toggleModal('validationModal')" class="mt-4 bg-gray-900 text-white px-4 py-2 rounded-lg">OK</button>
     </div>
 </div>
-
 
 <script>
     function toggleModal(modalId) {
@@ -265,7 +322,6 @@
 
         if (dropdown) {
             if (newAddressId) {
-                // Select the newly added address
                 dropdown.value = newAddressId;
             }
             fillAddressForm();
@@ -282,6 +338,82 @@
                 toggleModal('validationModal');
             }
         });
+
+        // Coupon Dropdown Toggle
+        const viewCouponsBtn = document.getElementById('view-coupons');
+        const couponDropdown = document.getElementById('couponDropdown');
+
+        if (viewCouponsBtn) {
+            viewCouponsBtn.addEventListener('click', function () {
+                if (couponDropdown) {
+                    couponDropdown.classList.toggle('hidden');
+                }
+            });
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function (event) {
+            if (couponDropdown && !couponDropdown.contains(event.target) && viewCouponsBtn && !viewCouponsBtn.contains(event.target)) {
+                couponDropdown.classList.add('hidden');
+            }
+        });
+
+        // AJAX for Coupon Apply/Remove
+        document.querySelectorAll('.coupon-form, #remove-coupon-form').forEach(form => {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const formData = new FormData(form);
+                const url = form.action;
+
+                fetch(url, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        // Reload page on success for both apply and remove
+                        window.location.reload();
+                    } else {
+                        // Display error message
+                        const errorMessage = document.createElement('p');
+                        errorMessage.className = 'text-red-500 text-sm mt-2';
+                        errorMessage.textContent = data.message || 'An error occurred.';
+                        form.parentElement.appendChild(errorMessage);
+                        setTimeout(() => errorMessage.remove(), 5000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Coupon AJAX Error:', error);
+                    const errorMessage = document.createElement('p');
+                    errorMessage.className = 'text-red-500 text-sm mt-2';
+                    errorMessage.textContent = 'An error occurred while processing the coupon. Please try again.';
+                    form.parentElement.appendChild(errorMessage);
+                    setTimeout(() => errorMessage.remove(), 5000);
+                });
+            });
+        });
+
+        // Display Django messages after page load
+        const messages = document.querySelectorAll('.messages .message');
+        if (messages.length > 0) {
+            messages.forEach(msg => {
+                const errorMessage = document.createElement('p');
+                errorMessage.className = 'text-red-500 text-sm mt-2';
+                errorMessage.textContent = msg.textContent;
+                document.querySelector('.mt-6.pt-6.border-t').appendChild(errorMessage);
+                setTimeout(() => errorMessage.remove(), 5000);
+            });
+        }
     });
 </script>
 

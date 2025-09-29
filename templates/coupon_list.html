@@ -1,0 +1,93 @@
+{% extends 'admin_base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-100 px-4 py-6">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-2xl font-semibold text-gray-800 mb-4">Coupon Management</h1>
+        <a href="{% url 'add_coupon' %}" class="bg-blue-700 text-white px-3 py-1 rounded-sm text-sm hover:bg-blue-800 transition-colors">Add Coupon</a>
+
+        <!-- Coupon Table -->
+        <div class="mt-4 overflow-x-auto bg-white shadow-sm rounded-sm">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Code</th>
+                        <th class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Discount (₹)</th>
+                        <th class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Min Order (₹)</th>
+                        <th class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Valid From</th>
+                        <th class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Valid To</th>
+                        <th class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for coupon in coupons %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2 text-sm">{{ coupon.code }}</td>
+                        <td class="px-3 py-2 text-sm">{{ coupon.discount_amount }}</td>
+                        <td class="px-3 py-2 text-sm">{{ coupon.minimum_order_amount }}</td>
+                        <td class="px-3 py-2 text-sm">{{ coupon.valid_from|date:'Y-m-d' }}</td>
+                        <td class="px-3 py-2 text-sm">{{ coupon.valid_to|date:'Y-m-d' }}</td>
+                        <td class="px-3 py-2 text-sm">
+                            <span class="px-2 py-1 rounded-full {% if coupon.active %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %} text-xs">
+                                {{ coupon.active|yesno:'Active,Inactive' }}
+                            </span>
+                        </td>
+                        <td class="px-3 py-2 text-sm">
+                            <a href="{% url 'edit_coupon' coupon.id %}" class="text-blue-600 hover:text-blue-800 text-xs mr-2">Edit</a>
+                            <a href="{% url 'soft_delete_coupon' coupon.id %}" class="text-red-600 hover:text-red-800 text-xs">Delete</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-3 py-2 text-center text-sm text-gray-500">No coupons available.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if coupons.has_other_pages %}
+        <div class="mt-4 flex justify-center">
+            {% if coupons.has_previous %}
+                <a href="?page={{ coupons.previous_page_number }}" class="px-2 py-1 bg-gray-200 text-gray-700 rounded-l hover:bg-gray-300 text-sm">&laquo; Prev</a>
+            {% endif %}
+            {% for num in coupons.paginator.page_range %}
+                <a href="?page={{ num }}" class="px-2 py-1 {% if coupons.number == num %}bg-blue-700 text-white{% else %}bg-gray-200 text-gray-700 hover:bg-gray-300{% endif %} text-sm mx-1">{{ num }}</a>
+            {% endfor %}
+            {% if coupons.has_next %}
+                <a href="?page={{ coupons.next_page_number }}" class="px-2 py-1 bg-gray-200 text-gray-700 rounded-r hover:bg-gray-300 text-sm">Next &raquo;</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Placeholder for SweetAlert2 messages (handled by JS) -->
+    </div>
+</div>
+
+<!-- SweetAlert2 CDN and Script -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        {% if messages %}
+            {% for message in messages %}
+                Swal.fire({
+                    toast: true,
+                    position: 'top-right',
+                    icon: '{{ message.tags }}' == 'success' ? 'success' : 'error',
+                    title: '{{ message }}',
+                    showConfirmButton: false,
+                    timer: 3000,
+                    timerProgressBar: true,
+                    didOpen: (toast) => {
+                        toast.addEventListener('mouseenter', Swal.stopTimer)
+                        toast.addEventListener('mouseleave', Swal.resumeTimer)
+                    }
+                });
+            {% endfor %}
+        {% endif %}
+    });
+</script>
+{% endblock %}

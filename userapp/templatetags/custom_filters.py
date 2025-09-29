@@ -14,3 +14,8 @@ def mul(value, arg):
 @register.filter
 def has_cancelled_items(items):
     return any(item.status == 'cancelled' for item in items)
+
+
+@register.filter
+def get_item(dictionary, key):
+    return dictionary.get(key)

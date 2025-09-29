@@ -1,6 +1,7 @@
 import uuid
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 from adminapp.models import Product, ProductColorVariant, ProductSizeStock
 
 class CustomUser(AbstractUser):
@@ -194,3 +195,32 @@ class ReturnRequest(models.Model):
 
     def __str__(self):
         return f"Return Request for {self.order_item} - {self.status}"
+    
+
+class Coupon(models.Model):
+    code = models.CharField(max_length=20, unique=True)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    minimum_order_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    valid_from = models.DateTimeField()
+    valid_to = models.DateTimeField()
+    active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+
+    def is_valid(self):
+        now = timezone.now()
+        return self.valid_from <= now <= self.valid_to and self.active
+
+    def __str__(self):
+        return self.code
+
+
+class UsedCoupon(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE, related_name='used_by')
+    used_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'coupon')
+
+    def __str__(self):
+        return f"{self.user.username} used {self.coupon.code}"

@@ -28,6 +28,10 @@ urlpatterns = [
     path('orders/<int:order_id>/status/', views.update_order_status, name='update_order_status'),
     path('admin/order/<int:item_id>/accept-return/',views.return_accept, name='return_accept'),
     path('admin/order/<int:item_id>/reject-return/',views.return_reject, name='return_reject'),
-
+    path('admin/coupons/', views.coupon_list, name='coupon_list'),
+    path('admin/coupons/add/', views.add_coupon, name='add_coupon'),
+    path('admin/coupons/edit/<int:coupon_id>/', views.edit_coupon, name='edit_coupon'),
+    path('admin/coupons/delete/<int:coupon_id>/', views.delete_coupon, name='soft_delete_coupon'),
+    
 
 ]

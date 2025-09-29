@@ -5,6 +5,8 @@ import dj_database_url
 
 # logging.basicConfig(level=logging.DEBUG)
 
+TIME_ZONE = 'Asia/Kolkata'
+USE_TZ = True
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
