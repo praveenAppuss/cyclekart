@@ -32,6 +32,12 @@ urlpatterns = [
     path('admin/coupons/add/', views.add_coupon, name='add_coupon'),
     path('admin/coupons/edit/<int:coupon_id>/', views.edit_coupon, name='edit_coupon'),
     path('admin/coupons/delete/<int:coupon_id>/', views.delete_coupon, name='soft_delete_coupon'),
-    
+    path('offers/', views.list_offers, name='offers_list'),
+    path('offers/product/add/', views.add_product_offer, name='add_product_offer'),
+    path('offers/category/add/', views.add_category_offer, name='add_category_offer'),
+    path('offers/product/edit/<int:offer_id>/', views.edit_product_offer, name='edit_product_offer'),
+    path('offers/category/edit/<int:offer_id>/', views.edit_category_offer, name='edit_category_offer'),
+    path('offers/product/delete/<int:offer_id>/', views.delete_product_offer, name='delete_product_offer'),
+    path('offers/category/delete/<int:offer_id>/', views.delete_category_offer, name='delete_category_offer'),
 
 ]

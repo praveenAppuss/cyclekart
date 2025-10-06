@@ -9,10 +9,11 @@ from django.contrib.auth.decorators import user_passes_test
 from django.views.decorators.http import require_POST
 from django.db.models import Q,Sum
 from django.core.paginator import Paginator
+import pytz
 from userapp.services import WalletService
 from userapp.models import Coupon, CustomUser, Order, OrderItem, ReturnRequest, Wallet, WalletTransaction
 from django.utils.text import slugify
-from adminapp.models import Product, Category, Brand, ProductColorVariant, ProductImage,ProductSizeStock
+from adminapp.models import Product, Category, Brand, ProductColorVariant, ProductImage, ProductOffer,ProductSizeStock,CategoryOffer
 import base64
 import uuid
 from django.core.files.base import ContentFile
@@ -1149,3 +1150,365 @@ def delete_coupon(request, coupon_id):
     coupon.save()
     messages.success(request, f"Coupon '{coupon.code}' has been deleted successfully.")
     return redirect('coupon_list')
+
+
+#----------------------------------Offer Management----------------------------------------#
+@superuser_required
+def list_offers(request):
+    now = timezone.now()
+    
+    product_offers = ProductOffer.objects.filter(
+        is_deleted=False
+    ).prefetch_related('products__category', 'products__brand', 'products').order_by('-created_at')
+    
+    for offer in product_offers:
+        offer.is_currently_active = offer.is_active and offer.valid_from <= now <= offer.valid_to
+    
+    category_offers = CategoryOffer.objects.filter(
+        is_deleted=False
+    ).prefetch_related('categories').order_by('-created_at')
+    
+    for offer in category_offers:
+        offer.is_currently_active = offer.is_active and offer.valid_from <= now <= offer.valid_to
+
+    context = {
+        'product_offers': product_offers,
+        'category_offers': category_offers,
+    }
+    return render(request, 'offers_list.html', context)
+
+
+LOCAL_TZ = pytz.timezone('Asia/Kolkata')
+
+@superuser_required
+def add_product_offer(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        discount_percentage_str = request.POST.get('discount_percentage')
+        valid_from_str = request.POST.get('valid_from')
+        valid_to_str = request.POST.get('valid_to')
+        is_active = 'is_active' in request.POST
+        selected_product_ids = request.POST.getlist('products')  
+
+        errors = []
+        if not name:
+            errors.append('Offer name is required.')
+        if not discount_percentage_str:
+            errors.append('Discount percentage is required.')
+        else:
+            try:
+                discount_percentage = float(discount_percentage_str)
+                if not 0 <= discount_percentage <= 100:
+                    errors.append('Discount percentage must be between 0 and 100.')
+            except ValueError:
+                errors.append('Discount percentage must be a valid number.')
+        
+        if not valid_from_str or not valid_to_str:
+            errors.append('Both valid from and valid to are required.')
+        else:
+            try:
+                naive_from = datetime.fromisoformat(valid_from_str)
+                naive_to = datetime.fromisoformat(valid_to_str)
+                valid_from = timezone.make_aware(naive_from, LOCAL_TZ)
+                valid_to = timezone.make_aware(naive_to, LOCAL_TZ)
+                valid_from = valid_from.astimezone(pytz.UTC)
+                valid_to = valid_to.astimezone(pytz.UTC)
+                
+                if valid_from >= valid_to:
+                    errors.append("Valid 'to' must be after 'from'.")
+            except ValueError:
+                errors.append('Invalid date/time format. Use YYYY-MM-DDTHH:MM.')
+
+        if len(selected_product_ids) == 0:
+            errors.append('Select at least one product.')
+
+        if errors:
+            messages.error(request, '<br>'.join(errors))  
+        else:
+            offer = ProductOffer.objects.create(
+                name=name,
+                discount_percentage=discount_percentage,
+                valid_from=valid_from,
+                valid_to=valid_to,
+                is_active=is_active,
+                is_deleted=False
+            )
+            selected_products = Product.objects.filter(
+                id__in=selected_product_ids,
+                is_active=True,
+                is_deleted=False
+            )
+            offer.products.set(selected_products)
+            messages.success(request, f'Product offer "{name}" created successfully with {selected_products.count()} products!')
+            return redirect('offers_list')
+
+    products = Product.objects.filter(is_active=True, is_deleted=False).order_by('name')
+    return render(request, 'add_product_offer.html', {'products': products})
+
+
+@superuser_required
+def add_category_offer(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        discount_percentage_str = request.POST.get('discount_percentage')
+        valid_from_str = request.POST.get('valid_from')
+        valid_to_str = request.POST.get('valid_to')
+        is_active = 'is_active' in request.POST
+        selected_category_ids = request.POST.getlist('categories')
+
+        errors = []
+        if not name:
+            errors.append('Offer name is required.')
+        if not discount_percentage_str:
+            errors.append('Discount percentage is required.')
+        else:
+            try:
+                discount_percentage = float(discount_percentage_str)
+                if not 0 <= discount_percentage <= 100:
+                    errors.append('Discount percentage must be between 0 and 100.')
+            except ValueError:
+                errors.append('Discount percentage must be a valid number.')
+        
+        if not valid_from_str or not valid_to_str:
+            errors.append('Both valid from and valid to are required.')
+        else:
+            try:
+                naive_from = datetime.fromisoformat(valid_from_str)
+                naive_to = datetime.fromisoformat(valid_to_str)
+                valid_from = timezone.make_aware(naive_from, LOCAL_TZ)
+                valid_to = timezone.make_aware(naive_to, LOCAL_TZ)
+                valid_from = valid_from.astimezone(pytz.UTC)
+                valid_to = valid_to.astimezone(pytz.UTC)
+                
+                if valid_from >= valid_to:
+                    errors.append("Valid 'to' must be after 'from'.")
+            except ValueError:
+                errors.append('Invalid date/time format. Use YYYY-MM-DDTHH:MM.')
+
+        if len(selected_category_ids) == 0:
+            errors.append('Select at least one category.')
+
+        if errors:
+            messages.error(request, '<br>'.join(errors))
+        else:
+            offer = CategoryOffer.objects.create(
+                name=name,
+                discount_percentage=discount_percentage,
+                valid_from=valid_from,
+                valid_to=valid_to,
+                is_active=is_active,
+                is_deleted=False
+            )
+            selected_categories = Category.objects.filter(
+                id__in=selected_category_ids,
+                is_active=True,
+                is_deleted=False
+            )
+            offer.categories.set(selected_categories)
+            messages.success(request, f'Category offer "{name}" created successfully with {selected_categories.count()} categories!')
+            return redirect('offers_list')
+
+    categories = Category.objects.filter(is_active=True, is_deleted=False).order_by('name')
+    return render(request, 'add_category_offer.html', {'categories': categories})
+
+
+@superuser_required
+def edit_product_offer(request, offer_id):
+    offer = get_object_or_404(ProductOffer, id=offer_id, is_deleted=False)
+    
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        discount_percentage_str = request.POST.get('discount_percentage')
+        valid_from_str = request.POST.get('valid_from')
+        valid_to_str = request.POST.get('valid_to')
+        is_active = 'is_active' in request.POST
+        selected_product_ids = request.POST.getlist('products')  
+
+        errors = []
+        if not name:
+            errors.append('Offer name is required.')
+        if not discount_percentage_str:
+            errors.append('Discount percentage is required.')
+        else:
+            try:
+                discount_percentage = float(discount_percentage_str)
+                if not 0 <= discount_percentage <= 100:
+                    errors.append('Discount percentage must be between 0 and 100.')
+            except ValueError:
+                errors.append('Discount percentage must be a valid number.')
+        
+        if not valid_from_str or not valid_to_str:
+            errors.append('Both valid from and valid to are required.')
+        else:
+            try:
+                naive_from = datetime.fromisoformat(valid_from_str)
+                naive_to = datetime.fromisoformat(valid_to_str)
+                valid_from = timezone.make_aware(naive_from, LOCAL_TZ)
+                valid_to = timezone.make_aware(naive_to, LOCAL_TZ)
+                valid_from = valid_from.astimezone(pytz.UTC)
+                valid_to = valid_to.astimezone(pytz.UTC)
+                
+                if valid_from >= valid_to:
+                    errors.append("Valid 'to' must be after 'from'.")
+            except ValueError:
+                errors.append('Invalid date/time format. Use YYYY-MM-DDTHH:MM.')
+
+        if len(selected_product_ids) == 0:
+            errors.append('Select at least one product.')
+
+        if errors:
+            messages.error(request, '<br>'.join(errors))  
+            local_from = offer.valid_from.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+            local_to = offer.valid_to.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+            products = Product.objects.filter(is_active=True, is_deleted=False).order_by('name')
+            selected_product_ids_current = [str(p.id) for p in offer.products.all()]
+            context = {
+                'offer': offer,
+                'products': products,
+                'selected_product_ids': selected_product_ids_current,
+                'valid_from': local_from,
+                'valid_to': local_to,
+            }
+            return render(request, 'add_product_offer.html', context)
+        else:
+            offer.name = name
+            offer.discount_percentage = discount_percentage
+            offer.valid_from = valid_from
+            offer.valid_to = valid_to
+            offer.is_active = is_active
+            offer.save()
+            selected_products = Product.objects.filter(
+                id__in=selected_product_ids,
+                is_active=True,
+                is_deleted=False
+            )
+            offer.products.set(selected_products)
+            messages.success(request, f'Product offer "{name}" updated successfully with {selected_products.count()} products!')
+            return redirect('offers_list')
+
+    local_from = offer.valid_from.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+    local_to = offer.valid_to.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+    
+    products = Product.objects.filter(is_active=True, is_deleted=False).order_by('name')
+    selected_product_ids = [str(p.id) for p in offer.products.all()]
+    
+    context = {
+        'offer': offer,
+        'products': products,
+        'selected_product_ids': selected_product_ids,
+        'valid_from': local_from,
+        'valid_to': local_to,
+    }
+    return render(request, 'add_product_offer.html', context)
+
+
+@superuser_required
+def edit_category_offer(request, offer_id):
+    offer = get_object_or_404(CategoryOffer, id=offer_id, is_deleted=False)
+    
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        discount_percentage_str = request.POST.get('discount_percentage')
+        valid_from_str = request.POST.get('valid_from')
+        valid_to_str = request.POST.get('valid_to')
+        is_active = 'is_active' in request.POST
+        selected_category_ids = request.POST.getlist('categories')
+
+        errors = []
+        if not name:
+            errors.append('Offer name is required.')
+        if not discount_percentage_str:
+            errors.append('Discount percentage is required.')
+        else:
+            try:
+                discount_percentage = float(discount_percentage_str)
+                if not 0 <= discount_percentage <= 100:
+                    errors.append('Discount percentage must be between 0 and 100.')
+            except ValueError:
+                errors.append('Discount percentage must be a valid number.')
+        
+        if not valid_from_str or not valid_to_str:
+            errors.append('Both valid from and valid to are required.')
+        else:
+            try:
+                naive_from = datetime.fromisoformat(valid_from_str)
+                naive_to = datetime.fromisoformat(valid_to_str)
+                valid_from = timezone.make_aware(naive_from, LOCAL_TZ)
+                valid_to = timezone.make_aware(naive_to, LOCAL_TZ)
+                valid_from = valid_from.astimezone(pytz.UTC)
+                valid_to = valid_to.astimezone(pytz.UTC)
+                
+                if valid_from >= valid_to:
+                    errors.append("Valid 'to' must be after 'from'.")
+            except ValueError:
+                errors.append('Invalid date/time format. Use YYYY-MM-DDTHH:MM.')
+
+        if len(selected_category_ids) == 0:
+            errors.append('Select at least one category.')
+
+        if errors:
+            messages.error(request, '<br>'.join(errors))
+            local_from = offer.valid_from.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+            local_to = offer.valid_to.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+            categories = Category.objects.filter(is_active=True, is_deleted=False).order_by('name')
+            selected_category_ids_current = [str(c.id) for c in offer.categories.all()]
+            context = {
+                'offer': offer,
+                'categories': categories,
+                'selected_category_ids': selected_category_ids_current,
+                'valid_from': local_from,
+                'valid_to': local_to,
+            }
+            return render(request, 'add_category_offer.html', context)
+        else:
+            offer.name = name
+            offer.discount_percentage = discount_percentage
+            offer.valid_from = valid_from
+            offer.valid_to = valid_to
+            offer.is_active = is_active
+            offer.save()
+            selected_categories = Category.objects.filter(
+                id__in=selected_category_ids,
+                is_active=True,
+                is_deleted=False
+            )
+            offer.categories.set(selected_categories)
+            messages.success(request, f'Category offer "{name}" updated successfully with {selected_categories.count()} categories!')
+            return redirect('offers_list')
+
+    local_from = offer.valid_from.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+    local_to = offer.valid_to.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+    
+    categories = Category.objects.filter(is_active=True, is_deleted=False).order_by('name')
+    selected_category_ids = [str(c.id) for c in offer.categories.all()]
+    
+    context = {
+        'offer': offer,
+        'categories': categories,
+        'selected_category_ids': selected_category_ids,
+        'valid_from': local_from,
+        'valid_to': local_to,
+    }
+    return render(request, 'add_category_offer.html', context)
+
+
+@superuser_required
+def delete_product_offer(request, offer_id):
+    if request.method == 'POST':
+        offer = get_object_or_404(ProductOffer, id=offer_id, is_deleted=False)
+        offer.is_deleted = True
+        offer.save()
+        messages.success(request, f'Product offer "{offer.name}" deleted successfully.')
+        return redirect('offers_list')
+    return redirect('offers_list')
+
+
+@superuser_required
+def delete_category_offer(request, offer_id):
+    if request.method == 'POST':
+        offer = get_object_or_404(CategoryOffer, id=offer_id, is_deleted=False)
+        offer.is_deleted = True
+        offer.save()
+        messages.success(request, f'Category offer "{offer.name}" deleted successfully.')
+        return redirect('offers_list')
+    return redirect('offers_list')

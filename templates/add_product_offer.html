@@ -1,0 +1,98 @@
+{% extends 'admin_base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="p-4 max-w-xl mx-auto bg-white rounded-lg shadow-sm">
+  <h2 class="text-xl font-semibold mb-6 text-gray-800 flex items-center gap-2">
+    <i data-lucide="{% if offer %}edit-3{% else %}plus-circle{% endif %}" class="w-5 h-5 text-blue-600"></i>
+    {% if offer %}Edit Product Offer: {{ offer.name }}{% else %}Add Product Offer{% endif %}
+  </h2>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="mb-4 p-4 rounded-lg text-sm {% if message.tags == 'success' %}bg-green-50 border border-green-200 text-green-700{% elif message.tags == 'error' %}bg-red-50 border border-red-200 text-red-700{% endif %}">
+        {{ message|safe }}  <!-- safe for <br> in errors -->
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" id="offer-form" class="space-y-6">
+    {% csrf_token %}
+    
+    <!-- Offer Name -->
+    <div>
+      <label for="name" class="block text-sm font-medium text-gray-700 mb-2">Offer Name <span class="text-red-500">*</span></label>
+      <input type="text" name="name" id="name" value="{{ offer.name|default:'' }}" required 
+             class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+             placeholder="e.g., Summer Sale 20% Off">
+    </div>
+
+    <!-- Products Selection: Scrollable Checkboxes -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-2">Select Products <span class="text-red-500">*</span></label>
+      <div class="border border-gray-300 rounded-md p-3 max-h-44 overflow-y-auto bg-gray-50">
+        {% for product in products %}
+          <label class="flex items-center p-2 hover:bg-gray-100 rounded cursor-pointer w-full">
+            <input type="checkbox" name="products" value="{{ product.id }}" 
+                   class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500 h-3 w-3 mr-2"
+                   {% if offer and product.id|stringformat:"s" in selected_product_ids %}checked{% endif %}>
+            <span class="text-sm text-gray-700">{{ product.name }}</span>
+          </label>
+        {% empty %}
+          <p class="text-sm text-gray-500 p-2 italic">No active products available.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Discount Percentage -->
+    <div>
+      <label for="discount_percentage" class="block text-sm font-medium text-gray-700 mb-2">Discount Percentage <span class="text-red-500">*</span></label>
+      <input type="number" name="discount_percentage" id="discount_percentage" value="{{ offer.discount_percentage|default:'' }}" min="0" max="100" step="0.01" required
+             class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+             placeholder="e.g., 20.00">
+      <p class="mt-1 text-xs text-gray-500">Enter a value between 0 and 100</p>
+    </div>
+
+    <!-- Valid From -->
+    <div>
+      <label for="valid_from" class="block text-sm font-medium text-gray-700 mb-2">Valid From <span class="text-red-500">*</span></label>
+      <input type="datetime-local" name="valid_from" id="valid_from" value="{{ valid_from|default:'' }}" required
+             class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      <p class="mt-1 text-xs text-gray-500">Start date and time</p>
+    </div>
+
+    <!-- Valid To -->
+    <div>
+      <label for="valid_to" class="block text-sm font-medium text-gray-700 mb-2">Valid To <span class="text-red-500">*</span></label>
+      <input type="datetime-local" name="valid_to" id="valid_to" value="{{ valid_to|default:'' }}" required
+             class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+      <p class="mt-1 text-xs text-gray-500">End date and time (must be after 'from')</p>
+    </div>
+
+    <!-- Active Toggle -->
+    <div class="flex items-center">
+      <input type="checkbox" name="is_active" id="is_active" {% if not offer or offer.is_active %}checked{% endif %}
+             class="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4">
+      <label for="is_active" class="ml-2 block text-sm font-medium text-gray-700">Active</label>
+    </div>
+  </form>
+
+  <!-- Buttons -->
+  <div class="mt-8 flex justify-end space-x-3 pt-4 border-t">
+    <a href="{% url 'offers_list' %}" class="px-4 py-2 text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition">Cancel</a>
+    <button type="submit" form="offer-form" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition">
+      {% if offer %}Update Offer{% else %}Create Offer{% endif %}
+    </button>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const now = new Date();
+    const validFromInput = document.getElementById('valid_from');
+    if (validFromInput && !validFromInput.value) {
+      validFromInput.value = now.toISOString().slice(0, 16);
+    }
+  });
+</script>
+{% endblock %}

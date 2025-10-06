@@ -1,0 +1,205 @@
+{% extends 'admin_base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="p-6 max-w-6xl mx-auto bg-white rounded shadow-sm">
+
+  {% if messages %}
+  <div id="toast-container" class="fixed top-5 right-5 z-50 space-y-2">
+    {% for message in messages %}
+    <div class="toast px-4 py-2 rounded text-sm shadow-md text-white animate-fade-in
+          {% if message.tags == 'success' %} bg-green-600 hidden
+          {% elif message.tags == 'error' %} bg-red-600
+          {% elif message.tags == 'warning' %} bg-yellow-500 text-black
+          {% else %} bg-gray-700
+          {% endif %}" data-message="{{ message }}" data-tags="{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="mb-6">
+    <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+      <i data-lucide="gift" class="w-4 h-4 mr-2"></i>
+      Offer Management
+    </h2>
+  </div>
+
+  <!-- Product Offers Section -->
+  <div class="mb-8">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-lg font-medium text-gray-700 flex items-center gap-2">
+        <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+        Product Offers ({{ product_offers.count }} Total)
+      </h3>
+      <a href="{% url 'add_product_offer' %}" 
+         class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1.5 rounded">
+        <i data-lucide="plus" class="w-4 h-4"></i> Add Product Offer
+      </a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Products</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Discount %</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valid Period</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          {% for offer in product_offers %}
+          <tr>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ offer.name }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+              {% if offer.is_currently_active %}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+              {% else %}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">
+              {% for product in offer.products.all %}
+                {{ product.name }}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                No products assigned
+              {% endfor %}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ offer.discount_percentage }}%</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {{ offer.valid_from|date:"M d, Y H:i" }} – {{ offer.valid_to|date:"M d, Y H:i" }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+              <a href="{% url 'edit_product_offer' offer.id %}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+              <form method="post" action="{% url 'delete_product_offer' offer.id %}" class="inline" onsubmit="return confirmDelete(this)">
+                {% csrf_token %}
+                <button type="submit" class="text-red-600 hover:text-red-900 border-none bg-transparent cursor-pointer">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="px-6 py-4 text-center text-gray-500">No product offers found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Category Offers Section -->
+  <div>
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="text-lg font-medium text-gray-700 flex items-center gap-2">
+        <i data-lucide="tag" class="w-4 h-4"></i>
+        Category Offers ({{ category_offers.count }} Total)
+      </h3>
+      <a href="{% url 'add_category_offer' %}" 
+         class="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded">
+        <i data-lucide="plus" class="w-4 h-4"></i> Add Category Offer
+      </a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categories</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Discount %</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valid Period</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          {% for offer in category_offers %}
+          <tr>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ offer.name }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm">
+              {% if offer.is_currently_active %}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+              {% else %}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">
+              {% for category in offer.categories.all %}
+                {{ category.name }}{% if not forloop.last %}, {% endif %}
+              {% empty %}
+                No categories assigned
+              {% endfor %}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ offer.discount_percentage }}%</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              {{ offer.valid_from|date:"M d, Y H:i" }} – {{ offer.valid_to|date:"M d, Y H:i" }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+              <a href="{% url 'edit_category_offer' offer.id %}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+              <form method="post" action="{% url 'delete_category_offer' offer.id %}" class="inline" onsubmit="return confirmDelete(this)">
+                {% csrf_token %}
+                <button type="submit" class="text-red-600 hover:text-red-900 border-none bg-transparent cursor-pointer">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="px-6 py-4 text-center text-gray-500">No category offers found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- SweetAlert2 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+  // SweetAlert for delete confirmation
+  function confirmDelete(form) {
+    Swal.fire({
+      title: 'Are you sure?',
+      text: 'This action cannot be undone!',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        form.submit();
+      }
+    });
+    return false;  // Prevent default submit
+  }
+
+  // Handle messages with SweetAlert for success, toast for others
+  document.addEventListener('DOMContentLoaded', function() {
+    const toasts = document.querySelectorAll('.toast');
+    toasts.forEach(toast => {
+      const tags = toast.dataset.tags;
+      const message = toast.dataset.message;
+      
+      if (tags === 'success') {
+        Swal.fire({
+          icon: 'success',
+          title: 'Success!',
+          text: message,
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 3000,
+          timerProgressBar: true
+        });
+      } else {
+        // Show toast for error/warning/info
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.remove(), 5000);
+      }
+    });
+  });
+</script>
+{% endblock %}

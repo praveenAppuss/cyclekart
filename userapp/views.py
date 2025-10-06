@@ -375,9 +375,10 @@ def product_detail(request, product_id):
         messages.error(request, 'This product is currently unavailable.')
         return redirect('userproduct_list')
 
-    savings = 0
-    if product.discount_price and product.discount_price < product.price:
-        savings = product.price - product.discount_price
+    final_price = product.get_final_price()
+    savings = product.get_savings()
+    
+    best_discount = product.get_best_discount()  
 
     related_products = Product.objects.filter(
         category=product.category,
@@ -402,10 +403,11 @@ def product_detail(request, product_id):
         'product': product,
         'color_variants': color_variants,
         'related_products': related_products,
-        'savings': savings,
+        'final_price': final_price,  
+        'savings': savings,         
+        'best_discount': best_discount,  
         'wishlist_items': wishlist_items,
     }
-    
     return render(request, 'product_detail.html', context)
 
 

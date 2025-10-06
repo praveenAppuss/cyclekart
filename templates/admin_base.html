@@ -53,21 +53,18 @@
                     <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
                         <i data-lucide="image" class="w-4 h-4 mr-2"></i> Banner Management
                     </a>
-                    <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
+                    <a href="{% url 'offers_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
                         <i data-lucide="gift" class="w-4 h-4 mr-2"></i> Offer Management
                     </a>
-                    <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="settings" class="w-4 h-4 mr-2"></i> Settings
-                    </a>
-                    <a href="{% url 'admin_logout' %}"
-                        class="flex items-center px-3 py-2 rounded hover:bg-gray-100 text-red-600 font-medium">
+                    <a href="{% url 'admin_logout' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100 text-red-600 font-medium">
                         <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Logout
                     </a>
+                    
 
                 </nav>
             </div>
 
-            <!-- Settings + Logout -->
+            
             
         </aside>
 
