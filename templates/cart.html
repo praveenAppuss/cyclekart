@@ -36,26 +36,35 @@
               </div>
             </div>
           </div>
+
           <div class="flex items-center space-x-5">
-            <!-- Display only the original price (price field) -->
-            <span class="text-md font-semibold text-gray-900" data-unit-price>
-              ₹{{ item.product.price|floatformat:0 }}
-            </span>
+            <!-- Updated: Dynamic price display -->
+            {% with final_price=item.product.get_final_price savings=item.product.get_savings %}
+              <div class="text-right">
+                {% if savings > 0 %}
+                  <span class="text-md font-semibold text-gray-900">₹{{ final_price|floatformat:0 }}</span>
+                  <span class="text-xs text-red-400 line-through ml-1">₹{{ item.product.price|floatformat:0 }}</span>
+                {% else %}
+                  <span class="text-md font-semibold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
+                {% endif %}
+              </div>
+            {% endwith %}
+
             <div class="flex items-center space-x-2">
               {% if item.is_available %}
                 <button onclick="updateQuantity('{{ item.id }}', 'decrement')"
                         class="decrement-btn px-2 py-1 rounded {% if item.quantity <= 1 %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %}"
-                        data-max-quantity="{{ item.max_quantity }}"
                         {% if item.quantity <= 1 %}disabled{% endif %}>−</button>
                 <span class="px-2 font-semibold quantity-display">{{ item.quantity }}</span>
                 <button onclick="updateQuantity('{{ item.id }}', 'increment')"
                         class="increment-btn px-2 py-1 rounded {% if item.quantity >= item.max_quantity %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %}"
-                        data-max-quantity="{{ item.max_quantity }}"
-                        {% if item.quantity >= item.max_quantity %}disabled{% endif %}>+</button>
+                        {% if item.quantity >= item.max_quantity %}disabled{% endif %}
+                        data-max-quantity="{{ item.max_quantity }}">+</button>
               {% else %}
                 <span class="px-2 font-semibold">{{ item.quantity }}</span>
               {% endif %}
             </div>
+
             <button onclick="openRemoveModal('{{ item.id }}')" class="text-red-600 hover:text-red-800">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -84,7 +93,7 @@
             <span class="font-medium text-green-600">Free</span>
           </div>
           <div class="flex justify-between">
-            <span>Tax</span>
+            <span>Tax (5%)</span>
             <span class="font-medium" data-taxes>₹{{ taxes|floatformat:2 }}</span>
           </div>
           <hr class="border-gray-100">
@@ -93,6 +102,7 @@
             <span data-final-total>₹{{ total|floatformat:2 }}</span>
           </div>
         </div>
+
         {% if cart_items and not has_unavailable_items %}
           <a href="{% url 'checkout' %}" class="mt-6 block text-center bg-gray-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">Proceed to Checkout</a>
           <a href="{% url 'userproduct_list' %}" class="mt-5 block text-black-100 hover:underline text-xs text-center">Continue Shopping</a>
@@ -100,6 +110,7 @@
           <button disabled class="mt-6 block text-center bg-gray-400 text-white px-4 py-2 rounded-lg font-medium cursor-not-allowed">Proceed to Checkout</button>
         {% endif %}
       </div>
+
     </div>
     {% else %}
     <div class="text-center py-20">
@@ -119,7 +130,8 @@
       {% csrf_token %}
       <div class="flex justify-center space-x-4 mt-4">
         <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md">Yes, Remove</button>
-        <button type="button" onclick="closeRemoveModal()" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-md">Cancel</button>
+        <button type="button" onclick="closeRemoveModal()"
+          class="px-4 py-2 bg-gray-300 hover:bg-gray-400 rounded-md">Cancel</button>
       </div>
     </form>
   </div>
@@ -131,9 +143,9 @@
   document.addEventListener("DOMContentLoaded", function () {
     // Render Django messages as SweetAlert Toasts
     {% if messages %}
-      {% for message in messages %}
-        showToast("{{ message|escapejs }}", "{{ message.tags }}");
-      {% endfor %}
+    {% for message in messages %}
+    showToast("{{ message|escapejs }}", "{{ message.tags }}");
+    {% endfor %}
     {% endif %}
   });
 
@@ -176,7 +188,6 @@
   async function updateQuantity(itemId, action) {
     const itemElement = document.querySelector(`[data-item-id="${itemId}"]`);
     const quantityDisplay = itemElement.querySelector('.quantity-display');
-    const unitPriceDisplay = itemElement.querySelector('[data-unit-price]');
     const incrementBtn = itemElement.querySelector('.increment-btn');
     const decrementBtn = itemElement.querySelector('.decrement-btn');
     const maxQuantity = parseInt(incrementBtn.dataset.maxQuantity || 5);

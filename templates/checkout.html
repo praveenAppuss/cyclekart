@@ -125,11 +125,9 @@
                             </div>
                         </div>
                         <div class="text-sm font-semibold">
-                            {% if item.product.discount_price %}
-                                ₹{{ item.product.discount_price|mul:item.quantity|floatformat:2 }}
-                            {% else %}
-                                ₹{{ item.product.price|mul:item.quantity|floatformat:2 }}
-                            {% endif %}
+                            {% with final_price=item.product.get_final_price %}
+                                ₹{{ final_price|mul:item.quantity|floatformat:2 }}
+                            {% endwith %}
                         </div>
                     </div>
                     {% endfor %}

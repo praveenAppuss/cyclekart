@@ -277,16 +277,8 @@ def user_product_list(request):
     min_price = price_range['min_price'] or 0
     max_price = price_range['max_price'] or 10000
 
-    products = products.annotate(
-        has_stock=ExpressionWrapper(
-            Case(
-                When(color_variants__size_stocks__quantity__gt=0, then=Value(1)),
-                default=Value(0),
-                output_field=IntegerField()
-            ),
-            output_field=IntegerField()
-        )
-    ).filter(has_stock=1).distinct()
+    # Simplified stock filter: products with at least one size stock > 0
+    products = products.filter(color_variants__size_stocks__quantity__gt=0).distinct()
 
     query = request.GET.get('search', '').strip()
     if query:
@@ -298,12 +290,12 @@ def user_product_list(request):
     brand_id = request.GET.get('brand')
     size_list = request.GET.getlist('size')
     color_list = request.GET.getlist('color')
-    price_min = request.GET.get('price_min', min_price)
-    price_max = request.GET.get('price_max', max_price)
+    price_min_str = request.GET.get('price_min', '')
+    price_max_str = request.GET.get('price_max', '')
 
     try:
-        price_min = float(price_min) if price_min else min_price
-        price_max = float(price_max) if price_max else max_price
+        price_min = float(price_min_str) if price_min_str else min_price
+        price_max = float(price_max_str) if price_max_str else max_price
     except ValueError:
         price_min, price_max = min_price, max_price
 
@@ -350,12 +342,13 @@ def user_product_list(request):
         'selected_colors': color_list,
         'price_min': price_min,
         'price_max': price_max,
+        'price_min_input': price_min_str,
+        'price_max_input': price_max_str,
         'sort_by': sort_by,
         'min_price': min_price,
         'max_price': max_price,
     }
     return render(request, 'user_product_list.html', context)
-
 
 
 @login_required(login_url='user_login')
@@ -714,50 +707,59 @@ def get_sizes(request, color_variant_id):
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
-@no_cache_view
 @never_cache
 def cart_view(request):
     cart = Cart.objects.filter(user=request.user).first()
-    cart_items = cart.items.select_related('product', 'color_variant', 'size_stock').prefetch_related(
-        'product__color_variants__images',
-        'product__color_variants__size_stocks'
-    ).all() if cart else []
+    cart_items = (
+        cart.items
+        .select_related('product', 'color_variant', 'size_stock')
+        .prefetch_related('product__color_variants__images')
+        if cart else []
+    )
 
-    total_subtotal = Decimal('0')  
-    total_discount = Decimal('0')
+    total_subtotal = Decimal('0.00')
+    total_discount = Decimal('0.00')
+    TAX_RATE = Decimal('0.05')
     has_unavailable_items = False
-    taxes = Decimal('0')
-    TAX_RATE = Decimal('0.05')  
 
     for item in cart_items:
-        item.subtotal = item.quantity * item.product.price
+        product = item.product
+
+        # Always use the original price for subtotal
+        item_unit_price = product.price
+        item.subtotal = item_unit_price * item.quantity
         total_subtotal += item.subtotal
-        item.color_variant = item.color_variant
-        item.image = item.color_variant.images.first().image.url if item.color_variant.images.exists() else item.product.thumbnail.url if item.product.thumbnail else ''
-        item.size_stock = item.size_stock
+
+        # Calculate savings based on offers/discounts
+        item_unit_savings = product.get_savings()  # price - final_price
+        item.savings = item_unit_savings * item.quantity
+        total_discount += item.savings
+
+        # Image and availability
+        item.image = (
+            item.color_variant.images.first().image.url
+            if item.color_variant and item.color_variant.images.exists()
+            else product.thumbnail.url if product.thumbnail else ''
+        )
         item.stock = item.size_stock.quantity
         item.max_quantity = min(item.stock, 5)
         item.size_display = item.size_stock.get_size_display()
 
-        if (item.product.is_deleted or not item.product.is_active or 
-            item.product.category.is_deleted or not item.product.category.is_active or 
-            item.quantity > item.stock):
+        # Availability check
+        if (
+            product.is_deleted or not product.is_active or
+            product.category.is_deleted or not product.category.is_active or
+            item.quantity > item.stock
+        ):
             has_unavailable_items = True
             item.is_available = False
         else:
             item.is_available = True
 
-        if item.product.discount_price and item.product.discount_price < item.product.price:
-            item_savings = (item.product.price - item.product.discount_price) * item.quantity
-            item.savings = item_savings
-            total_discount += item.savings
-        else:
-            item.savings = Decimal('0')
-
+    # Totals
     taxable_amount = total_subtotal - total_discount
     taxes = taxable_amount * TAX_RATE
     final_total = taxable_amount + taxes
-
 
     return render(request, 'cart.html', {
         'cart_items': cart_items,
@@ -768,64 +770,60 @@ def cart_view(request):
         'has_unavailable_items': has_unavailable_items,
     })
 
-
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
+@require_http_methods(["POST"])
 def update_cart_quantity(request, cart_item_id):
     cart_item = get_object_or_404(CartItem, id=cart_item_id, cart__user=request.user)
-    
-    if request.method == 'POST':
-        action = request.POST.get('action')
-        try:
-            stock_entry = cart_item.size_stock
-            max_quantity = min(stock_entry.quantity, 5)
-        except ProductSizeStock.DoesNotExist:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'message': 'Selected size stock not found.'}, status=400)
-            messages.error(request, "Selected size stock not found.")
-            return redirect('cart_view')
+    action = request.POST.get('action')
 
-        new_quantity = cart_item.quantity
-        if action == 'increment' and cart_item.quantity < max_quantity:
-            new_quantity = cart_item.quantity + 1
-            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color_variant.name}, {stock_entry.get_size_display()}).")
-        elif action == 'decrement' and cart_item.quantity > 1:
-            new_quantity = cart_item.quantity - 1
-            messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color_variant.name}, {stock_entry.get_size_display()}).")
-        else:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'success': False, 'message': f"Cannot update quantity. Max limit: {max_quantity} or minimum reached."}, status=400)
-            messages.warning(request, f"Cannot update quantity. Max limit: {max_quantity} or minimum reached.")
-            return redirect('cart_view')
+    stock_entry = cart_item.size_stock
+    max_quantity = min(stock_entry.quantity, 5)
 
-        cart_item.quantity = new_quantity
-        cart_item.save()
-        subtotal = new_quantity * cart_item.product.price
-        savings = (cart_item.product.price - (cart_item.product.discount_price or cart_item.product.price)) * new_quantity if cart_item.product.discount_price and cart_item.product.discount_price < cart_item.product.price else Decimal('0')
-        cart = cart_item.cart
-        cart_items = cart.items.select_related('product', 'size_stock').all()
-        new_cart_total = sum(item.quantity * item.product.price for item in cart_items)  
-        new_total_discount = sum((item.product.price - (item.product.discount_price or item.product.price)) * item.quantity for item in cart_items if item.product.discount_price and item.product.discount_price < item.product.price)
-        new_taxes = new_cart_total * Decimal('0.05')
-        new_total = new_cart_total + new_taxes - new_total_discount
-
+    if action == 'increment' and cart_item.quantity < max_quantity:
+        cart_item.quantity += 1
+        messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color_variant.name}, {stock_entry.get_size_display()}).")
+    elif action == 'decrement' and cart_item.quantity > 1:
+        cart_item.quantity -= 1
+        messages.success(request, f"Quantity updated for {cart_item.product.name} ({cart_item.color_variant.name}, {stock_entry.get_size_display()}).")
+    else:
+        msg = f"Cannot update quantity. Max limit: {max_quantity} or minimum reached."
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            storage = get_messages(request)
-            message = storage._queued_messages[-1].message if storage._queued_messages else ''
-            return JsonResponse({
-                'success': True,
-                'quantity': new_quantity,
-                'subtotal': float(subtotal),
-                'savings': float(savings),
-                'cart_total': float(new_cart_total),
-                'total_discount': float(new_total_discount),
-                'taxes': float(new_taxes),
-                'total': float(new_total),
-                'message': message
-            })
+            return JsonResponse({'success': False, 'message': msg}, status=400)
+        messages.warning(request, msg)
         return redirect('cart_view')
-    
+
+    cart_item.save()
+
+    # Recalculate using product's offer logic
+    cart = cart_item.cart
+    cart_items = cart.items.select_related('product', 'size_stock').all()
+
+    total_subtotal = sum(item.product.price * item.quantity for item in cart_items)
+    total_discount = sum(item.product.get_savings() * item.quantity for item in cart_items)
+    taxable_amount = total_subtotal - total_discount
+    taxes = taxable_amount * Decimal('0.05')
+    total = taxable_amount + taxes
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        storage = messages.get_messages(request)
+        message = ''
+        for msg in storage:
+            message = msg.message  # Get the last message
+        return JsonResponse({
+            'success': True,
+            'quantity': cart_item.quantity,
+            'cart_total': float(total_subtotal),
+            'total_discount': float(total_discount),
+            'taxes': float(taxes),
+            'total': float(total),
+            'message': message
+        })
+
+    return redirect('cart_view')
+
+
 
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
@@ -998,15 +996,16 @@ def checkout_view(request):
     coupon_discount = Decimal('0')
 
     for item in cart_items:
-        original_price = Decimal(str(item.product.price))
-        discount_price = Decimal(str(item.product.discount_price)) if item.product.discount_price and item.product.discount_price < original_price else original_price
+        # Updated: Use dynamic final_price and savings (includes offers)
+        unit_price = item.product.price
+        unit_savings = item.product.get_savings()
         quantity = item.quantity
-        item_total = original_price * quantity
-        item_discount = (original_price - discount_price) * quantity
+        item_total = unit_price * quantity
+        item_discount = unit_savings * quantity
         subtotal += item_total
         total_discount += item_discount
         total_quantity += quantity
-        logger.debug(f"Item: {item.product.name}, Original: {original_price}, Discount: {discount_price}, Qty: {quantity}, Item Total: {item_total}, Item Discount: {item_discount}")
+        logger.debug(f"Item: {item.product.name}, Final Price: {unit_price}, Savings: {unit_savings}, Qty: {quantity}, Item Total: {item_total}, Item Discount: {item_discount}")
 
     shipping_cost = Decimal('0')
     taxable_amount = subtotal - total_discount  
@@ -1074,6 +1073,7 @@ def checkout_view(request):
 @login_required(login_url='user_login')
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
+@require_http_methods(["POST"])
 def apply_coupon(request):
     if request.method == 'POST':
         coupon_code = request.POST.get('coupon_code', '').strip()
@@ -1084,14 +1084,18 @@ def apply_coupon(request):
         try:
             cart = Cart.objects.get(user=user)
             cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
+            
+            # Updated: Recalculate subtotal with dynamic offers
             subtotal = Decimal('0')
+            total_discount = Decimal('0')
             for item in cart_items:
-                original_price = Decimal(str(item.product.price))
-                discount_price = Decimal(str(item.product.discount_price)) if item.product.discount_price and item.product.discount_price < original_price else original_price
+                unit_price = item.product.price
+                unit_savings = item.product.get_savings()
                 quantity = item.quantity
-                item_total = original_price * quantity
-                subtotal += item_total
-            logger.debug(f"Subtotal in apply_coupon: {subtotal}")
+                subtotal += unit_price * quantity
+                total_discount += unit_savings * quantity
+            taxable_amount = subtotal - total_discount
+            logger.debug(f"Taxable Amount in apply_coupon: {taxable_amount}")
 
             coupon = Coupon.objects.get(
                 code=coupon_code,
@@ -1106,7 +1110,7 @@ def apply_coupon(request):
 
             min_order_amount = Decimal(str(coupon.minimum_order_amount))
             logger.debug(f"Minimum order amount: {min_order_amount}")
-            if min_order_amount > subtotal:
+            if min_order_amount > taxable_amount:
                 return JsonResponse({'success': False, 'message': 'Minimum order amount not met for this coupon.'})
 
             request.session['applied_coupon_id'] = coupon.id  
@@ -1136,6 +1140,7 @@ razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZOR
 @login_required(login_url='user_login')
 @never_cache
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@require_http_methods(["POST"])
 def place_order(request):
     if request.method != 'POST':
         return redirect('checkout')
@@ -1155,17 +1160,19 @@ def place_order(request):
         messages.error(request, "Your cart is empty.")
         return redirect('cart_view')
 
+    # Updated: Calculate with dynamic offers
     subtotal = Decimal('0.00')
     product_discount = Decimal('0.00')
     coupon_discount = Decimal('0.00')
     applied_coupon = None
 
     for item in cart_items:
-        original_price = Decimal(str(item.product.price))
-        item_discount_price = Decimal(str(item.product.discount_price)) if item.product.discount_price and item.product.discount_price < original_price else original_price
-        subtotal += original_price * item.quantity
-        product_discount += (original_price - item_discount_price) * item.quantity
-        logger.debug(f"Item: {item.product.name}, Price: {original_price}, Qty: {item.quantity}, Subtotal: {original_price * item.quantity}, Discount: {(original_price - item_discount_price) * item.quantity}")
+        unit_price = item.product.price
+        unit_savings = item.product.get_savings()
+        quantity = item.quantity
+        subtotal += unit_price * quantity
+        product_discount += unit_savings * quantity
+        logger.debug(f"Item: {item.product.name}, Final Price: {unit_price}, Savings: {unit_savings}, Qty: {quantity}, Subtotal: {unit_price * quantity}, Discount: {unit_savings * quantity}")
 
     if 'applied_coupon_id' in request.session:
         try:
@@ -1230,14 +1237,16 @@ def place_order(request):
                 size_stock.quantity -= item.quantity
                 size_stock.save(update_fields=['quantity'])
 
+                # Updated: Store dynamic final_price as price, original as reference
+                final_price = item.product.get_final_price()
                 OrderItem.objects.create(
                     order=order,
                     product=item.product,
                     color_variant=item.color_variant,
                     size=size_stock.size,
                     quantity=item.quantity,
-                    price=item.product.discount_price or item.product.price,
-                    discount_price=item.product.discount_price,
+                    price=item.product.price,  # Original for reference
+                    discount_price=final_price,  # Offer-applied as discount_price
                     payment_status=initial_payment_status
                 )
 
