@@ -116,6 +116,8 @@ class Order(models.Model):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     cancel_reason = models.TextField(blank=True, null=True)
     return_reason = models.TextField(blank=True, null=True)
+    coupon_code = models.CharField(max_length=20, blank=True, null=True)
+    coupon_discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
         return f"Order {self.order_id}"

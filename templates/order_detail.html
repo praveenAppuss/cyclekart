@@ -168,7 +168,10 @@
                 <h4 class="font-semibold text-lg mb-2">Order Summary</h4>
                 <div class="text-sm text-gray-700 space-y-1">
                     <div class="flex justify-between"><span>Subtotal</span><span>₹{{ subtotal|floatformat:2 }}</span></div>
-                    <div class="flex justify-between text-green-600"><span>Discount</span><span>- ₹{{ discount|floatformat:2 }}</span></div>
+                    <div class="flex justify-between text-green-600"><span>Product Discount</span><span>- ₹{{ product_discount|floatformat:2 }}</span></div>
+                    {% if coupon_discount > 0 %}
+                    <div class="flex justify-between text-green-600"><span>Coupon Discount</span><span>- ₹{{ coupon_discount|floatformat:2 }}</span></div>
+                    {% endif %}
                     <div class="flex justify-between"><span>Tax</span><span>₹{{ tax|floatformat:2 }}</span></div>
                     <div class="flex justify-between"><span>Shipping</span><span>₹{{ shipping|floatformat:2 }}</span></div>
                     <hr class="my-1">

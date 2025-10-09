@@ -1,0 +1,155 @@
+{% extends 'admin_base.html' %}
+{% load static %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-100 px-6 py-8">
+    <div class="max-w-7xl mx-auto">
+        
+        <!-- Page Header -->
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-semibold text-gray-800">Sales Report</h2>
+            <a href="{% url 'download_sales_report_csv' %}?{{ request.GET.urlencode }}"
+               class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg shadow-sm transition">
+               Download CSV
+            </a>
+        </div>
+
+        <!-- Errors if any -->
+        {% if errors.date %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                {{ errors.date }}
+            </div>
+        {% endif %}
+
+        <!-- Filters -->
+        <form method="get" class="bg-white rounded-xl shadow p-4 mb-6 flex flex-wrap items-center gap-4">
+            <div>
+                <label class="text-sm text-gray-700 font-medium">Filter</label>
+                <select name="filter" id="filterSelect" onchange="toggleDateRange(this.value)"
+                        class="ml-2 border rounded-md text-sm px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="today" {% if filter_type == 'today' %}selected{% endif %}>Today</option>
+                    <option value="week" {% if filter_type == 'week' %}selected{% endif %}>Last 7 Days</option>
+                    <option value="month" {% if filter_type == 'month' %}selected{% endif %}>This Month</option>
+                    <option value="year" {% if filter_type == 'year' %}selected{% endif %}>This Year</option>
+                    <option value="custom" {% if filter_type == 'custom' %}selected{% endif %}>Custom Range</option>
+                </select>
+            </div>
+
+            <div id="dateRange" class="flex items-center gap-2 {% if filter_type != 'custom' %}hidden{% endif %}">
+                <label class="text-sm text-gray-700 font-medium">From:</label>
+                <input type="date" name="from_date" value="{{ from_date }}"
+                       class="border rounded-md text-sm px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                <label class="text-sm text-gray-700 font-medium">To:</label>
+                <input type="date" name="to_date" value="{{ to_date }}"
+                       class="border rounded-md text-sm px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400">
+            </div>
+
+            <button type="submit"
+                    class="bg-gray-800 hover:bg-gray-900 text-white text-sm px-4 py-2 rounded-md transition">
+                Apply Filter
+            </button>
+        </form>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+            <div class="bg-white shadow rounded-lg p-4 border-l-4 border-blue-500">
+                <p class="text-sm text-gray-500">Item Sales</p>
+                <h3 class="text-xl font-bold text-gray-800 mt-1">₹{{ total_item_sales|floatformat:2 }}</h3>
+            </div>
+            <div class="bg-white shadow rounded-lg p-4 border-l-4 border-green-500">
+                <p class="text-sm text-gray-500">Total Orders</p>
+                <h3 class="text-xl font-bold text-gray-800 mt-1">{{ total_orders }}</h3>
+            </div>
+            <div class="bg-white shadow rounded-lg p-4 border-l-4 border-yellow-500">
+                <p class="text-sm text-gray-500">Total Quantity Sold</p>
+                <h3 class="text-xl font-bold text-gray-800 mt-1">{{ total_qty }}</h3>
+            </div>
+            <div class="bg-white shadow rounded-lg p-4 border-l-4 border-red-500">
+                <p class="text-sm text-gray-500">Overall Discount</p>
+                <h3 class="text-xl font-bold text-gray-800 mt-1">₹{{ total_discount|floatformat:2 }}</h3>
+            </div>
+            <div class="bg-white shadow rounded-lg p-4 border-l-4 border-indigo-500">
+                <p class="text-sm text-gray-500">Final Amount</p>
+                <h3 class="text-xl font-bold text-gray-800 mt-1">₹{{ total_order_amount|floatformat:2 }}</h3>
+            </div>
+        </div>
+
+        <!-- Sales Table -->
+        <div class="bg-white rounded-xl shadow overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-gray-700">
+                    <thead class="bg-gray-100 text-gray-700 text-left">
+                        <tr>
+                            <th class="px-4 py-3 font-medium">Date</th>
+                            <th class="px-4 py-3 font-medium">Order ID</th>
+                            <th class="px-4 py-3 font-medium">User</th>
+                            <th class="px-4 py-3 font-medium text-center">Items</th>
+                            <th class="px-4 py-3 font-medium">Coupon</th>
+                            <th class="px-4 py-3 font-medium text-right">Discount</th>
+                            <th class="px-4 py-3 font-medium text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                            <tr class="border-b hover:bg-gray-50 transition">
+                                <td class="px-4 py-3">{{ order.created_at|date:"M d, Y" }}</td>
+                                <td class="px-4 py-3">{{ order.order_id }}</td>
+                                <td class="px-4 py-3">{{ order.user.username }}</td>
+                                <td class="px-4 py-3 text-center">{{ order.items.count }}</td>
+                                <td class="px-4 py-3">-</td>
+                                <td class="px-4 py-3 text-right">₹{{ order.discount|floatformat:2 }}</td>
+                                <td class="px-4 py-3 text-right font-medium">₹{{ order.total_amount|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-gray-500 py-6">No sales data found for this period.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="mt-6 flex justify-center">
+            <nav class="inline-flex rounded-md shadow">
+                {% if page_obj.has_previous %}
+                <a href="?page=1&{{ request.GET.urlencode }}" class="px-3 py-2 bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 rounded-l-md">First</a>
+                <a href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}" class="px-3 py-2 bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">Previous</a>
+                {% else %}
+                <span class="px-3 py-2 bg-white border border-gray-300 text-gray-300 rounded-l-md">First</span>
+                <span class="px-3 py-2 bg-white border border-gray-300 text-gray-300">Previous</span>
+                {% endif %}
+
+                <span class="px-3 py-2 bg-white border border-gray-300 text-gray-700">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}" class="px-3 py-2 bg-white border border-gray-300 text-gray-500 hover:bg-gray-50">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}&{{ request.GET.urlencode }}" class="px-3 py-2 bg-white border border-gray-300 text-gray-500 hover:bg-gray-50 rounded-r-md">Last</a>
+                {% else %}
+                <span class="px-3 py-2 bg-white border border-gray-300 text-gray-300">Next</span>
+                <span class="px-3 py-2 bg-white border border-gray-300 text-gray-300 rounded-r-md">Last</span>
+                {% endif %}
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleDateRange(value) {
+    const dateRange = document.getElementById('dateRange');
+    dateRange.classList.toggle('hidden', value !== 'custom');
+}
+
+// Show range if custom selected
+window.addEventListener('load', () => {
+    const filter = document.getElementById('filterSelect').value;
+    toggleDateRange(filter);
+});
+</script>
+{% endblock %}

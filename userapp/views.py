@@ -1219,7 +1219,9 @@ def place_order(request):
                 payment_method=payment_method,
                 order_id=unique_order_id,
                 subtotal=subtotal,
-                discount=product_discount + coupon_discount,  
+                discount=product_discount,
+                coupon_discount=coupon_discount,
+                coupon_code=applied_coupon.code if applied_coupon else None,
                 tax=tax,
                 shipping_cost=shipping_cost,
                 total_amount=total_amount,
@@ -1429,8 +1431,7 @@ def payment_handler(request):
     logger.warning("Invalid request method for payment_handler")
     return JsonResponse({"status": "failed", "redirect_url": reverse('payment_failed')})
 
-def order_failed(request):
-    return render(request, 'order_failed.html')
+
 
 
 def payment_failed(request):
@@ -1544,7 +1545,7 @@ def order_detail(request, order_id):
     order = get_object_or_404(Order, id=order_id, user=request.user)
     items = order.items.select_related('product').all()
     subtotal = Decimal('0.00')
-    total_discount = Decimal('0.00')
+    product_discount = Decimal('0.00')
     total_quantity = 0
 
     for item in items:
@@ -1556,13 +1557,13 @@ def order_detail(request, order_id):
         item_discount = (original_price - discount_price) * quantity if discount_price else Decimal('0.00')
 
         subtotal += item_total
-        total_discount += item_discount
+        product_discount += item_discount
         total_quantity += quantity
 
-    
     shipping_cost = order.shipping_cost
     taxes = order.tax
     final_total = order.total_amount
+    coupon_discount = order.coupon_discount
 
     steps = ["Pending", "Confirmed", "Shipped", "Out for Delivery", "Delivered", "Returned", "Cancelled"]
     status_map = ["pending", "confirmed", "shipped", "out_for_delivery", "delivered", "returned", "cancelled"]
@@ -1581,8 +1582,9 @@ def order_detail(request, order_id):
     context = {
         'order': order,
         'items': items,
-        'subtotal': order.subtotal,
-        'discount': order.discount,
+        'subtotal': subtotal,
+        'product_discount': product_discount,
+        'coupon_discount': coupon_discount,
         'tax': taxes,
         'shipping': shipping_cost,
         'grand_total': final_total,
@@ -1592,8 +1594,6 @@ def order_detail(request, order_id):
         'order_status_lower': order.status.lower(),
     }
     return render(request, 'order_detail.html', context)
-
-
 
 
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
@@ -1622,6 +1622,11 @@ def cancel_order(request, order_id):
                     return redirect('order_detail', order_id=order.id)
 
             refund_amount = Decimal('0.00')
+            total_net_before_coupon = sum(
+                ((oi.discount_price if oi.discount_price else oi.price) * oi.quantity)
+                for oi in order.items.all()
+            )
+            total_after_discounts = order.subtotal - order.discount - order.coupon_discount
 
             for item in items_to_cancel:
                 item.status = 'cancelled'
@@ -1646,17 +1651,17 @@ def cancel_order(request, order_id):
                 else:
                     logger.warning(f"Skipping stock update for item {item.id}: missing variant/size data.")
 
-                item_price = (item.discount_price or item.price) * item.quantity
-                total_items_price = sum((oi.discount_price or oi.price) * oi.quantity for oi in order.items.all())
-                tax_amount = Decimal('0.00')
-                if order.tax and total_items_price > 0:
-                    tax_amount = (item_price / total_items_price) * order.tax
-                refund_amount += item_price + tax_amount
+                item_net_before_coupon = (item.discount_price if item.discount_price else item.price) * item.quantity
+                item_coupon_share = order.coupon_discount * (item_net_before_coupon / total_net_before_coupon) if total_net_before_coupon > 0 else Decimal('0.00')
+                item_effective = item_net_before_coupon - item_coupon_share
+                item_tax_share = order.tax * (item_effective / total_after_discounts) if total_after_discounts > 0 else Decimal('0.00')
+                refund_amount += item_effective + item_tax_share
 
             if not order.items.filter(status='active').exists():
                 order.status = 'cancelled'
                 order.cancelled_at = timezone.now()
                 order.cancel_reason = reason if reason else None
+                refund_amount += order.shipping_cost
                 order.save()
                 logger.info(f"Order {order.order_id} status updated to 'cancelled'")
             else:

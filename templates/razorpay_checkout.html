@@ -4,11 +4,19 @@
     <meta charset="UTF-8">
     <title>Razorpay Payment</title>
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f8f9fa; }
+        #container { text-align: center; }
+        #error-message { color: red; }
+        #status-message { color: blue; }
+    </style>
 </head>
 <body>
-    <h2>Processing Payment for Order {{ order.order_id }}...</h2>
-    <div id="error-message" style="color: red; display: none;"></div>
-    <div id="status-message" style="color: blue;"></div>
+    <div id="container">
+        <h2 id="processing-text">Processing Payment for Order {{ order.order_id }}...</h2>
+        <div id="error-message" style="display: none;"></div>
+        <div id="status-message"></div>
+    </div>
 
     <script>
         console.log("Order ID available:", "{{ order.id }}"); 
@@ -68,8 +76,10 @@
             },
             "modal": {
                 "ondismiss": function() {
-                    console.log("Modal dismissed, reason:", rzp.getDismissReason());
-                    document.getElementById("error-message").textContent = "Payment cancelled or timed out. Redirecting...";
+                    console.log("Modal dismissed");
+                    // Removed invalid getDismissReason() to prevent errors
+                    document.getElementById("processing-text").style.display = "none";  // Hide processing text
+                    document.getElementById("error-message").textContent = "Payment cancelled or timed out. Redirecting to payment failed...";
                     document.getElementById("error-message").style.display = "block";
                     setTimeout(() => {
                         window.location.href = "{% url 'payment_failed' %}";
@@ -85,6 +95,7 @@
 
         rzp.on('payment.failed', function (response) {
             console.error("Payment failed event:", response.error);
+            document.getElementById("processing-text").style.display = "none";
             document.getElementById("error-message").textContent = `Payment failed: ${response.error.description}. Redirecting...`;
             document.getElementById("error-message").style.display = "block";
             setTimeout(() => {
@@ -93,6 +104,10 @@
         });
 
         rzp.open();
+        // Hide processing text after modal opens (give it a second to load)
+        setTimeout(() => {
+            document.getElementById("processing-text").style.display = "none";
+        }, 1000);
     </script>
 </body>
 </html>

@@ -1,6 +1,9 @@
-from datetime import datetime
+import csv
+from datetime import datetime, timedelta
 from decimal import Decimal
 import re
+from django.forms import DecimalField
+from django.db.models import Sum, F, ExpressionWrapper
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login,logout
 from django.views.decorators.cache import never_cache
@@ -19,7 +22,7 @@ import uuid
 from django.core.files.base import ContentFile
 import logging
 from django.db import transaction
-from django.http import HttpResponseBadRequest, HttpResponseServerError
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
 from django.utils import timezone
 import logging
 
@@ -872,21 +875,23 @@ def return_accept(request, item_id):
             item.save()
 
             if order.payment_status == 'paid':
-                item_price = (item.discount_price or item.price) * item.quantity
-                total_items_price = sum(
-                    (oi.discount_price or oi.price) * oi.quantity
+                total_net_before_coupon = sum(
+                    ((oi.discount_price if oi.discount_price else oi.price) * oi.quantity)
                     for oi in order.items.all()
                 )
+                item_net_before_coupon = (item.discount_price if item.discount_price else item.price) * item.quantity
+                item_coupon_share = order.coupon_discount * (item_net_before_coupon / total_net_before_coupon) if total_net_before_coupon > 0 else Decimal('0.00')
+                item_effective = item_net_before_coupon - item_coupon_share
 
-                tax_amount = Decimal('0.00')
-                if order.tax and total_items_price > 0:
-                    tax_amount = (item_price / total_items_price) * order.tax
+                total_after_discounts = order.subtotal - order.discount - order.coupon_discount
+                tax_amount = order.tax * (item_effective / total_after_discounts) if total_after_discounts > 0 else Decimal('0.00')
 
                 shipping_amount = Decimal('0.00')
-                if order.shipping_cost and not order.items.exclude(status='return_accepted').exists():
+                all_items_returned = not order.items.filter(status__in=['active', 'return_requested']).exists()
+                if all_items_returned:
                     shipping_amount = order.shipping_cost
 
-                refund_amount = item_price + tax_amount + shipping_amount                
+                refund_amount = item_effective + tax_amount + shipping_amount                
                 wallet, _ = Wallet.objects.get_or_create(user=order.user)
 
                 # Generate unique transaction ID
@@ -1512,3 +1517,176 @@ def delete_category_offer(request, offer_id):
         messages.success(request, f'Category offer "{offer.name}" deleted successfully.')
         return redirect('offers_list')
     return redirect('offers_list')
+
+
+# ----------------------Sales Report---------------------------------#
+from django.db import models
+
+@superuser_required
+def sales_report(request):
+    errors = {}
+    now = timezone.now()
+    today = now.date()
+    filter_type = request.GET.get('filter', 'month')
+    from_date_str = request.GET.get('from_date')
+    to_date_str = request.GET.get('to_date')
+
+    start_date = None
+    end_date = today
+
+    if filter_type == 'today':
+        start_date = today
+        end_date = today
+    elif filter_type == 'week':
+        start_date = today - timedelta(days=7)
+        end_date = today
+    elif filter_type == 'month':
+        start_date = today.replace(day=1)
+        end_date = today
+    elif filter_type == 'year':
+        start_date = today.replace(month=1, day=1)
+        end_date = today
+    elif filter_type == 'custom':
+        if from_date_str and to_date_str:
+            try:
+                start_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
+                end_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
+                if end_date < start_date:
+                    errors['date'] = 'End date cannot be earlier than start date.'
+            except ValueError:
+                errors['date'] = 'Invalid date format. Use YYYY-MM-DD.'
+        else:
+            errors['date'] = 'Please provide both start and end dates for custom filter.'
+
+    if errors:
+        context = {
+            'errors': errors,
+            'filter_type': filter_type,
+            'from_date': from_date_str,
+            'to_date': to_date_str,
+            'orders': [],
+            'total_order_amount': Decimal('0.00'),
+            'total_item_sales': Decimal('0.00'),
+            'total_discount': Decimal('0.00'),
+            'total_orders': 0,
+            'total_qty': 0,
+        }
+        return render(request, 'sales_report.html', context)
+
+    # Filter orders: delivered and paid
+    orders_queryset = Order.objects.filter(
+        status='delivered',
+        payment_status='paid',
+        created_at__date__range=(start_date, end_date)
+    ).order_by('-created_at')
+
+    # Aggregates
+    total_orders = orders_queryset.count()
+    total_order_amount = orders_queryset.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    total_discount = orders_queryset.aggregate(discount=Sum('coupon_discount'))['discount'] or Decimal('0.00')
+
+    # Order items for quantity and item sales
+    order_items_qs = OrderItem.objects.filter(
+        order__in=orders_queryset,
+        status='active'  # Only active items, exclude cancelled/returned
+    )
+    total_qty = order_items_qs.aggregate(qty=Sum('quantity'))['qty'] or 0
+    total_item_sales = order_items_qs.annotate(
+        total_price=ExpressionWrapper(F('quantity') * F('price'), output_field=models.DecimalField(max_digits=12, decimal_places=2))
+    ).aggregate(sales=Sum('total_price'))['sales'] or Decimal('0.00')
+
+    # Pagination
+    paginator = Paginator(orders_queryset, 10)  # 10 orders per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'page_obj': page_obj,
+        'orders': page_obj,  # For template looping
+        'total_order_amount': total_order_amount,
+        'total_item_sales': total_item_sales,
+        'total_discount': total_discount,
+        'total_orders': total_orders,
+        'total_qty': total_qty,
+        'filter_type': filter_type,
+        'from_date': from_date_str if filter_type == 'custom' else (start_date.strftime('%Y-%m-%d') if start_date else ''),
+        'to_date': to_date_str if filter_type == 'custom' else (end_date.strftime('%Y-%m-%d') if end_date else ''),
+        'errors': errors,
+    }
+
+    return render(request, 'sales_report.html', context)
+
+
+@superuser_required
+def download_sales_report_csv(request):
+    now = timezone.now()
+    today = now.date()
+    filter_type = request.GET.get('filter', 'month')
+    from_date_str = request.GET.get('from_date')
+    to_date_str = request.GET.get('to_date')
+
+    start_date = None
+    end_date = today
+
+    if filter_type == 'today':
+        start_date = today
+        end_date = today
+    elif filter_type == 'week':
+        start_date = today - timedelta(days=7)
+        end_date = today
+    elif filter_type == 'month':
+        start_date = today.replace(day=1)
+        end_date = today
+    elif filter_type == 'year':
+        start_date = today.replace(month=1, day=1)
+        end_date = today
+    elif filter_type == 'custom' and from_date_str and to_date_str:
+        try:
+            start_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            start_date = end_date = today  # Fallback
+
+    orders_queryset = Order.objects.filter(
+        status='delivered',
+        payment_status='paid',
+        created_at__date__range=(start_date, end_date)
+    ).order_by('-created_at')
+
+    # Aggregates for summary
+    total_orders = orders_queryset.count()
+    total_order_amount = orders_queryset.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    total_discount = orders_queryset.aggregate(discount=Sum('coupon_discount'))['discount'] or Decimal('0.00')
+    order_items_qs = OrderItem.objects.filter(order__in=orders_queryset, status='active')
+    total_qty = order_items_qs.aggregate(qty=Sum('quantity'))['qty'] or 0
+    total_item_sales = order_items_qs.annotate(
+        total_price=ExpressionWrapper(F('quantity') * F('price'), output_field=models.DecimalField(max_digits=12, decimal_places=2))
+    ).aggregate(sales=Sum('total_price'))['sales'] or Decimal('0.00')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="sales_report.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Sales Report'])
+    writer.writerow(['Filter', filter_type])
+    writer.writerow(['Date Range', f'{start_date} to {end_date}'])
+    writer.writerow([])
+    writer.writerow(['Summary'])
+    writer.writerow(['Total Orders', total_orders])
+    writer.writerow(['Total Quantity Sold', total_qty])
+    writer.writerow(['Total Item Sales', f'₹{total_item_sales}'])
+    writer.writerow(['Total Coupon Discount', f'₹{total_discount}'])
+    writer.writerow(['Total Order Amount', f'₹{total_order_amount}'])
+    writer.writerow([])
+    writer.writerow(['Order ID', 'Date', 'User', 'Total Amount', 'Coupon Discount'])
+
+    for order in orders_queryset:
+        writer.writerow([
+            order.order_id,
+            order.created_at.strftime('%Y-%m-%d'),
+            order.user.username,
+            f'₹{order.total_amount}',
+            f'₹{order.coupon_discount or Decimal("0.00")}'
+        ])
+
+    return response
