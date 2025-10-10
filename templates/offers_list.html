@@ -53,10 +53,14 @@
           <tr>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ offer.name }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm">
-              {% if offer.is_currently_active %}
+              {% if offer.is_active and offer.valid_from <= now and offer.valid_to >= now %}
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+              {% elif offer.is_active and offer.valid_to < now %}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Expired</span>
+              {% elif offer.is_active and offer.valid_from > now %}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Upcoming</span>
               {% else %}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Disabled</span>
               {% endif %}
             </td>
             <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">
@@ -68,7 +72,7 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ offer.discount_percentage }}%</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ offer.valid_from|date:"M d, Y H:i" }} – {{ offer.valid_to|date:"M d, Y H:i" }}
+              {{ offer.valid_from|date:"M d, Y" }} – {{ offer.valid_to|date:"M d, Y" }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
               <a href="{% url 'edit_product_offer' offer.id %}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
@@ -76,6 +80,9 @@
                 {% csrf_token %}
                 <button type="submit" class="text-red-600 hover:text-red-900 border-none bg-transparent cursor-pointer">Delete</button>
               </form>
+              <a href="{% url 'toggle_product_offer' offer.id %}" class="text-{% if offer.is_active %}red{% else %}green{% endif %}-600 hover:text-{% if offer.is_active %}red{% else %}green{% endif %}-800">
+                {% if offer.is_active %}Disable{% else %}Enable{% endif %}
+              </a>
             </td>
           </tr>
           {% empty %}
@@ -117,10 +124,14 @@
           <tr>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ offer.name }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm">
-              {% if offer.is_currently_active %}
+              {% if offer.is_active and offer.valid_from <= now and offer.valid_to >= now %}
                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+              {% elif offer.is_active and offer.valid_to < now %}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Expired</span>
+              {% elif offer.is_active and offer.valid_from > now %}
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Upcoming</span>
               {% else %}
-                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Inactive</span>
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Disabled</span>
               {% endif %}
             </td>
             <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">
@@ -132,7 +143,7 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ offer.discount_percentage }}%</td>
             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-              {{ offer.valid_from|date:"M d, Y H:i" }} – {{ offer.valid_to|date:"M d, Y H:i" }}
+              {{ offer.valid_from|date:"M d, Y" }} – {{ offer.valid_to|date:"M d, Y" }}
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
               <a href="{% url 'edit_category_offer' offer.id %}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
@@ -140,6 +151,9 @@
                 {% csrf_token %}
                 <button type="submit" class="text-red-600 hover:text-red-900 border-none bg-transparent cursor-pointer">Delete</button>
               </form>
+              <a href="{% url 'toggle_category_offer' offer.id %}" class="text-{% if offer.is_active %}red{% else %}green{% endif %}-600 hover:text-{% if offer.is_active %}red{% else %}green{% endif %}-800">
+                {% if offer.is_active %}Disable{% else %}Enable{% endif %}
+              </a>
             </td>
           </tr>
           {% empty %}
@@ -167,7 +181,13 @@
       showCancelButton: true,
       confirmButtonColor: '#ef4444',
       cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Yes, delete it!'
+      confirmButtonText: 'Yes, delete it!',
+      width: '300px',  // Smaller width for confirmation modal
+      padding: '0.5em',  // Reduced padding to decrease height
+      customClass: {
+        title: 'text-base',  // Smaller font for title
+        htmlContainer: 'text-sm'  // Smaller font for text
+      }
     }).then((result) => {
       if (result.isConfirmed) {
         form.submit();
@@ -186,13 +206,19 @@
       if (tags === 'success') {
         Swal.fire({
           icon: 'success',
-          title: 'Success!',
-          text: message,
+          title: message, // directly show the message as title
           toast: true,
           position: 'top-end',
           showConfirmButton: false,
-          timer: 3000,
-          timerProgressBar: true
+          timer: 2500,
+          timerProgressBar: true,
+          background: '#fff',
+          customClass: {
+            popup: 'shadow-md rounded-md',
+            title: 'text-sm font-medium text-gray-800'
+          },
+          width: 'fit-content',   // auto width based on content
+          padding: '0.6em'        // compact spacing
         });
       } else {
         // Show toast for error/warning/info

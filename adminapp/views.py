@@ -1161,6 +1161,15 @@ def toggle_coupon(request, coupon_id):
 
 
 #----------------------------------Offer Management----------------------------------------#
+import pytz
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.utils import timezone
+from datetime import datetime
+import re
+
+from .models import ProductOffer, CategoryOffer, Product, Category
+
 @superuser_required
 def list_offers(request):
     now = timezone.now()
@@ -1169,24 +1178,16 @@ def list_offers(request):
         is_deleted=False
     ).prefetch_related('products__category', 'products__brand', 'products').order_by('-created_at')
     
-    for offer in product_offers:
-        offer.is_currently_active = offer.is_active and offer.valid_from <= now <= offer.valid_to
-    
     category_offers = CategoryOffer.objects.filter(
         is_deleted=False
     ).prefetch_related('categories').order_by('-created_at')
-    
-    for offer in category_offers:
-        offer.is_currently_active = offer.is_active and offer.valid_from <= now <= offer.valid_to
 
     context = {
         'product_offers': product_offers,
         'category_offers': category_offers,
+        'now': now,
     }
     return render(request, 'offers_list.html', context)
-
-
-LOCAL_TZ = pytz.timezone('Asia/Kolkata')
 
 @superuser_required
 def add_product_offer(request):
@@ -1195,7 +1196,6 @@ def add_product_offer(request):
         discount_percentage_str = request.POST.get('discount_percentage')
         valid_from_str = request.POST.get('valid_from')
         valid_to_str = request.POST.get('valid_to')
-        is_active = 'is_active' in request.POST
         selected_product_ids = request.POST.getlist('products')  
 
         errors = []
@@ -1214,18 +1214,16 @@ def add_product_offer(request):
         if not valid_from_str or not valid_to_str:
             errors.append('Both valid from and valid to are required.')
         else:
+            date_format = '%Y-%m-%d'
             try:
-                naive_from = datetime.fromisoformat(valid_from_str)
-                naive_to = datetime.fromisoformat(valid_to_str)
-                valid_from = timezone.make_aware(naive_from, LOCAL_TZ)
-                valid_to = timezone.make_aware(naive_to, LOCAL_TZ)
-                valid_from = valid_from.astimezone(pytz.UTC)
-                valid_to = valid_to.astimezone(pytz.UTC)
-                
-                if valid_from >= valid_to:
+                valid_from_date = datetime.strptime(valid_from_str, date_format)
+                valid_to_date = datetime.strptime(valid_to_str, date_format)
+                valid_from = timezone.make_aware(valid_from_date)
+                valid_to = timezone.make_aware(valid_to_date)
+                if valid_to < valid_from:
                     errors.append("Valid 'to' must be after 'from'.")
             except ValueError:
-                errors.append('Invalid date/time format. Use YYYY-MM-DDTHH:MM.')
+                errors.append('Invalid date format (YYYY-MM-DD).')
 
         if len(selected_product_ids) == 0:
             errors.append('Select at least one product.')
@@ -1238,7 +1236,7 @@ def add_product_offer(request):
                 discount_percentage=discount_percentage,
                 valid_from=valid_from,
                 valid_to=valid_to,
-                is_active=is_active,
+                is_active=True,
                 is_deleted=False
             )
             selected_products = Product.objects.filter(
@@ -1253,7 +1251,6 @@ def add_product_offer(request):
     products = Product.objects.filter(is_active=True, is_deleted=False).order_by('name')
     return render(request, 'add_product_offer.html', {'products': products})
 
-
 @superuser_required
 def add_category_offer(request):
     if request.method == 'POST':
@@ -1261,7 +1258,6 @@ def add_category_offer(request):
         discount_percentage_str = request.POST.get('discount_percentage')
         valid_from_str = request.POST.get('valid_from')
         valid_to_str = request.POST.get('valid_to')
-        is_active = 'is_active' in request.POST
         selected_category_ids = request.POST.getlist('categories')
 
         errors = []
@@ -1280,18 +1276,16 @@ def add_category_offer(request):
         if not valid_from_str or not valid_to_str:
             errors.append('Both valid from and valid to are required.')
         else:
+            date_format = '%Y-%m-%d'
             try:
-                naive_from = datetime.fromisoformat(valid_from_str)
-                naive_to = datetime.fromisoformat(valid_to_str)
-                valid_from = timezone.make_aware(naive_from, LOCAL_TZ)
-                valid_to = timezone.make_aware(naive_to, LOCAL_TZ)
-                valid_from = valid_from.astimezone(pytz.UTC)
-                valid_to = valid_to.astimezone(pytz.UTC)
-                
-                if valid_from >= valid_to:
+                valid_from_date = datetime.strptime(valid_from_str, date_format)
+                valid_to_date = datetime.strptime(valid_to_str, date_format)
+                valid_from = timezone.make_aware(valid_from_date)
+                valid_to = timezone.make_aware(valid_to_date)
+                if valid_to < valid_from:
                     errors.append("Valid 'to' must be after 'from'.")
             except ValueError:
-                errors.append('Invalid date/time format. Use YYYY-MM-DDTHH:MM.')
+                errors.append('Invalid date format (YYYY-MM-DD).')
 
         if len(selected_category_ids) == 0:
             errors.append('Select at least one category.')
@@ -1304,7 +1298,7 @@ def add_category_offer(request):
                 discount_percentage=discount_percentage,
                 valid_from=valid_from,
                 valid_to=valid_to,
-                is_active=is_active,
+                is_active=True,
                 is_deleted=False
             )
             selected_categories = Category.objects.filter(
@@ -1319,7 +1313,6 @@ def add_category_offer(request):
     categories = Category.objects.filter(is_active=True, is_deleted=False).order_by('name')
     return render(request, 'add_category_offer.html', {'categories': categories})
 
-
 @superuser_required
 def edit_product_offer(request, offer_id):
     offer = get_object_or_404(ProductOffer, id=offer_id, is_deleted=False)
@@ -1329,7 +1322,6 @@ def edit_product_offer(request, offer_id):
         discount_percentage_str = request.POST.get('discount_percentage')
         valid_from_str = request.POST.get('valid_from')
         valid_to_str = request.POST.get('valid_to')
-        is_active = 'is_active' in request.POST
         selected_product_ids = request.POST.getlist('products')  
 
         errors = []
@@ -1348,34 +1340,30 @@ def edit_product_offer(request, offer_id):
         if not valid_from_str or not valid_to_str:
             errors.append('Both valid from and valid to are required.')
         else:
+            date_format = '%Y-%m-%d'
             try:
-                naive_from = datetime.fromisoformat(valid_from_str)
-                naive_to = datetime.fromisoformat(valid_to_str)
-                valid_from = timezone.make_aware(naive_from, LOCAL_TZ)
-                valid_to = timezone.make_aware(naive_to, LOCAL_TZ)
-                valid_from = valid_from.astimezone(pytz.UTC)
-                valid_to = valid_to.astimezone(pytz.UTC)
-                
-                if valid_from >= valid_to:
+                valid_from_date = datetime.strptime(valid_from_str, date_format)
+                valid_to_date = datetime.strptime(valid_to_str, date_format)
+                valid_from = timezone.make_aware(valid_from_date)
+                valid_to = timezone.make_aware(valid_to_date)
+                if valid_to < valid_from:
                     errors.append("Valid 'to' must be after 'from'.")
             except ValueError:
-                errors.append('Invalid date/time format. Use YYYY-MM-DDTHH:MM.')
+                errors.append('Invalid date format (YYYY-MM-DD).')
 
         if len(selected_product_ids) == 0:
             errors.append('Select at least one product.')
 
         if errors:
             messages.error(request, '<br>'.join(errors))  
-            local_from = offer.valid_from.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
-            local_to = offer.valid_to.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
             products = Product.objects.filter(is_active=True, is_deleted=False).order_by('name')
             selected_product_ids_current = [str(p.id) for p in offer.products.all()]
             context = {
                 'offer': offer,
                 'products': products,
                 'selected_product_ids': selected_product_ids_current,
-                'valid_from': local_from,
-                'valid_to': local_to,
+                'valid_from': valid_from_str,
+                'valid_to': valid_to_str,
             }
             return render(request, 'add_product_offer.html', context)
         else:
@@ -1383,7 +1371,6 @@ def edit_product_offer(request, offer_id):
             offer.discount_percentage = discount_percentage
             offer.valid_from = valid_from
             offer.valid_to = valid_to
-            offer.is_active = is_active
             offer.save()
             selected_products = Product.objects.filter(
                 id__in=selected_product_ids,
@@ -1394,8 +1381,8 @@ def edit_product_offer(request, offer_id):
             messages.success(request, f'Product offer "{name}" updated successfully with {selected_products.count()} products!')
             return redirect('offers_list')
 
-    local_from = offer.valid_from.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
-    local_to = offer.valid_to.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+    valid_from = offer.valid_from.date().strftime('%Y-%m-%d') if offer.valid_from else ''
+    valid_to = offer.valid_to.date().strftime('%Y-%m-%d') if offer.valid_to else ''
     
     products = Product.objects.filter(is_active=True, is_deleted=False).order_by('name')
     selected_product_ids = [str(p.id) for p in offer.products.all()]
@@ -1404,11 +1391,10 @@ def edit_product_offer(request, offer_id):
         'offer': offer,
         'products': products,
         'selected_product_ids': selected_product_ids,
-        'valid_from': local_from,
-        'valid_to': local_to,
+        'valid_from': valid_from,
+        'valid_to': valid_to,
     }
     return render(request, 'add_product_offer.html', context)
-
 
 @superuser_required
 def edit_category_offer(request, offer_id):
@@ -1419,7 +1405,6 @@ def edit_category_offer(request, offer_id):
         discount_percentage_str = request.POST.get('discount_percentage')
         valid_from_str = request.POST.get('valid_from')
         valid_to_str = request.POST.get('valid_to')
-        is_active = 'is_active' in request.POST
         selected_category_ids = request.POST.getlist('categories')
 
         errors = []
@@ -1438,34 +1423,30 @@ def edit_category_offer(request, offer_id):
         if not valid_from_str or not valid_to_str:
             errors.append('Both valid from and valid to are required.')
         else:
+            date_format = '%Y-%m-%d'
             try:
-                naive_from = datetime.fromisoformat(valid_from_str)
-                naive_to = datetime.fromisoformat(valid_to_str)
-                valid_from = timezone.make_aware(naive_from, LOCAL_TZ)
-                valid_to = timezone.make_aware(naive_to, LOCAL_TZ)
-                valid_from = valid_from.astimezone(pytz.UTC)
-                valid_to = valid_to.astimezone(pytz.UTC)
-                
-                if valid_from >= valid_to:
+                valid_from_date = datetime.strptime(valid_from_str, date_format)
+                valid_to_date = datetime.strptime(valid_to_str, date_format)
+                valid_from = timezone.make_aware(valid_from_date)
+                valid_to = timezone.make_aware(valid_to_date)
+                if valid_to < valid_from:
                     errors.append("Valid 'to' must be after 'from'.")
             except ValueError:
-                errors.append('Invalid date/time format. Use YYYY-MM-DDTHH:MM.')
+                errors.append('Invalid date format (YYYY-MM-DD).')
 
         if len(selected_category_ids) == 0:
             errors.append('Select at least one category.')
 
         if errors:
             messages.error(request, '<br>'.join(errors))
-            local_from = offer.valid_from.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
-            local_to = offer.valid_to.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
             categories = Category.objects.filter(is_active=True, is_deleted=False).order_by('name')
             selected_category_ids_current = [str(c.id) for c in offer.categories.all()]
             context = {
                 'offer': offer,
                 'categories': categories,
                 'selected_category_ids': selected_category_ids_current,
-                'valid_from': local_from,
-                'valid_to': local_to,
+                'valid_from': valid_from_str,
+                'valid_to': valid_to_str,
             }
             return render(request, 'add_category_offer.html', context)
         else:
@@ -1473,7 +1454,6 @@ def edit_category_offer(request, offer_id):
             offer.discount_percentage = discount_percentage
             offer.valid_from = valid_from
             offer.valid_to = valid_to
-            offer.is_active = is_active
             offer.save()
             selected_categories = Category.objects.filter(
                 id__in=selected_category_ids,
@@ -1484,8 +1464,8 @@ def edit_category_offer(request, offer_id):
             messages.success(request, f'Category offer "{name}" updated successfully with {selected_categories.count()} categories!')
             return redirect('offers_list')
 
-    local_from = offer.valid_from.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
-    local_to = offer.valid_to.astimezone(LOCAL_TZ).replace(tzinfo=None).isoformat(timespec='minutes')
+    valid_from = offer.valid_from.date().strftime('%Y-%m-%d') if offer.valid_from else ''
+    valid_to = offer.valid_to.date().strftime('%Y-%m-%d') if offer.valid_to else ''
     
     categories = Category.objects.filter(is_active=True, is_deleted=False).order_by('name')
     selected_category_ids = [str(c.id) for c in offer.categories.all()]
@@ -1494,11 +1474,10 @@ def edit_category_offer(request, offer_id):
         'offer': offer,
         'categories': categories,
         'selected_category_ids': selected_category_ids,
-        'valid_from': local_from,
-        'valid_to': local_to,
+        'valid_from': valid_from,
+        'valid_to': valid_to,
     }
     return render(request, 'add_category_offer.html', context)
-
 
 @superuser_required
 def delete_product_offer(request, offer_id):
@@ -1510,7 +1489,6 @@ def delete_product_offer(request, offer_id):
         return redirect('offers_list')
     return redirect('offers_list')
 
-
 @superuser_required
 def delete_category_offer(request, offer_id):
     if request.method == 'POST':
@@ -1521,6 +1499,23 @@ def delete_category_offer(request, offer_id):
         return redirect('offers_list')
     return redirect('offers_list')
 
+@superuser_required
+def toggle_product_offer(request, offer_id):
+    offer = get_object_or_404(ProductOffer, id=offer_id)
+    offer.is_active = not offer.is_active
+    offer.save()
+    status = 'Enabled' if offer.is_active else 'Disabled'
+    messages.success(request, f'Product offer has been {status} successfully.')
+    return redirect('offers_list')
+
+@superuser_required
+def toggle_category_offer(request, offer_id):
+    offer = get_object_or_404(CategoryOffer, id=offer_id)
+    offer.is_active = not offer.is_active
+    offer.save()
+    status = 'Enabled' if offer.is_active else 'Disabled'
+    messages.success(request, f'Category offer has been {status} successfully.')
+    return redirect('offers_list')
 
 # ----------------------Sales Report---------------------------------#
 from django.db import models
