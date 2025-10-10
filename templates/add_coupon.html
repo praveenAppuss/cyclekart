@@ -40,10 +40,6 @@
                     <input type="date" id="valid_to" name="valid_to" value="{{ form.valid_to }}" class="w-full px-2 py-1 border border-gray-300 rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" required>
                     {% if error.valid_to %}<p class="text-red-500 text-xs mt-1">{{ error.valid_to }}</p>{% endif %}
                 </div>
-                <div class="mb-3">
-                    <label class="block text-sm font-medium text-gray-700">Active</label>
-                    <input type="checkbox" id="active" name="active" {% if form.active %}checked{% endif %} class="h-4 w-4 text-blue-600 focus:ring-blue-500">
-                </div>
                 <button type="submit" class="w-full bg-blue-700 text-white px-3 py-1 rounded-sm text-sm hover:bg-blue-800 transition-colors">{% if form.coupon_id %}Update Coupon{% else %}Create Coupon{% endif %}</button>
             </form>
 

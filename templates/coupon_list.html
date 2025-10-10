@@ -30,13 +30,22 @@
                         <td class="px-3 py-2 text-sm">{{ coupon.valid_from|date:'Y-m-d' }}</td>
                         <td class="px-3 py-2 text-sm">{{ coupon.valid_to|date:'Y-m-d' }}</td>
                         <td class="px-3 py-2 text-sm">
-                            <span class="px-2 py-1 rounded-full {% if coupon.active %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %} text-xs">
-                                {{ coupon.active|yesno:'Active,Inactive' }}
-                            </span>
+                            {% if coupon.is_valid %}
+                                <span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">Active</span>
+                            {% elif coupon.active and coupon.valid_to < now %}
+                                <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs">Expired</span>
+                            {% elif coupon.active and coupon.valid_from > now %}
+                                <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">Upcoming</span>
+                            {% else %}
+                                <span class="px-2 py-1 rounded-full bg-red-100 text-red-800 text-xs">Disabled</span>
+                            {% endif %}
                         </td>
                         <td class="px-3 py-2 text-sm">
                             <a href="{% url 'edit_coupon' coupon.id %}" class="text-blue-600 hover:text-blue-800 text-xs mr-2">Edit</a>
-                            <a href="{% url 'soft_delete_coupon' coupon.id %}" class="text-red-600 hover:text-red-800 text-xs">Delete</a>
+                            <a href="{% url 'delete_coupon' coupon.id %}" class="text-red-600 hover:text-red-800 text-xs mr-2">Delete</a>
+                            <a href="{% url 'toggle_coupon' coupon.id %}" class="text-{% if coupon.active %}red{% else %}green{% endif %}-600 hover:text-{% if coupon.active %}red{% else %}green{% endif %}-800 text-xs">
+                                {% if coupon.active %}Disable{% else %}Enable{% endif %}
+                            </a>
                         </td>
                     </tr>
                     {% empty %}

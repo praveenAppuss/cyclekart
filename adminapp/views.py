@@ -972,7 +972,7 @@ def coupon_list(request):
     paginator = Paginator(coupons, 6)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    return render(request, 'coupon_list.html', {'coupons': page_obj})
+    return render(request, 'coupon_list.html', {'coupons': page_obj, 'now': timezone.now()})
 
 @superuser_required
 def add_coupon(request):
@@ -982,7 +982,6 @@ def add_coupon(request):
         minimum_order_amount = request.POST.get('minimum_order_amount', '').strip()
         valid_from = request.POST.get('valid_from', '').strip()
         valid_to = request.POST.get('valid_to', '').strip()
-        active = request.POST.get('active') == 'on'
         error = {}
 
         if not code:
@@ -1040,7 +1039,7 @@ def add_coupon(request):
                 minimum_order_amount=minimum_order_amount,
                 valid_from=valid_from_date,
                 valid_to=valid_to_date,
-                active=active
+                active=True
             )
             messages.success(request, 'Coupon created successfully.')
             return redirect('coupon_list')
@@ -1051,7 +1050,6 @@ def add_coupon(request):
                 'minimum_order_amount': minimum_order_amount,
                 'valid_from': valid_from,
                 'valid_to': valid_to,
-                'active': active
             }})
 
     return render(request, 'add_coupon.html')
@@ -1065,7 +1063,6 @@ def edit_coupon(request, coupon_id):
         minimum_order_amount = request.POST.get('minimum_order_amount', '').strip()
         valid_from = request.POST.get('valid_from', '').strip()
         valid_to = request.POST.get('valid_to', '').strip()
-        active = request.POST.get('active') == 'on'
         error = {}
 
         if Coupon.objects.exclude(id=coupon_id).filter(code__iexact=code).exists():
@@ -1122,7 +1119,6 @@ def edit_coupon(request, coupon_id):
             coupon.minimum_order_amount = minimum_order_amount
             coupon.valid_from = valid_from_date
             coupon.valid_to = valid_to_date
-            coupon.active = active
             coupon.save()
             messages.success(request, 'Coupon updated successfully.')
             return redirect('coupon_list')
@@ -1134,7 +1130,6 @@ def edit_coupon(request, coupon_id):
                 'minimum_order_amount': minimum_order_amount,
                 'valid_from': valid_from,
                 'valid_to': valid_to,
-                'active': active
             }})
 
     form = {
@@ -1144,7 +1139,6 @@ def edit_coupon(request, coupon_id):
         'minimum_order_amount': coupon.minimum_order_amount,
         'valid_from': coupon.valid_from.date().strftime('%Y-%m-%d') if coupon.valid_from else '',
         'valid_to': coupon.valid_to.date().strftime('%Y-%m-%d') if coupon.valid_to else '',
-        'active': coupon.active
     }
     return render(request, 'add_coupon.html', {'form': form})
 
@@ -1154,6 +1148,15 @@ def delete_coupon(request, coupon_id):
     coupon.is_deleted = True
     coupon.save()
     messages.success(request, f"Coupon '{coupon.code}' has been deleted successfully.")
+    return redirect('coupon_list')
+
+@superuser_required
+def toggle_coupon(request, coupon_id):
+    coupon = get_object_or_404(Coupon, id=coupon_id)
+    coupon.active = not coupon.active
+    coupon.save()
+    status = 'Enabled' if coupon.active else 'Disabled'
+    messages.success(request, f'Coupon has been {status} successfully.')
     return redirect('coupon_list')
 
 
