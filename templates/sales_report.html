@@ -66,7 +66,7 @@
                 <h3 class="text-xl font-bold text-gray-800 mt-1">{{ total_qty }}</h3>
             </div>
             <div class="bg-white shadow rounded-lg p-4 border-l-4 border-red-500">
-                <p class="text-sm text-gray-500">Overall Discount</p>
+                <p class="text-sm text-gray-500">Discount</p>
                 <h3 class="text-xl font-bold text-gray-800 mt-1">₹{{ total_discount|floatformat:2 }}</h3>
             </div>
             <div class="bg-white shadow rounded-lg p-4 border-l-4 border-indigo-500">
@@ -95,10 +95,10 @@
                             <tr class="border-b hover:bg-gray-50 transition">
                                 <td class="px-4 py-3">{{ order.created_at|date:"M d, Y" }}</td>
                                 <td class="px-4 py-3">{{ order.order_id }}</td>
-                                <td class="px-4 py-3">{{ order.user.username }}</td>
+                                <td class="px-4 py-3">{{ order.user.email }}</td>
                                 <td class="px-4 py-3 text-center">{{ order.items.count }}</td>
-                                <td class="px-4 py-3">-</td>
-                                <td class="px-4 py-3 text-right">₹{{ order.discount|floatformat:2 }}</td>
+                                <td class="px-4 py-3">{{ order.coupon_code|default:"-" }}</td>
+                                <td class="px-4 py-3 text-right">₹{{ order.coupon_discount|default:"0.00"|floatformat:2 }}</td>
                                 <td class="px-4 py-3 text-right font-medium">₹{{ order.total_amount|floatformat:2 }}</td>
                             </tr>
                         {% empty %}

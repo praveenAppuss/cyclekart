@@ -1520,6 +1520,7 @@ def toggle_category_offer(request, offer_id):
 # ----------------------Sales Report---------------------------------#
 from django.db import models
 
+
 @superuser_required
 def sales_report(request):
     errors = {}
@@ -1672,19 +1673,20 @@ def download_sales_report_csv(request):
     writer.writerow(['Summary'])
     writer.writerow(['Total Orders', total_orders])
     writer.writerow(['Total Quantity Sold', total_qty])
-    writer.writerow(['Total Item Sales', f'₹{total_item_sales}'])
-    writer.writerow(['Total Coupon Discount', f'₹{total_discount}'])
-    writer.writerow(['Total Order Amount', f'₹{total_order_amount}'])
+    writer.writerow(['Total Item Sales', f'Rs.{total_item_sales}'])
+    writer.writerow(['Total Coupon Discount', f'Rs.{total_discount}'])
+    writer.writerow(['Total Order Amount', f'Rs.{total_order_amount}'])
     writer.writerow([])
-    writer.writerow(['Order ID', 'Date', 'User', 'Total Amount', 'Coupon Discount'])
+    writer.writerow(['Order ID', 'Date', 'User', 'Total Amount', 'Coupon Code', 'Coupon Discount'])
 
     for order in orders_queryset:
         writer.writerow([
             order.order_id,
             order.created_at.strftime('%Y-%m-%d'),
             order.user.username,
-            f'₹{order.total_amount}',
-            f'₹{order.coupon_discount or Decimal("0.00")}'
+            f'Rs.{order.total_amount}',
+            order.coupon_code or '-',
+            f'Rs.{order.coupon_discount or Decimal("0.00")}'
         ])
 
     return response
