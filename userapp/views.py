@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 import uuid
 from django.forms import DecimalField
 from .services import WalletService
+from django.db.models import Prefetch, Exists, OuterRef
 from django.shortcuts import render, redirect
 from django.contrib.auth import get_user_model, authenticate, login, logout
 from django.contrib.auth.hashers import make_password
@@ -255,12 +256,36 @@ def user_logout(request):
 
 
 @login_required(login_url='user_login')
-@cache_control(no_store=True, no_cache=True, must_revalidate=True,max_age=0)
+@cache_control(no_store=True, no_cache=True, must_revalidate=True, max_age=0)
 @never_cache
 def user_home(request):
-    all_products = list(Product.objects.filter(is_active=True, is_deleted=False))
-    featured_products = random.sample(all_products, min(len(all_products), 4))  
-    return render(request, 'user_home.html', {'featured_products': featured_products})
+    all_products = Product.objects.filter(is_active=True, is_deleted=False).prefetch_related(
+        Prefetch('color_variants', queryset=ProductColorVariant.objects.annotate(
+            has_stock=Exists(ProductSizeStock.objects.filter(
+                color_variant=OuterRef('pk'),
+                quantity__gt=0
+            ))
+        ))
+    )
+    featured_products = random.sample(list(all_products), min(len(all_products), 4))
+    
+    featured_with_variants = []
+    for product in featured_products:
+        first_variant = next((v for v in product.color_variants.all() if v.has_stock), None)
+        featured_with_variants.append({
+            'product': product,
+            'first_variant': first_variant
+        })
+    
+    wishlist_variant_ids = []
+    if request.user.is_authenticated:
+        wishlist_variant_ids = list(Wishlist.objects.filter(user=request.user).values_list('color_variant__id', flat=True))
+    
+    context = {
+        'featured_with_variants': featured_with_variants,
+        'wishlist_variant_ids': wishlist_variant_ids
+    }
+    return render(request, 'user_home.html', context)
 
 
 @login_required(login_url='user_login')

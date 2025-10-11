@@ -11,9 +11,12 @@
       <p class="text-gray-600 text-lg mb-6">Explore our premium collection of bicycles. Find your perfect ride today!</p>
       <a href="{% url 'userproduct_list' %}" class="inline-block bg-blue-700 text-white py-2 px-5 rounded hover:bg-blue-800 transition">Shop Now</a>
     </div>
+
     <!-- Right Image -->
     <div class="md:w-1/2 text-center">
-      <img src="{% static 'images/back.png' %}" alt="CycleKart Banner" class="w-80 h-80 mx-auto object-contain" onerror="this.style.display='none'">
+      <img src="{% static 'images/back.png' %}" alt="CycleKart Banner" 
+           class="w-80 h-80 mx-auto object-contain"
+           onerror="this.style.display='none'">
     </div>
   </div>
 </section>
@@ -22,24 +25,76 @@
 <section class="py-10 bg-white">
   <div class="max-w-6xl mx-auto px-6">
     <h2 class="text-2xl font-semibold text-gray-800 text-center mb-6">Featured Products</h2>
+
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-      {% for product in featured_products %}
-      <a href="{% url 'product_detail' product.id %}" class="block text-center p-4 bg-gray-50 rounded-lg shadow hover:shadow-md transition">
-        {% if product.thumbnail %}
-        <img src="{{ product.thumbnail.url }}" alt="{{ product.name }}" class="w-50 h-48 object-contain mx-auto mb-4" onerror="this.style.display='none'">
-        {% else %}
-        <div class="w-full h-48 bg-gray-200 flex items-center justify-center rounded-t-lg mb-4">No Image</div>
-        {% endif %}
-        <h3 class="text-lg font-medium text-gray-700">{{ product.name }}</h3>
-        <div class="mt-2">
-          {% if product.discount_price and product.discount_price < product.price %}
-            <span class="text-lg font-bold text-gray-900">₹{{ product.discount_price|floatformat:0 }}</span>
-            <span class="text-base text-red-500 line-through ml-2">₹{{ product.price|floatformat:0 }}</span>
-          {% else %}
-            <span class="text-lg font-bold text-gray-900">₹{{ price|floatformat:0 }}</span>
-          {% endif %}
+      {% for item in featured_with_variants %}
+      <div class="bg-white rounded-2xl shadow-md hover:shadow-lg transition duration-300 overflow-hidden flex flex-col">
+        <a href="{% url 'product_detail' item.product.id %}" class="block">
+          <!-- Product Image -->
+          <div class="h-52 sm:h-60 bg-gray-100 relative flex items-center justify-center overflow-hidden rounded-t-2xl">
+            {% if item.product.thumbnail %}
+              <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}"
+                   class="object-cover w-full h-full transition-transform duration-300 hover:scale-105"
+                   onerror="this.src='{% static 'images/no_image.png' %}'">
+            {% else %}
+              <img src="{% static 'images/no_image.png' %}" alt="No image"
+                   class="object-contain w-full h-full bg-gray-200">
+            {% endif %}
+          </div>
+        </a>
+
+        <!-- Product Info -->
+        <div class="p-4 sm:p-5 flex flex-col flex-1">
+          <h3 class="text-lg font-semibold mb-1 text-gray-800">
+            <a href="{% url 'product_detail' item.product.id %}" class="hover:text-green-600">
+              {{ item.product.name }}
+            </a>
+          </h3>
+          <p class="text-gray-600 text-sm mb-2 line-clamp-2">
+            {{ item.product.description|truncatewords:15 }}
+          </p>
+
+          <!-- Price and Discount Info -->
+          <div class="mb-4">
+            {% with final_price=item.product.get_final_price savings=item.product.get_savings best_discount=item.product.get_best_discount %}
+              {% if final_price < item.product.price %}
+              <div class="flex items-center space-x-2">
+                <span class="text-lg font-bold text-green-600">₹{{ final_price|floatformat:0 }}</span>
+                <span class="text-sm text-gray-500 line-through">₹{{ item.product.price|floatformat:0 }}</span>
+                {% if savings > 0 %}
+                  <span class="text-green-500 text-sm">
+                    Save ₹{{ savings|floatformat:0 }}
+                    {% if best_discount > 0 %}
+                      ({{ best_discount }}% off)
+                    {% endif %}
+                  </span>
+                {% endif %}
+              </div>
+              {% else %}
+                <span class="text-lg font-bold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
+              {% endif %}
+            {% endwith %}
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex justify-between items-center space-x-2 mt-auto">
+            <a href="{% url 'product_detail' item.product.id %}" class="flex-1">
+              <button type="button"
+                class="w-full bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-green-700 transition duration-200">
+                View Details
+              </button>
+            </a>
+
+            {% if request.user.is_authenticated %}
+            {% if item.first_variant %}
+            <button type="button" class="wishlist-toggle p-2 rounded-full hover:bg-gray-200 transition" data-variant-id="{{ item.first_variant.id }}">
+              <i data-lucide="heart" class="w-5 h-5 transition {% if item.first_variant.id in wishlist_variant_ids %}fill-current text-red-500{% else %}text-gray-700{% endif %}"></i>
+            </button>
+            {% endif %}
+            {% endif %}
+          </div>
         </div>
-      </a>
+      </div>
       {% empty %}
       <p class="text-center text-gray-600">No featured products right now.</p>
       {% endfor %}
@@ -51,6 +106,94 @@
 <section class="py-10 bg-gray-500 text-white text-center">
   <h2 class="text-2xl font-semibold mb-4">Start Your Cycling Adventure!</h2>
   <p class="text-lg mb-6">Discover eco-friendly rides for health and travel.</p>
-  <a href="{% url 'userproduct_list' %}" class="inline-block bg-white text-blue-600 py-2 px-5 rounded hover:bg-gray-200 transition">Explore Now</a>
+  <a href="{% url 'userproduct_list' %}" class="inline-block bg-white text-blue-600 py-2 px-5 rounded hover:bg-gray-200 transition">
+    Explore Now
+  </a>
 </section>
+
+<!-- Hidden CSRF form -->
+<div style="display: none;">
+  {% csrf_token %}
+</div>
+
+<!-- SweetAlert2 -->
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script id="wishlist-data" type="application/json">{{ wishlist_variant_ids|safe }}</script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const wishlistToggles = document.querySelectorAll(".wishlist-toggle");
+    const wishlistedVariants = JSON.parse(document.getElementById("wishlist-data").textContent);
+    const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+    wishlistToggles.forEach((toggle) => {
+      toggle.addEventListener("click", function () {
+        const variantId = parseInt(this.dataset.variantId);
+        if (!variantId) return;
+
+        const isWishlisted = wishlistedVariants.includes(variantId);
+        const url = `/wishlist/add/${variantId}/`;
+
+        fetch(url, {
+          method: "POST",
+          headers: {
+            "X-CSRFToken": csrfToken,
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.success) {
+              const icon = this.querySelector('svg');
+              if (data.added) {
+                wishlistedVariants.push(variantId);
+                icon.classList.add('fill-current', 'text-red-500');
+                icon.classList.remove('text-gray-700');
+              } else {
+                const index = wishlistedVariants.indexOf(variantId);
+                if (index > -1) wishlistedVariants.splice(index, 1);
+                icon.classList.remove('fill-current', 'text-red-500');
+                icon.classList.add('text-gray-700');
+              }
+              showSweetAlert(data.message, data.added ? "success" : "info");
+            } else {
+              showSweetAlert(data.message, "error");
+            }
+          })
+          .catch((error) => {
+            showSweetAlert("An error occurred. Please try again.", "error");
+          });
+      });
+    });
+
+    function showSweetAlert(message, type) {
+      Swal.fire({
+        text: message,
+        icon: type,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 1500,
+        timerProgressBar: true,
+        customClass: {
+          popup: "swal2-small",
+        },
+      });
+    }
+  });
+</script>
+
+<style>
+  .fill-current path {
+    fill: currentColor;
+    stroke: none;
+  }
+  .swal2-small {
+    width: 300px !important;
+    padding: 10px !important;
+    font-size: 14px !important;
+  }
+</style>
 {% endblock %}
