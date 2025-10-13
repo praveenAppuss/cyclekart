@@ -2,85 +2,92 @@
 {% load static %}
 {% block content %}
 
-<div class="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+<div class="flex flex-col md:flex-row min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
     <!-- Sidebar -->
-    {% include 'sidebar.html' %}
+    <div class="md:w-64 w-full border-b md:border-b-0 md:border-r bg-white shadow-sm">
+        {% include 'sidebar.html' %}
+    </div>
 
     <!-- Main Wallet Section -->
-    <div class="flex-1 p-8">
-        <h1 class="text-2xl font-bold mb-6">Wallet</h1>
+    <div class="flex-1 p-4 sm:p-6 md:p-8">
+        <h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Wallet</h1>
 
         <!-- Wallet Balance -->
-        <div class="bg-white rounded-xl shadow p-6 mb-6">
-            <h2 class="text-lg font-semibold">Wallet Balance</h2>
-            <p class="mt-2 text-xl font-bold text-green-600">
+        <div class="bg-white rounded-xl shadow p-4 sm:p-6 mb-4 sm:mb-6">
+            <h2 class="text-base sm:text-lg font-semibold">Wallet Balance</h2>
+            <p class="mt-2 text-lg sm:text-xl font-bold text-green-600">
                 Available wallet balance: ₹{{ wallet.balance }}
             </p>
         </div>
 
         <!-- Wallet Transactions -->
-        <div class="bg-white rounded-xl shadow p-6">
-            <h2 class="text-lg font-semibold mb-4">Wallet Transaction History</h2>
-            
-            <table class="w-full text-sm text-left">
-                <thead>
-                    <tr class="border-b">
-                        <th class="px-4 py-2">Transaction ID</th>
-                        <th class="px-4 py-2">Date</th>
-                        <th class="px-4 py-2">Amount</th>
-                        <th class="px-4 py-2">Type</th>
-                        <th class="px-4 py-2">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for t in transactions %}
-                    <tr class="border-b">
-                        <td class="px-4 py-2">{{ t.transaction_id }}</td>
-                        <td class="px-4 py-2">{{ t.created_at|date:"d M Y" }}</td>
-                        <td class="px-4 py-2 {% if t.transaction_type == 'credit' %}text-green-600{% else %}text-red-600{% endif %}">
-                            ₹{{ t.amount }}
-                        </td>
-                        <td class="px-4 py-2 capitalize">{{ t.transaction_type }}</td>
-                        <td class="px-4 py-2">
-                            <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
-                                SUCCESS
-                            </span>
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center py-4">No transactions found.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="bg-white rounded-xl shadow p-4 sm:p-6">
+            <h2 class="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Wallet Transaction History</h2>
+
+            <!-- Responsive Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left border-collapse">
+                    <thead class="bg-slate-50">
+                        <tr class="border-b text-gray-700">
+                            <th class="px-4 py-2 whitespace-nowrap">Transaction ID</th>
+                            <th class="px-4 py-2 whitespace-nowrap">Date</th>
+                            <th class="px-4 py-2 whitespace-nowrap">Amount</th>
+                            <th class="px-4 py-2 whitespace-nowrap">Type</th>
+                            <th class="px-4 py-2 whitespace-nowrap">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in transactions %}
+                        <tr class="border-b hover:bg-slate-50 transition">
+                            <td class="px-4 py-2 whitespace-nowrap">{{ t.transaction_id }}</td>
+                            <td class="px-4 py-2 whitespace-nowrap">{{ t.created_at|date:"d M Y" }}</td>
+                            <td class="px-4 py-2 whitespace-nowrap {% if t.transaction_type == 'credit' %}text-green-600{% else %}text-red-600{% endif %}">
+                                ₹{{ t.amount }}
+                            </td>
+                            <td class="px-4 py-2 whitespace-nowrap capitalize">{{ t.transaction_type }}</td>
+                            <td class="px-4 py-2 whitespace-nowrap">
+                                <span class="bg-green-100 text-green-700 text-xs font-medium px-2 py-1 rounded-full">
+                                    SUCCESS
+                                </span>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-gray-500">No transactions found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
 
             <!-- Pagination -->
             {% if transactions.has_other_pages %}
-            <div class="mt-4 flex justify-center">
+            <div class="mt-4 flex flex-wrap justify-center gap-2">
                 <nav aria-label="Page navigation">
-                    <ul class="inline-flex -space-x-px">
+                    <ul class="inline-flex flex-wrap items-center -space-x-px text-sm">
                         {% if transactions.has_previous %}
                         <li>
-                            <a href="?page=1" class="px-3 py-2 ml-0 leading-tight text-gray-500 bg-white rounded-l-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700">First</a>
+                            <a href="?page=1" class="px-3 py-2 rounded-l-lg border border-gray-300 text-gray-600 hover:bg-gray-100">First</a>
                         </li>
                         <li>
-                            <a href="?page={{ transactions.previous_page_number }}" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700">&laquo; Previous</a>
+                            <a href="?page={{ transactions.previous_page_number }}" class="px-3 py-2 border border-gray-300 text-gray-600 hover:bg-gray-100">&laquo; Prev</a>
                         </li>
                         {% endif %}
 
                         {% for num in transactions.paginator.page_range %}
                         <li>
-                            <a href="?page={{ num }}" class="px-3 py-2 leading-tight {% if transactions.number == num %}text-blue-600 bg-blue-50{% else %}text-gray-500 bg-white{% endif %} border border-gray-300 hover:bg-gray-100 hover:text-gray-700">{{ num }}</a>
+                            <a href="?page={{ num }}" class="px-3 py-2 border border-gray-300 {% if transactions.number == num %}bg-blue-50 text-blue-600{% else %}text-gray-600 bg-white{% endif %} hover:bg-gray-100">
+                                {{ num }}
+                            </a>
                         </li>
                         {% endfor %}
 
                         {% if transactions.has_next %}
                         <li>
-                            <a href="?page={{ transactions.next_page_number }}" class="px-3 py-2 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700">Next &raquo;</a>
+                            <a href="?page={{ transactions.next_page_number }}" class="px-3 py-2 border border-gray-300 text-gray-600 hover:bg-gray-100">Next &raquo;</a>
                         </li>
                         <li>
-                            <a href="?page={{ transactions.paginator.num_pages }}" class="px-3 py-2 leading-tight text-gray-500 bg-white rounded-r-lg border border-gray-300 hover:bg-gray-100 hover:text-gray-700">Last</a>
+                            <a href="?page={{ transactions.paginator.num_pages }}" class="px-3 py-2 rounded-r-lg border border-gray-300 text-gray-600 hover:bg-gray-100">Last</a>
                         </li>
                         {% endif %}
                     </ul>

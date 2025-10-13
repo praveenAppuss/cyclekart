@@ -2,6 +2,11 @@
 {% load static %}
 
 {% block content %}
+<style>
+  .progress-scroll::-webkit-scrollbar {
+    display: none;
+  }
+</style>
 <div class="min-h-screen bg-slate-50 px-4 py-8">
     <div class="max-w-5xl mx-auto">
         
@@ -26,10 +31,10 @@
 
         
         {% for item in items %}
-        <div class="bg-white p-4 rounded-xl shadow-md mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+        <div class="bg-white p-4 rounded-xl shadow-md mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div class="flex items-start gap-4">
                 <img src="{% if item.color_variant and item.color_variant.images.first %}{{ item.color_variant.images.first.image.url }}{% else %}{{ item.product.thumbnail.url }}{% endif %}" alt="{{ item.product.name }}"
-                     class="w-24 h-24 object-cover rounded-md border" />
+                     class="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-md border" />
                 <div>
                     <h3 class="font-semibold text-lg">{{ item.product.name }}</h3>
                     <p class="text-sm text-gray-700">Size: {{ item.size|default:"-" }} | Quantity: {{ item.quantity }} | Color: {{ item.color_variant.name }}</p>
@@ -52,7 +57,7 @@
                         {% else %}
                             <span class="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-1 rounded-full">Processing</span>
                         {% endif %}
-                        <span class="text-sm text-gray-600">Expected by {{ order.created_at|date:"d/m/Y" }}</span>
+                        <span class="text-sm text-gray-600 block mt-1">Expected by {{ order.created_at|date:"d/m/Y" }}</span>
                     </div>
 
                     
@@ -97,7 +102,7 @@
         
         <div class="mb-6">
             <h4 class="font-semibold mb-4 text-lg text-gray-800">Order Progress</h4>
-            <div class="relative flex items-center justify-between text-sm font-medium bg-white p-6 rounded-xl shadow-lg">
+            <div class="relative flex flex-wrap items-center justify-center gap-6 text-sm font-medium bg-white p-6 rounded-xl shadow-lg overflow-x-auto progress-scroll">
                 {% for item in progress_data %}
                     <div class="flex-1 text-center relative z-10">
                         {% if item.status == "completed" %}

@@ -13,12 +13,19 @@
       <!-- Cart Items -->
       <div class="lg:col-span-2 space-y-5">
         {% for item in cart_items %}
-        <div class="flex justify-between items-center bg-white rounded-xl border border-gray-100 hover:shadow-sm p-3 transition-shadow {% if not item.is_available %}opacity-50{% endif %}" data-item-id="{{ item.id }}">
-          <div class="flex items-center space-x-5">
-            <img src="{{ item.image }}" alt="{{ item.product.name }}" class="w-20 h-20 rounded-sm object-contain border border-gray-100" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
-            <div>
-              <h3 class="text-lg font-semibold text-gray-900">{{ item.product.name }}</h3>
-              <div class="flex items-center mt-1 text-sm space-x-6 text-gray-600">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center bg-white rounded-xl border border-gray-100 hover:shadow-sm p-4 gap-3 transition-shadow {% if not item.is_available %}opacity-50{% endif %}" data-item-id="{{ item.id }}">
+          
+          <!-- Left section (Image + Info) -->
+          <div class="flex items-start sm:items-center gap-3 flex-1">
+            <img src="{{ item.image }}" alt="{{ item.product.name }}" 
+                 class="w-20 h-20 sm:w-24 sm:h-24 rounded-md object-contain border border-gray-100"
+                 onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
+            
+            <div class="flex flex-col gap-1">
+              <h3 class="text-base sm:text-lg font-semibold text-gray-900 leading-tight">
+                {{ item.product.name }}
+              </h3>
+              <div class="flex flex-wrap items-center gap-x-4 text-sm text-gray-600">
                 <div class="flex items-center gap-1">
                   Color:
                   {% if item.color_variant and item.color_variant.hex_code %}
@@ -37,35 +44,36 @@
             </div>
           </div>
 
-          <div class="flex items-center space-x-5">
-            <!-- Updated: Dynamic price display -->
-            {% with final_price=item.product.get_final_price savings=item.product.get_savings %}
-              <div class="text-right">
+          <!-- Right section (Price + Quantity + Delete) -->
+          <div class="flex flex-row sm:flex-col sm:items-end justify-between sm:justify-center gap-3 w-full sm:w-auto">
+            <div class="text-right sm:text-left">
+              {% with final_price=item.product.get_final_price savings=item.product.get_savings %}
                 {% if savings > 0 %}
-                  <span class="text-md font-semibold text-gray-900">₹{{ final_price|floatformat:0 }}</span>
-                  <span class="text-xs text-red-400 line-through ml-1">₹{{ item.product.price|floatformat:0 }}</span>
+                  <span class="text-md font-semibold text-gray-900 block">₹{{ final_price|floatformat:0 }}</span>
+                  <span class="text-xs text-red-400 line-through">₹{{ item.product.price|floatformat:0 }}</span>
                 {% else %}
                   <span class="text-md font-semibold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
                 {% endif %}
-              </div>
-            {% endwith %}
+              {% endwith %}
+            </div>
 
-            <div class="flex items-center space-x-2">
+            <div class="flex items-center justify-center gap-2">
               {% if item.is_available %}
-                <button onclick="updateQuantity('{{ item.id }}', 'decrement')"
-                        class="decrement-btn px-2 py-1 rounded {% if item.quantity <= 1 %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %}"
+                <button onclick="updateQuantity('{{ item.id }}', 'decrement')" 
+                        class="decrement-btn px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:bg-gray-300 disabled:cursor-not-allowed"
                         {% if item.quantity <= 1 %}disabled{% endif %}>−</button>
                 <span class="px-2 font-semibold quantity-display">{{ item.quantity }}</span>
-                <button onclick="updateQuantity('{{ item.id }}', 'increment')"
-                        class="increment-btn px-2 py-1 rounded {% if item.quantity >= item.max_quantity %}bg-gray-300 cursor-not-allowed{% else %}bg-gray-200 hover:bg-gray-300{% endif %}"
-                        {% if item.quantity >= item.max_quantity %}disabled{% endif %}
-                        data-max-quantity="{{ item.max_quantity }}">+</button>
+                <button onclick="updateQuantity('{{ item.id }}', 'increment')" 
+                        class="increment-btn px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        data-max-quantity="{{ item.max_quantity }}" 
+                        {% if item.quantity >= item.max_quantity %}disabled{% endif %}>+</button>
               {% else %}
                 <span class="px-2 font-semibold">{{ item.quantity }}</span>
               {% endif %}
             </div>
 
-            <button onclick="openRemoveModal('{{ item.id }}')" class="text-red-600 hover:text-red-800">
+            <button onclick="openRemoveModal('{{ item.id }}')" 
+                    class="text-red-600 hover:text-red-800 flex items-center justify-center">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
               </svg>
@@ -137,15 +145,14 @@
   </div>
 </div>
 
-<!-- JavaScript for SweetAlert2 Toast and Other Functionality -->
+<!-- JavaScript for Toast & Quantity Update -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    // Render Django messages as SweetAlert Toasts
     {% if messages %}
-    {% for message in messages %}
-    showToast("{{ message|escapejs }}", "{{ message.tags }}");
-    {% endfor %}
+      {% for message in messages %}
+        showToast("{{ message|escapejs }}", "{{ message.tags }}");
+      {% endfor %}
     {% endif %}
   });
 
@@ -176,13 +183,9 @@
       }
     });
 
-    if (type === "success") {
-      Toast.fire({ icon: 'success', title: message });
-    } else if (type === "error") {
-      Toast.fire({ icon: 'error', title: message });
-    } else {
-      Toast.fire({ icon: 'warning', title: message });
-    }
+    if (type === "success") Toast.fire({ icon: 'success', title: message });
+    else if (type === "error") Toast.fire({ icon: 'error', title: message });
+    else Toast.fire({ icon: 'warning', title: message });
   }
 
   async function updateQuantity(itemId, action) {
@@ -192,9 +195,7 @@
     const decrementBtn = itemElement.querySelector('.decrement-btn');
     const maxQuantity = parseInt(incrementBtn.dataset.maxQuantity || 5);
 
-    if ((action === 'increment' && incrementBtn.disabled) || (action === 'decrement' && decrementBtn.disabled)) {
-      return;
-    }
+    if ((action === 'increment' && incrementBtn.disabled) || (action === 'decrement' && decrementBtn.disabled)) return;
 
     try {
       const response = await fetch(`/cart/update/${itemId}/`, {
@@ -215,16 +216,6 @@
         const newQuantity = data.quantity;
         incrementBtn.disabled = newQuantity >= maxQuantity;
         decrementBtn.disabled = newQuantity <= 1;
-
-        incrementBtn.classList.toggle('bg-gray-300', newQuantity >= maxQuantity);
-        incrementBtn.classList.toggle('cursor-not-allowed', newQuantity >= maxQuantity);
-        incrementBtn.classList.toggle('bg-gray-200', newQuantity < maxQuantity);
-        incrementBtn.classList.toggle('hover:bg-gray-300', newQuantity < maxQuantity);
-
-        decrementBtn.classList.toggle('bg-gray-300', newQuantity <= 1);
-        decrementBtn.classList.toggle('cursor-not-allowed', newQuantity <= 1);
-        decrementBtn.classList.toggle('bg-gray-200', newQuantity > 1);
-        decrementBtn.classList.toggle('hover:bg-gray-300', newQuantity > 1);
 
         document.querySelector('[data-cart-total]').textContent = `₹${data.cart_total.toFixed(0)}`;
         document.querySelector('[data-total-discount]').textContent = `-₹${data.total_discount.toFixed(0)}`;

@@ -3,35 +3,35 @@
 
 {% block content %}
 <!-- Hero Section -->
-<section class="bg-gray-100 py-10 px-6">
-  <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10">
+<section class="bg-gray-100 py-8 px-4 sm:py-10 sm:px-6">
+  <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 sm:gap-10">
     <!-- Left Text -->
-    <div class="md:w-1/2 text-center md:text-left">
-      <h1 class="text-4xl font-bold text-gray-800 mb-4">Welcome to CycleKart</h1>
-      <p class="text-gray-600 text-lg mb-6">Explore our premium collection of bicycles. Find your perfect ride today!</p>
-      <a href="{% url 'userproduct_list' %}" class="inline-block bg-blue-700 text-white py-2 px-5 rounded hover:bg-blue-800 transition">Shop Now</a>
+    <div class="w-full md:w-1/2 text-center md:text-left">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">Welcome to CycleKart</h1>
+      <p class="text-gray-600 text-base sm:text-lg mb-6">Explore our premium collection of bicycles. Find your perfect ride today!</p>
+      <a href="{% url 'userproduct_list' %}" class="inline-block bg-blue-700 text-white py-2 px-4 sm:px-5 rounded hover:bg-blue-800 transition">Shop Now</a>
     </div>
 
     <!-- Right Image -->
-    <div class="md:w-1/2 text-center">
+    <div class="w-full md:w-1/2 text-center mt-6 md:mt-0">
       <img src="{% static 'images/back.png' %}" alt="CycleKart Banner" 
-           class="w-80 h-80 mx-auto object-contain"
+           class="w-64 h-64 sm:w-80 sm:h-80 mx-auto object-contain"
            onerror="this.style.display='none'">
     </div>
   </div>
 </section>
 
 <!-- Featured Products Section -->
-<section class="py-10 bg-white">
-  <div class="max-w-6xl mx-auto px-6">
-    <h2 class="text-2xl font-semibold text-gray-800 text-center mb-6">Featured Products</h2>
+<section class="py-8 px-4 sm:py-10 sm:px-6 bg-white">
+  <div class="max-w-6xl mx-auto">
+    <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 text-center mb-6">Featured Products</h2>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
       {% for item in featured_with_variants %}
       <div class="bg-white rounded-2xl shadow-md hover:shadow-lg transition duration-300 overflow-hidden flex flex-col">
         <a href="{% url 'product_detail' item.product.id %}" class="block">
           <!-- Product Image -->
-          <div class="h-52 sm:h-60 bg-gray-100 relative flex items-center justify-center overflow-hidden rounded-t-2xl">
+          <div class="h-48 sm:h-52 lg:h-60 bg-gray-100 relative flex items-center justify-center overflow-hidden rounded-t-2xl">
             {% if item.product.thumbnail %}
               <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}"
                    class="object-cover w-full h-full transition-transform duration-300 hover:scale-105"
@@ -44,34 +44,27 @@
         </a>
 
         <!-- Product Info -->
-        <div class="p-4 sm:p-5 flex flex-col flex-1">
-          <h3 class="text-lg font-semibold mb-1 text-gray-800">
+        <div class="p-3 sm:p-4 lg:p-5 flex flex-col flex-1">
+          <h3 class="text-base sm:text-lg font-semibold mb-1 text-gray-800">
             <a href="{% url 'product_detail' item.product.id %}" class="hover:text-green-600">
               {{ item.product.name }}
             </a>
           </h3>
-          <p class="text-gray-600 text-sm mb-2 line-clamp-2">
+          <p class="text-gray-600 text-xs sm:text-sm mb-2 line-clamp-2">
             {{ item.product.description|truncatewords:15 }}
           </p>
 
           <!-- Price and Discount Info -->
-          <div class="mb-4">
+          <div class="mb-3 sm:mb-4">
             {% with final_price=item.product.get_final_price savings=item.product.get_savings best_discount=item.product.get_best_discount %}
               {% if final_price < item.product.price %}
-              <div class="flex items-center space-x-2">
-                <span class="text-lg font-bold text-green-600">₹{{ final_price|floatformat:0 }}</span>
-                <span class="text-sm text-gray-500 line-through">₹{{ item.product.price|floatformat:0 }}</span>
-                {% if savings > 0 %}
-                  <span class="text-green-500 text-sm">
-                    Save ₹{{ savings|floatformat:0 }}
-                    {% if best_discount > 0 %}
-                      ({{ best_discount }}% off)
-                    {% endif %}
-                  </span>
-                {% endif %}
+              <div class="flex items-center space-x-2 sm:space-x-6 flex-wrap">
+                <span class="text-base sm:text-lg font-bold text-dark-600">₹{{ final_price|floatformat:0 }}</span>
+                <span class="text-xs sm:text-sm text-red-500 line-through">₹{{ item.product.price|floatformat:0 }}</span>
+                
               </div>
               {% else %}
-                <span class="text-lg font-bold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
+                <span class="text-base sm:text-lg font-bold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
               {% endif %}
             {% endwith %}
           </div>
@@ -80,15 +73,15 @@
           <div class="flex justify-between items-center space-x-2 mt-auto">
             <a href="{% url 'product_detail' item.product.id %}" class="flex-1">
               <button type="button"
-                class="w-full bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-green-700 transition duration-200">
+                class="w-full bg-black text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-md hover:bg-gray-800 transition duration-200">
                 View Details
               </button>
             </a>
 
             {% if request.user.is_authenticated %}
             {% if item.first_variant %}
-            <button type="button" class="wishlist-toggle p-2 rounded-full hover:bg-gray-200 transition" data-variant-id="{{ item.first_variant.id }}">
-              <i data-lucide="heart" class="w-5 h-5 transition {% if item.first_variant.id in wishlist_variant_ids %}fill-current text-red-500{% else %}text-gray-700{% endif %}"></i>
+            <button type="button" class="wishlist-toggle p-1.5 sm:p-2 rounded-full hover:bg-gray-200 transition" data-variant-id="{{ item.first_variant.id }}">
+              <i data-lucide="heart" class="w-4 sm:w-5 h-4 sm:h-5 transition {% if item.first_variant.id in wishlist_variant_ids %}fill-current text-red-500{% else %}text-gray-700{% endif %}"></i>
             </button>
             {% endif %}
             {% endif %}
@@ -103,10 +96,10 @@
 </section>
 
 <!-- Call to Action Section -->
-<section class="py-10 bg-gray-500 text-white text-center">
-  <h2 class="text-2xl font-semibold mb-4">Start Your Cycling Adventure!</h2>
-  <p class="text-lg mb-6">Discover eco-friendly rides for health and travel.</p>
-  <a href="{% url 'userproduct_list' %}" class="inline-block bg-white text-blue-600 py-2 px-5 rounded hover:bg-gray-200 transition">
+<section class="py-8 px-4 sm:py-10 sm:px-6 bg-gray-500 text-white text-center">
+  <h2 class="text-xl sm:text-2xl font-semibold mb-4">Start Your Cycling Adventure!</h2>
+  <p class="text-base sm:text-lg mb-6">Discover eco-friendly rides for health and travel.</p>
+  <a href="{% url 'userproduct_list' %}" class="inline-block bg-white text-blue-600 py-2 px-4 sm:px-5 rounded hover:bg-gray-200 transition">
     Explore Now
   </a>
 </section>

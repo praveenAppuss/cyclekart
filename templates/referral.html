@@ -1,94 +1,111 @@
 {% extends 'header.html' %}
 {% load static %}
+
 {% block content %}
-<div class="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-    {% include 'sidebar.html' %}
-    <div class="flex-1 px-4 py-10 sm:px-8">
-        <div class="max-w-5xl mx-auto flex flex-col h-full">
+<div class="flex flex-col md:flex-row min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 overflow-x-hidden">
+    <!-- Sidebar -->
+    <div class="md:w-64 w-full border-b md:border-b-0 md:border-r bg-white shadow-sm">
+        {% include 'sidebar.html' %}
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 px-4 sm:px-6 lg:px-8 py-8 flex flex-col">
+        <div class="w-full max-w-5xl mx-auto flex flex-col flex-grow">
+            
             <!-- Header Section -->
-            <div class="mb-8">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">My Referral Program</h1>
-                <p class="text-gray-600">Invite friends and earn rewards! Share your unique code below.</p>
+            <div class="mb-6 sm:mb-10 text-center md:text-left">
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">My Referral Program</h1>
+                <p class="text-gray-600 text-sm sm:text-base">
+                    Invite friends and earn rewards! Share your unique code below.
+                </p>
             </div>
 
             <!-- Referral Code Card -->
-            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-                <h2 class="text-xl font-semibold text-gray-900 mb-4">Your Referral Code</h2>
-                <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                    <span id="referral-code" class="text-lg font-mono text-gray-800">{{ user.referral_code }}</span>
-                    <button id="copy-btn" class="ml-4 p-2 text-gray-500 hover:text-gray-700 transition-colors" title="Copy to clipboard">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-900 mb-4 text-center sm:text-left">Your Referral Code</h2>
+                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 bg-gray-50 rounded-lg">
+                    <span id="referral-code" class="text-lg font-mono text-gray-800 text-center sm:text-left break-all">
+                        {{ user.referral_code }}
+                    </span>
+                    <button id="copy-btn"
+                            class="flex items-center justify-center gap-1 bg-black text-white px-3 py-2 rounded-md hover:bg-gray-800 transition-colors w-full sm:w-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                             stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                         </svg>
+                        <span class="text-sm font-medium">Copy</span>
                     </button>
                 </div>
             </div>
 
             <!-- How It Works Section -->
-            <div class="bg-white rounded-lg shadow-md p-6">
-                <h2 class="text-xl font-semibold text-gray-900 mb-4">How the Referral Program Works</h2>
-                <ul class="space-y-2 text-gray-600">
+            <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6 sm:mb-8">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-900 mb-4 text-center sm:text-left">How the Referral Program Works</h2>
+                <ul class="space-y-3 text-gray-600 text-sm sm:text-base">
                     <li class="flex items-start">
-                        <span class="text-green-500 mr-2">•</span>
-                        Share your unique code with friends.
+                        <span class="text-green-500 mr-2 mt-1">•</span>
+                        <span>Share your unique code with friends.</span>
                     </li>
                     <li class="flex items-start">
-                        <span class="text-green-500 mr-2">•</span>
-                        When they sign up using your code, you both get rewards (e.g., ₹100 credit).
+                        <span class="text-green-500 mr-2 mt-1">•</span>
+                        <span>When they sign up using your code, you both get rewards (e.g., ₹100 credit).</span>
                     </li>
                     <li class="flex items-start">
-                        <span class="text-green-500 mr-2">•</span>
-                        Track your referrals below.
+                        <span class="text-green-500 mr-2 mt-1">•</span>
+                        <span>Track your referrals below.</span>
                     </li>
                 </ul>
             </div>
 
-            <!-- Referrals List (Optional: Show users referred by you) -->
-            <div class="bg-white rounded-lg shadow-md p-6 mt-6">
-                <h2 class="text-xl font-semibold text-gray-900 mb-4">Your Referrals</h2>
+            <!-- Referrals List -->
+            <div class="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-900 mb-4 text-center sm:text-left">Your Referrals</h2>
                 {% if user.referrals.all %}
-                    <ul class="space-y-2">
+                    <ul class="space-y-3">
                         {% for referral in user.referrals.all %}
-                            <li class="flex justify-between items-center p-3 bg-gray-50 rounded">
-                                <span>{{ referral.username }} ({{ referral.date_joined|date:"M d, Y" }})</span>
-                                <span class="text-green-600 font-medium">₹100 Earned</span>
+                            <li class="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded-md text-sm sm:text-base">
+                                <span class="text-gray-800">{{ referral.username }} ({{ referral.date_joined|date:"M d, Y" }})</span>
+                                <span class="text-green-600 font-medium mt-1 sm:mt-0">₹100 Earned</span>
                             </li>
                         {% endfor %}
                     </ul>
                 {% else %}
-                    <p class="text-gray-500">No referrals yet. Start sharing!</p>
+                    <p class="text-gray-500 text-center sm:text-left">No referrals yet. Start sharing!</p>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<!-- Toast Notification for Copy Success -->
-<div id="toast" class="fixed top-4 right-4 hidden bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity">
+<!-- Toast Notification -->
+<div id="toast"
+     class="fixed top-6 right-4 hidden bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition transform">
     Copied to clipboard!
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const copyBtn = document.getElementById('copy-btn');
         const codeSpan = document.getElementById('referral-code');
         const toast = document.getElementById('toast');
 
-        copyBtn.addEventListener('click', function() {
-            const code = codeSpan.textContent;
-            navigator.clipboard.writeText(code).then(function() {
-                // Show toast
+        copyBtn.addEventListener('click', function () {
+            const code = codeSpan.textContent.trim();
+            navigator.clipboard.writeText(code).then(function () {
                 toast.classList.remove('hidden');
-                setTimeout(() => toast.classList.add('hidden'), 2000);
-                
-                // Optional: Change icon to checkmark temporarily
+                toast.classList.add('opacity-100', 'translate-y-0');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 2000);
+
                 const svg = copyBtn.querySelector('svg');
                 svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />';
                 setTimeout(() => {
                     svg.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />';
                 }, 2000);
-            }).catch(function(err) {
-                console.error('Failed to copy: ', err);
+            }).catch(function (err) {
+                console.error('Failed to copy:', err);
             });
         });
     });

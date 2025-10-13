@@ -4,23 +4,23 @@
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
-<div class="flex min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+<div class="flex flex-col md:flex-row min-h-[100dvh] bg-gradient-to-br from-slate-50 to-slate-100 overflow-x-hidden">
 
-  <!-- Sidebar -->
+  <div class="md:w-64 w-full md:h-auto h-auto md:sticky top-0 bg-white z-20">
   {% include 'sidebar.html' %}
+  </div>
 
   <!-- Main Content -->
-  <div class="flex-1 p-6">
+  <div class="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[calc(100dvh-60px)] sm:max-h-none">
 
-    <h2 class="text-2xl font-bold mb-4">Shipping address</h2>
+    <h2 class="text-2xl font-bold mb-4 text-center md:text-left">Shipping Address</h2>
 
-    <!-- Add New Button -->
-    <div class="flex justify-between items-center mb-4">
-      <button onclick="toggleModal()" class="bg-black text-white px-4 py-2 rounded hover:bg-gray-800">+ Add new</button>
+    <!-- Add New Button & Dropdown -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+      <button onclick="toggleModal()" class="bg-black text-white px-4 py-2 rounded hover:bg-gray-800 w-full sm:w-auto">+ Add New</button>
 
-      <!-- Dropdown for existing addresses -->
       {% if addresses %}
-      <select id="addressDropdown" onchange="fillAddressForm()" class="border px-4 py-2 rounded">
+      <select id="addressDropdown" onchange="fillAddressForm()" class="border px-3 py-2 rounded w-full sm:w-auto">
         {% for address in addresses %}
         <option value="{{ address.id }}"
           data-full_name="{{ address.full_name }}"
@@ -42,28 +42,29 @@
       {% endif %}
     </div>
 
-    <!-- Address Form (Editable) -->
+    <!-- Address Form -->
     {% if addresses %}
-    <form id="addressForm" method="post" action="{% url 'update_address' addresses.0.id %}">
+    <form id="addressForm" method="post" action="{% url 'update_address' addresses.0.id %}" class="bg-white shadow rounded-xl p-4 sm:p-6">
       {% csrf_token %}
-      <div class="grid grid-cols-2 gap-4">
-        <input type="text" id="address_line" name="address_line" placeholder="Street Address" class="border p-2 rounded" readonly>
-        <input type="text" id="district" name="district" placeholder="District" class="border p-2 rounded" readonly>
-        <input type="text" id="full_name" name="full_name" placeholder="Full Name" class="border p-2 rounded" readonly>
-        <input type="text" id="pin_code" name="pin_code" placeholder="Pin Code" class="border p-2 rounded" readonly>
-        <input type="text" id="state" name="state" placeholder="State" class="border p-2 rounded" readonly>
-        <input type="text" id="mobile" name="mobile" placeholder="Mobile" class="border p-2 rounded" readonly>
-        <input type="text" id="country" name="country" placeholder="Country" class="border p-2 rounded" readonly>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <input type="text" id="address_line" name="address_line" placeholder="Street Address" class="border p-2 rounded w-full" readonly>
+        <input type="text" id="district" name="district" placeholder="District" class="border p-2 rounded w-full" readonly>
+        <input type="text" id="full_name" name="full_name" placeholder="Full Name" class="border p-2 rounded w-full" readonly>
+        <input type="text" id="pin_code" name="pin_code" placeholder="Pin Code" class="border p-2 rounded w-full" readonly>
+        <input type="text" id="state" name="state" placeholder="State" class="border p-2 rounded w-full" readonly>
+        <input type="text" id="mobile" name="mobile" placeholder="Mobile" class="border p-2 rounded w-full" readonly>
+        <input type="text" id="country" name="country" placeholder="Country" class="border p-2 rounded w-full" readonly>
       </div>
 
-      <div class="mt-4 flex gap-2">
-        <button type="button" onclick="makeEditable()" class="bg-black text-white px-4 py-2 rounded">Edit</button>
-        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hidden" id="saveBtn">Save</button>
-        <a id="deleteLink" href="{% url 'delete_address' addresses.0.id %}" class="text-red-600 text-xl ml-auto">Delete</a>
+      <div class="mt-4 flex flex-col sm:flex-row items-center gap-3">
+        <button type="button" onclick="makeEditable()" class="bg-black text-white px-4 py-2 rounded w-full sm:w-auto">Edit</button>
+        <button type="submit" id="saveBtn" class="bg-blue-600 text-white px-4 py-2 rounded hidden w-full sm:w-auto">Save</button>
+        <a id="deleteLink" href="{% url 'delete_address' addresses.0.id %}" class="text-red-600 text-center sm:ml-auto w-full sm:w-auto">Delete</a>
       </div>
     </form>
+
     {% else %}
-    <div class="text-center text-gray-500 mt-20">
+    <div class="text-center text-gray-500 mt-16">
       <p class="flex items-center justify-center gap-2 text-lg">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -75,32 +76,48 @@
     {% endif %}
 
     <!-- ADD MODAL -->
-    <div id="addModal" class="fixed inset-0 hidden bg-black bg-opacity-30 flex items-center justify-center z-50">
-      <div class="bg-white rounded p-6 w-full max-w-xl relative">
-        <button onclick="toggleModal()" class="absolute top-2 right-4 text-xl">✖</button>
-        <h3 class="text-lg font-bold mb-4">Add New Address</h3>
+    <!-- ADD MODAL -->
+<div id="addModal"
+     class="fixed inset-0 hidden bg-black bg-opacity-40 z-50 overflow-y-auto">
+  <div class="min-h-screen flex flex-col justify-end sm:justify-center items-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-2xl sm:rounded-lg w-full sm:max-w-md relative shadow-lg overflow-y-auto 
+                h-[90vh] sm:h-auto max-h-[90vh]">
+      
+      <!-- Close Button -->
+      <button onclick="toggleModal()" 
+              class="absolute top-3 right-4 text-2xl text-gray-600 hover:text-black z-50">✖</button>
 
-        <form method="post" action="{% url 'add_address' %}">
+      <!-- Modal Content -->
+      <div class="p-6 pb-8 overflow-y-auto h-full">
+        <h3 class="text-lg font-semibold mb-4 text-center">Add New Address</h3>
+
+        <form method="post" action="{% url 'add_address' %}" class="space-y-4">
           {% csrf_token %}
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input name="full_name" placeholder="Full Name" required class="border p-2 rounded">
             <input name="mobile" placeholder="Mobile" required class="border p-2 rounded">
-            <input name="address_line" placeholder="Street/Area" required class="border p-2 rounded">
+            <input name="address_line" placeholder="Street/Area" required class="border p-2 rounded sm:col-span-2">
             <input name="district" placeholder="District" required class="border p-2 rounded">
             <input name="state" placeholder="State" required class="border p-2 rounded">
             <input name="pin_code" placeholder="Pincode" required class="border p-2 rounded">
             <input name="country" placeholder="Country" required class="border p-2 rounded">
           </div>
 
-          <div class="mt-4 flex justify-end gap-2">
-            <button type="button" onclick="toggleModal()" class="px-4 py-2 border rounded">Cancel</button>
-            <button type="submit" class="bg-black text-white px-4 py-2 rounded">Save Address</button>
+          <!-- Buttons -->
+          <div class="flex flex-col sm:flex-row justify-end gap-2 mt-6">
+            <button type="button" onclick="toggleModal()" 
+                    class="px-4 py-2 border rounded w-full sm:w-auto">Cancel</button>
+            <button type="submit" 
+                    class="bg-black text-white px-4 py-2 rounded w-full sm:w-auto">Save Address</button>
           </div>
         </form>
       </div>
     </div>
+  </div>
+</div>
 
-    <!-- TOAST ALERTS (ONLY FOR THIS PAGE) -->
+
+    <!-- TOAST -->
     <div
       x-data="{ show: false, message: '', type: 'success' }"
       x-show="show"
@@ -133,15 +150,13 @@
       {% endfor %}
     </script>
     {% endif %}
-
   </div>
 </div>
 
 <!-- Scripts -->
 <script>
   function toggleModal() {
-    const modal = document.getElementById("addModal");
-    modal.classList.toggle("hidden");
+    document.getElementById("addModal").classList.toggle("hidden");
   }
 
   function makeEditable() {
@@ -167,11 +182,8 @@
     document.getElementById("country").value = option.dataset.country;
   }
 
-  // Automatically fill the first (or selected) address if available
   document.addEventListener('DOMContentLoaded', function () {
-    if (document.getElementById("addressDropdown")) {
-      fillAddressForm();
-    }
+    if (document.getElementById("addressDropdown")) fillAddressForm();
   });
 </script>
 {% endblock %}

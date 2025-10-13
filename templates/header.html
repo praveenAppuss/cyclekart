@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CycleKart</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script> <!-- Lucide Icon Library -->
@@ -73,19 +74,18 @@
   </script>
   {% load static %}
 </head>
-<body class="bg-gray-100">
-
+<body class="bg-gray-100 overflow-x-hidden">
   <!-- HEADER -->
   <header class="bg-white shadow-sm sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
+    <div class="max-w-7xl mx-auto flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
 
       <!-- Logo -->
       <a href="/" class="flex items-center gap-2">
-        <span class="text-2xl font-bold text-gray-800">CycleKart</span>
+        <span class="text-xl font-bold text-gray-800 sm:text-2xl">CycleKart</span>
       </a>
 
       <!-- Desktop Nav -->
-      <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-gray-700">
+      <nav class="hidden md:flex items-center gap-4 text-sm font-medium text-gray-700 lg:gap-6">
         <a href="{% url 'user_home' %}" class="hover:text-blue-700">Home</a>
         <a href="{% url 'userproduct_list' %}" class="hover:text-blue-700">Explore All</a>
         <a href="#" class="hover:text-blue-700">About</a>
@@ -96,13 +96,13 @@
       </nav>
 
       <!-- Search Bar + Icons -->
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3 sm:gap-4">
         <form method="GET" action="{% url 'userproduct_list' %}" class="relative hidden md:block">
           <input
             type="text" name="q"
             placeholder="Search products"
             value="{{ query|default:'' }}"
-            class="pl-8 pr-10 py-1 border border-gray-300 rounded-full text-sm focus:outline-none"
+            class="pl-8 pr-10 py-1 border border-gray-300 rounded-full text-sm focus:outline-none w-40 sm:w-auto"
           />
           <svg class="absolute left-2 top-1.5 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"></path>
@@ -149,7 +149,7 @@
         <!-- Referral Gift Icon (Homepage Only) -->
         {% if request.resolver_match.url_name == 'user_home' and user.is_authenticated %}
           <button onclick="toggleReferralModal()" title="Apply Referral Code" class="relative">
-            <i data-lucide="gift" class="w-6 h-6 text-amber-300 hover:scale-110 transition-transform"></i>
+            <i data-lucide="gift" class="w-5 h-5 text-amber-300 hover:scale-110 transition-transform sm:w-6 sm:h-6"></i>
           </button>
         {% endif %}
 
@@ -171,23 +171,22 @@
     </div>
 
     <!-- Mobile Menu -->
-    <div id="mobileMenu" class="md:hidden hidden bg-white border-t border-gray-200 px-6 py-4 text-sm font-medium text-gray-700">
-      <a href="{% url 'user_home' %}" class="block py-1">Home</a>
-      <a href="#" class="block py-1">Category</a>
-      <a href="#" class="block py-1">Brand</a>
-      <a href="#" class="block py-1">About</a>
-      <a href="#" class="block py-1">Contact</a>
+    <div id="mobileMenu" class="md:hidden hidden bg-white border-t border-gray-200 px-4 py-4 text-sm font-medium text-gray-700 sm:px-6">
+      <a href="{% url 'user_home' %}" class="block py-2 hover:text-blue-700">Home</a>
+      <a href="{% url 'userproduct_list' %}" class="block py-2 hover:text-blue-700">Explore All</a>
+      <a href="#" class="block py-2 hover:text-blue-700">About</a>
+      <a href="#" class="block py-2 hover:text-blue-700">Contact</a>
       {% if user.is_authenticated %}
-        <a href="{% url 'user_logout' %}" class="block py-1 text-red-500">Logout</a>
+        <a href="{% url 'user_logout' %}" class="block py-2 text-red-500 hover:text-red-700">Logout</a>
       {% endif %}
     </div>
 
     <!-- Referral Modal (Homepage Only) -->
     {% if request.resolver_match.url_name == 'user_home' and user.is_authenticated %}
       <div id="referralModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+        <div class="bg-white rounded-lg p-4 w-full max-w-md sm:p-6">
           <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold text-gray-900">Apply Referral Code</h2>
+            <h2 class="text-lg font-semibold text-gray-900 sm:text-xl">Apply Referral Code</h2>
             <button onclick="toggleReferralModal()" class="text-gray-500 hover:text-gray-700">
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -225,34 +224,34 @@
   </main>
 
   <!-- FOOTER -->
-  <footer class="bg-dark border-t">
-    <div class="max-w-6xl mx-auto px-4 py-10 grid grid-cols-1 sm:grid-cols-4 gap-6 text-sm text-gray-700">
-      <div>
+  <footer class="bg-gray-800 border-t"> <!-- Assuming 'bg-dark' was meant to be bg-gray-800; adjust if needed -->
+    <div class="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 text-center gap-6 text-sm text-gray-300 sm:grid-cols-2 md:grid-cols-4 sm:gap-8 sm:py-10">
+      <div class="text-center sm:text-left">
         <h2 class="font-bold text-base mb-2">CycleKart</h2>
         <p>Your ultimate destination for premium cycles and accessories.</p>
       </div>
-      <div>
+      <div class="text-center sm:text-left">
         <h3 class="font-semibold mb-2">Support</h3>
         <ul class="space-y-1">
-          <li><a href="#">FAQ</a></li>
-          <li><a href="#">Terms of Use</a></li>
-          <li><a href="#">Privacy Policy</a></li>
+          <li><a href="#" class="hover:text-white">FAQ</a></li>
+          <li><a href="#" class="hover:text-white">Terms of Use</a></li>
+          <li><a href="#" class="hover:text-white">Privacy Policy</a></li>
         </ul>
       </div>
-      <div>
+      <div class="text-center sm:text-left">
         <h3 class="font-semibold mb-2">Company</h3>
         <ul class="space-y-1">
-          <li><a href="#">About Us</a></li>
-          <li><a href="#">Contact</a></li>
-          <li><a href="#">Careers</a></li>
+          <li><a href="#" class="hover:text-white">About Us</a></li>
+          <li><a href="#" class="hover:text-white">Contact</a></li>
+          <li><a href="#" class="hover:text-white">Careers</a></li>
         </ul>
       </div>
-      <div>
+      <div class="text-center sm:text-left">
         <h3 class="font-semibold mb-2">Shop</h3>
         <ul class="space-y-1">
-          <li><a href="#">My Account</a></li>
-          <li><a href="#">Checkout</a></li>
-          <li><a href="#">Cart</a></li>
+          <li><a href="#" class="hover:text-white">My Account</a></li>
+          <li><a href="#" class="hover:text-white">Checkout</a></li>
+          <li><a href="#" class="hover:text-white">Cart</a></li>
         </ul>
       </div>
     </div>
