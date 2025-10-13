@@ -4,6 +4,7 @@ from decimal import Decimal
 import re
 from django.forms import DecimalField
 from django.db.models import Sum, F, ExpressionWrapper
+from django.db.models import ExpressionWrapper, F, Sum, DecimalField
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login,logout
 from django.views.decorators.cache import never_cache
@@ -1518,7 +1519,6 @@ def toggle_category_offer(request, offer_id):
     return redirect('offers_list')
 
 # ----------------------Sales Report---------------------------------#
-from django.db import models
 
 
 @superuser_required
@@ -1567,44 +1567,47 @@ def sales_report(request):
             'total_order_amount': Decimal('0.00'),
             'total_item_sales': Decimal('0.00'),
             'total_discount': Decimal('0.00'),
+            'total_product_savings': Decimal('0.00'),
             'total_orders': 0,
             'total_qty': 0,
         }
         return render(request, 'sales_report.html', context)
 
-    # Filter orders: delivered and paid
     orders_queryset = Order.objects.filter(
         status='delivered',
         payment_status='paid',
         created_at__date__range=(start_date, end_date)
     ).order_by('-created_at')
 
-    # Aggregates
     total_orders = orders_queryset.count()
     total_order_amount = orders_queryset.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
     total_discount = orders_queryset.aggregate(discount=Sum('coupon_discount'))['discount'] or Decimal('0.00')
 
-    # Order items for quantity and item sales
     order_items_qs = OrderItem.objects.filter(
         order__in=orders_queryset,
-        status='active'  # Only active items, exclude cancelled/returned
-    )
+        status='active'  
+    ).select_related('product')
     total_qty = order_items_qs.aggregate(qty=Sum('quantity'))['qty'] or 0
     total_item_sales = order_items_qs.annotate(
-        total_price=ExpressionWrapper(F('quantity') * F('price'), output_field=models.DecimalField(max_digits=12, decimal_places=2))
+        total_price=ExpressionWrapper(F('quantity') * F('price'), output_field=DecimalField(max_digits=12, decimal_places=2))
     ).aggregate(sales=Sum('total_price'))['sales'] or Decimal('0.00')
 
-    # Pagination
-    paginator = Paginator(orders_queryset, 10)  # 10 orders per page
+    total_product_savings = Decimal('0.00')
+    for item in order_items_qs:
+        total_product_savings += item.product.get_savings() * item.quantity
+
+    
+    paginator = Paginator(orders_queryset, 8)  
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
     context = {
         'page_obj': page_obj,
-        'orders': page_obj,  # For template looping
+        'orders': page_obj,  
         'total_order_amount': total_order_amount,
         'total_item_sales': total_item_sales,
         'total_discount': total_discount,
+        'total_product_savings': total_product_savings,
         'total_orders': total_orders,
         'total_qty': total_qty,
         'filter_type': filter_type,
@@ -1644,7 +1647,7 @@ def download_sales_report_csv(request):
             start_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
             end_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
         except ValueError:
-            start_date = end_date = today  # Fallback
+            start_date = end_date = today  
 
     orders_queryset = Order.objects.filter(
         status='delivered',
@@ -1652,15 +1655,18 @@ def download_sales_report_csv(request):
         created_at__date__range=(start_date, end_date)
     ).order_by('-created_at')
 
-    # Aggregates for summary
     total_orders = orders_queryset.count()
     total_order_amount = orders_queryset.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
     total_discount = orders_queryset.aggregate(discount=Sum('coupon_discount'))['discount'] or Decimal('0.00')
-    order_items_qs = OrderItem.objects.filter(order__in=orders_queryset, status='active')
+    order_items_qs = OrderItem.objects.filter(order__in=orders_queryset, status='active').select_related('product')
     total_qty = order_items_qs.aggregate(qty=Sum('quantity'))['qty'] or 0
     total_item_sales = order_items_qs.annotate(
-        total_price=ExpressionWrapper(F('quantity') * F('price'), output_field=models.DecimalField(max_digits=12, decimal_places=2))
+        total_price=ExpressionWrapper(F('quantity') * F('price'), output_field=DecimalField(max_digits=12, decimal_places=2))
     ).aggregate(sales=Sum('total_price'))['sales'] or Decimal('0.00')
+
+    total_product_savings = Decimal('0.00')
+    for item in order_items_qs:
+        total_product_savings += item.product.get_savings() * item.quantity
 
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="sales_report.csv"'
@@ -1675,6 +1681,7 @@ def download_sales_report_csv(request):
     writer.writerow(['Total Quantity Sold', total_qty])
     writer.writerow(['Total Item Sales', f'Rs.{total_item_sales}'])
     writer.writerow(['Total Coupon Discount', f'Rs.{total_discount}'])
+    writer.writerow(['Total Product Discount', f'Rs.{total_product_savings}'])
     writer.writerow(['Total Order Amount', f'Rs.{total_order_amount}'])
     writer.writerow([])
     writer.writerow(['Order ID', 'Date', 'User', 'Total Amount', 'Coupon Code', 'Coupon Discount'])

@@ -52,7 +52,7 @@
         </form>
 
         <!-- Summary Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
             <div class="bg-white shadow rounded-lg p-4 border-l-4 border-blue-500">
                 <p class="text-sm text-gray-500">Item Sales</p>
                 <h3 class="text-xl font-bold text-gray-800 mt-1">₹{{ total_item_sales|floatformat:2 }}</h3>
@@ -69,8 +69,14 @@
                 <p class="text-sm text-gray-500">Discount</p>
                 <h3 class="text-xl font-bold text-gray-800 mt-1">₹{{ total_discount|floatformat:2 }}</h3>
             </div>
+            {% if total_product_savings > 0 %}
+            <div class="bg-white shadow rounded-lg p-4 border-l-4 border-purple-500">
+                <p class="text-sm text-gray-500">Product Discount</p>
+                <h3 class="text-xl font-bold text-gray-800 mt-1">₹{{ total_product_savings|floatformat:2 }}</h3>
+            </div>
+            {% endif %}
             <div class="bg-white shadow rounded-lg p-4 border-l-4 border-indigo-500">
-                <p class="text-sm text-gray-500">Final Amount</p>
+                <p class="text-sm text-gray-500">Final Amount<p class="text-[10px] text-gray-500">inlcluding tax</p></p>
                 <h3 class="text-xl font-bold text-gray-800 mt-1">₹{{ total_order_amount|floatformat:2 }}</h3>
             </div>
         </div>
