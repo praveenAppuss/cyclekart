@@ -1225,8 +1225,8 @@ def place_order(request):
     razorpay_amount = int(total_amount * 100)
     logger.debug(f"Subtotal: {subtotal}, Product Discount: {product_discount}, Coupon Discount: {coupon_discount}, Tax: {tax}, Total: {total_amount}")
 
-    if payment_method == 'cod' and total_amount > Decimal('100000'):
-        messages.error(request, "Cash on Delivery not available for orders above ₹100000.")
+    if payment_method == 'cod' and total_amount > Decimal('1000'):
+        messages.error(request, "Cash on Delivery not available for orders above ₹1000.")
         return redirect('checkout')
 
     try:

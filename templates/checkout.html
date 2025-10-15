@@ -79,11 +79,11 @@
                         <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
                         <div class="space-y-3 text-sm">
                             <label class="flex items-center gap-2 text-sm">
-                                {% if final_total > 100000 %}
+                                {% if final_total > 1000 %}
                                 <input type="radio" disabled class="accent-blue-600">
                                 <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
                                 <span class="line-through text-gray-400">Cash on Delivery</span>
-                                <span class="text-red-500 text-xs ml-2">(COD not available for orders above ₹100000)</span>
+                                <span class="text-red-500 text-xs ml-2">(COD not available for orders above ₹1000)</span>
                                 {% else %}
                                 <input type="radio" name="payment_method" value="cod" class="accent-blue-600" checked>
                                 <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
