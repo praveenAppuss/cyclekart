@@ -11,65 +11,93 @@
     <title>{% block title %}Admin Panel{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar for premium feel */
+        .sidebar-nav::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: #f3f4f6;
+            border-radius: 3px;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: #6b7280;
+            border-radius: 3px;
+        }
+        .sidebar-nav::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+    </style>
 </head>
 
-<body class="bg-gray-100">
-
+<body class="bg-white text-gray-800 font-sans">
     <div class="flex min-h-screen">
         <!-- Sidebar -->
-        <aside class="w-50 bg-white border-r h-screen flex flex-col justify-between shadow-sm">
-            <div>
+<aside class="w-64 bg-gradient-to-b from-gray-100 via-gray-50 to-gray-200 text-gray-800 border-r border-gray-300 fixed h-screen shadow-lg transform transition-all duration-300 ease-in-out z-50">
+            <div class="h-full flex flex-col">
                 <!-- Logo/Header -->
-                <div class="flex items-center justify-center h-14 border-b font-bold text-xl">
-                    <i data-lucide="layout-dashboard" class="w-5 h-5 mr-1"></i> Admin
+                <div class="flex items-center justify-center h-20 border-b border-gray-700 bg-gray-850 text-black font-extrabold text-2xl tracking-wider shadow-md">
+                    <i data-lucide="layout-dashboard" class="w-6 h-6 mr-2 text-indigo-400"></i>
+                    Admin Hub
                 </div>
 
                 <!-- Navigation -->
-                <nav class="p-4 space-y-2 text-sm">
-                    <a href="{% url 'admin_dashboard' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="layout-dashboard" class="w-4 h-4 mr-2"></i> Dashboard
+                <nav class="sidebar-nav p-6 space-y-2 text-sm overflow-y-auto flex-1" style="max-height: calc(100vh - 8rem);">
+                    <a href="{% url 'admin_dashboard' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Dashboard</span>
                     </a>
-                    <a href="{% url 'product_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="box" class="w-4 h-4 mr-2"></i> Products
+                    <a href="{% url 'product_list' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="box" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Products</span>
                     </a>
-                    <a href="{% url 'admin_order_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="shopping-cart" class="w-4 h-4 mr-2"></i> Orders
+                    <a href="{% url 'admin_order_list' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="shopping-cart" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Orders</span>
                     </a>
-                    <a href="{% url 'user_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="users" class="w-4 h-4 mr-2"></i> Customers
+                    <a href="{% url 'user_list' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="users" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Customers</span>
                     </a>
-                    <a href="{% url 'sales_report' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="bar-chart" class="w-4 h-4 mr-2"></i> Report
+                    <a href="{% url 'sales_report' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="bar-chart" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Sales Report</span>
                     </a>
-                    <a href="{% url 'coupon_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="ticket" class="w-4 h-4 mr-2"></i> Coupons
+                    <a href="{% url 'coupon_list' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="ticket" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Coupons</span>
                     </a>
-                    <a href="{% url 'category_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="folder" class="w-4 h-4 mr-2"></i> Category
+                    <a href="{% url 'category_list' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="folder" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Category</span>
                     </a>
-                    <a href="{% url 'brand_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="tag" class="w-4 h-4 mr-2"></i> Brand
+                    <a href="{% url 'brand_list' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="tag" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Brand</span>
                     </a>
-                    <a href="#" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="image" class="w-4 h-4 mr-2"></i> Banner Management
+                    <a href="#" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="image" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Banner Management</span>
                     </a>
-                    <a href="{% url 'offers_list' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100">
-                        <i data-lucide="gift" class="w-4 h-4 mr-2"></i> Offer Management
+                    <a href="{% url 'offers_list' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-indigo-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="gift" class="w-5 h-5 mr-3 text-indigo-300"></i>
+                        <span class="font-medium">Offer Management</span>
                     </a>
-                    <a href="{% url 'admin_logout' %}" class="flex items-center px-3 py-2 rounded hover:bg-gray-100 text-red-600 font-medium">
-                        <i data-lucide="log-out" class="w-4 h-4 mr-2"></i> Logout
+                    <a href="{% url 'admin_logout' %}" class="flex items-center px-4 py-2.5 rounded-lg hover:bg-red-700/50 bg-opacity-0 hover:text-white transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                        <i data-lucide="log-out" class="w-5 h-5 mr-3 text-red-400"></i>
+                        <span class="font-medium">Logout</span>
                     </a>
-                    
-
                 </nav>
-            </div>
 
-            
-            
+                <!-- Footer -->
+                <div class="p-4 border-t border-gray-700 text-center text-xs text-gray-400 bg-gray-850">
+                    &copy; 2025 Admin Hub | Powered by xAI
+                </div>
+            </div>
         </aside>
 
         <!-- Main content -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-8 ml-64 transition-all duration-300">
             {% block content %}
             <!-- Content goes here -->
             {% endblock %}
@@ -80,6 +108,20 @@
         lucide.createIcons();
     </script>
 
+    <style>
+        /* Enhance premium feel with subtle animations */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        .sidebar-nav a:hover .lucide-icon {
+            animation: pulse 1.5s infinite;
+        }
+        /* Ensure smooth scroll behavior */
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
 </body>
 
 </html>

@@ -1,22 +1,269 @@
 {% extends "admin_base.html" %}
-
 {% block title %}Admin Dashboard{% endblock %}
 
 {% block content %}
-<h1 class="text-3xl font-semibold mb-6">Dashboard</h1>
+<div class="p-6 bg-slate-50 min-h-screen">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6">
+        <div>
+            <h2 class="text-2xl font-semibold text-gray-800 flex items-center">
+                <i class="fas fa-chart-pie mr-2 text-lg"></i>
+                Admin Dashboard
+            </h2>
+            <p class="text-sm text-gray-500 mt-1">Monitor business performance</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <form method="GET" class="flex items-center space-x-2">
+                <label class="text-sm text-gray-600 font-medium flex items-center">
+                    <i class="fas fa-filter mr-1 text-xs"></i>
+                    Time Period:
+                </label>
+                <select name="filter" onchange="this.form.submit()" class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm">
+                    <option value="daily" {% if filter_type == 'daily' %}selected{% endif %}>Daily</option>
+                    <option value="monthly" {% if filter_type == 'monthly' %}selected{% endif %}>Monthly</option>
+                    <option value="yearly" {% if filter_type == 'yearly' %}selected{% endif %}>Yearly</option>
+                </select>
+            </form>
+        </div>
+    </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-    <div class="bg-white p-6 rounded shadow text-center">
-        <h2 class="text-xl font-bold">Users</h2>
-        <p class="text-gray-600 text-2xl mt-2">--</p> <!-- Replace with count -->
+    <!-- Sales Chart Section -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
+        <div class="bg-gradient-to-r from-slate-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                <i class="fas fa-chart-line mr-2 text-base"></i>
+                Sales Overview
+            </h3>
+        </div>
+        <div class="p-6">
+            <div class="relative h-80">
+                <canvas id="salesChart"></canvas>
+            </div>
+        </div>
     </div>
-    <div class="bg-white p-6 rounded shadow text-center">
-        <h2 class="text-xl font-bold">Products</h2>
-        <p class="text-gray-600 text-2xl mt-2">--</p> <!-- Replace with count -->
+
+    <!-- Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Top Products Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center mb-4">
+                <div class="p-3 bg-gradient-to-br from-gray-500 to-gray-600 rounded-lg mr-3 flex items-center justify-center">
+                    <i data-lucide="box" class="text-white w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Top Products</h3>
+                    <p class="text-sm text-gray-500">Best selling items</p>
+                </div>
+            </div>
+            <div class="space-y-3 max-h-80 overflow-y-auto">
+                {% if top_products %}
+                    {% for item in top_products %}
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 px-2 rounded transition-colors">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900 text-sm truncate">{{ item.product__name }}</div>
+                            <div class="text-xs text-gray-500">Product</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-gray-500 to-gray-600 text-white px-2.5 py-1.5 rounded-md text-center shadow-sm inline-block">
+                            <div class="text-sm font-semibold leading-tight">{{ item.total_sold }}</div>
+                            <div class="text-[10px] font-medium opacity-90 -mt-0.5">Sold</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-inbox text-4xl mb-3 opacity-50"></i>
+                        <p class="text-sm">No data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Top Categories Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center mb-4">
+                <div class="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg mr-3 flex items-center justify-center">
+                    <i data-lucide="folder" class="w-4 h-4 mr-2"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Top Categories</h3>
+                    <p class="text-sm text-gray-500">Popular categories</p>
+                </div>
+            </div>
+            <div class="space-y-3 max-h-80 overflow-y-auto">
+                {% if top_categories %}
+                    {% for item in top_categories %}
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 px-2 rounded transition-colors">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900 text-sm truncate">{{ item.product__category__name }}</div>
+                            <div class="text-xs text-gray-500">Category</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-indigo-500 to-indigo-600 text-white px-2.5 py-1.5 rounded-md text-center shadow-sm inline-block">
+                            <div class="text-sm font-semibold leading-tight">{{ item.total_sold }}</div>
+                            <div class="text-[10px] font-medium opacity-90 -mt-0.5">Sold</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-inbox text-4xl mb-3 opacity-50"></i>
+                        <p class="text-sm">No data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Top Brands Card -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center mb-4">
+                <div class="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-lg mr-3 flex items-center justify-center">
+                    <i data-lucide="tag" class="w-4 h-4 mr-2"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Top Brands</h3>
+                    <p class="text-sm text-gray-500">Leading brands</p>
+                </div>
+            </div>
+            <div class="space-y-3 max-h-80 overflow-y-auto">
+                {% if top_brands %}
+                    {% for item in top_brands %}
+                    <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 px-2 rounded transition-colors">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900 text-sm truncate">{{ item.product__brand__name }}</div>
+                            <div class="text-xs text-gray-500">Brand</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-500 to-green-600 text-white px-2.5 py-1.5 rounded-md text-center shadow-sm inline-block">
+                            <div class="text-sm font-semibold leading-tight">{{ item.total_sold }}</div>
+                            <div class="text-[10px] font-medium opacity-90 -mt-0.5">Sold</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-inbox text-4xl mb-3 opacity-50"></i>
+                        <p class="text-sm">No data available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
-    <div class="bg-white p-6 rounded shadow text-center">
-        <h2 class="text-xl font-bold">Orders</h2>
-        <p class="text-gray-600 text-2xl mt-2">--</p> <!-- Replace with count -->
-    </div>
+
+    <!-- Chart.js Script -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        
+        // Create gradient for the chart - darker theme
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(71, 85, 105, 0.8)');
+        gradient.addColorStop(1, 'rgba(51, 65, 85, 0.1)');
+
+        const chartLabels = [{% for data in sales_data %}'{{ data.period|date:"M d" }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+        const chartData = [{% for data in sales_data %}{{ data.total|floatformat:0 }}{% if not forloop.last %}, {% endif %}{% endfor %}];
+
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: chartLabels,
+                datasets: [{
+                    label: 'Total Sales',
+                    data: chartData,
+                    borderColor: '#475569',
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#475569',
+                    pointBorderColor: '#ffffff',
+                    pointBorderWidth: 2,
+                    pointHoverBackgroundColor: '#334155',
+                    pointHoverBorderColor: '#ffffff',
+                    pointHoverBorderWidth: 3,
+                    borderWidth: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 16,
+                            font: {
+                                size: 12,
+                                weight: '600'
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleColor: '#ffffff',
+                        bodyColor: '#ffffff',
+                        borderColor: '#475569',
+                        borderWidth: 2,
+                        cornerRadius: 10,
+                        displayColors: false,
+                        callbacks: {
+                            label: function(context) {
+                                return 'Sales: ₹' + context.parsed.y.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            },
+                            color: '#64748b'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(226, 232, 240, 0.4)',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 11,
+                                weight: '500'
+                            },
+                            color: '#64748b',
+                            callback: function(value) {
+                                return '₹' + value.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                elements: {
+                    point: {
+                        hoverRadius: 7
+                    }
+                }
+            }
+        });
+
+        // Set chart height
+        document.getElementById('salesChart').style.height = '350px';
+
+        // Add smooth animations
+        chart.options.animation = {
+            duration: 1800,
+            easing: 'easeInOutQuart'
+        };
+    </script>
 </div>
 {% endblock %}

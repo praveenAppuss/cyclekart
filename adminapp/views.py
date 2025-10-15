@@ -5,6 +5,7 @@ import re
 from django.forms import DecimalField
 from django.db.models import Sum, F, ExpressionWrapper
 from django.db.models import ExpressionWrapper, F, Sum, DecimalField
+from django.db.models.functions import Coalesce
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login,logout
 from django.views.decorators.cache import never_cache
@@ -22,6 +23,8 @@ import base64
 import uuid
 from django.core.files.base import ContentFile
 import logging
+from dateutil.relativedelta import relativedelta
+from django.db.models.functions import TruncDate, TruncMonth, TruncYear,TruncDay
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
 from django.utils import timezone
@@ -60,11 +63,7 @@ def admin_logout(request):
     return redirect('admin_login')
 
 
-#  Admin Dashboard View 
-@superuser_required
-@never_cache
-def admin_dashboard(request):
-    return render(request, 'admin_dashboard.html')
+
 
 
 
@@ -1689,3 +1688,67 @@ def download_sales_report_csv(request):
         ])
 
     return response
+
+
+
+#--------------------Admin Dashboard------------------------------#
+
+@superuser_required
+def admin_dashboard(request):
+    filter_type = request.GET.get('filter', 'monthly')  
+    today = timezone.now()
+
+    if filter_type == 'daily':
+        orders = Order.objects.annotate(period=TruncDay('created_at'))
+    elif filter_type == 'yearly':
+        orders = Order.objects.annotate(period=TruncYear('created_at'))
+    else:   
+        orders = Order.objects.annotate(period=TruncMonth('created_at'))
+
+    orders = orders.filter(
+        status__in=['delivered', 'confirmed'],
+        payment_status='paid'
+    )
+
+    sales_data = orders.values('period').annotate(total=Sum('total_amount')).order_by('period')
+
+    top_products = (
+        OrderItem.objects.filter(
+            order__status__in=['delivered', 'confirmed'],
+            order__payment_status='paid'
+        )
+        .values('product__name', 'product__id')
+        .annotate(total_sold=Sum('quantity'))
+        .order_by('-total_sold')[:10]
+    )
+
+    
+    top_categories = (
+        OrderItem.objects.filter(
+            order__status__in=['delivered', 'confirmed'],
+            order__payment_status='paid'
+        )
+        .values('product__category__name', 'product__category__id')
+        .annotate(total_sold=Sum('quantity'))
+        .order_by('-total_sold')[:10]
+    )
+
+    
+    top_brands = (
+        OrderItem.objects.filter(
+            order__status__in=['delivered', 'confirmed'],
+            order__payment_status='paid'
+        )
+        .values('product__brand__name', 'product__brand__id')
+        .annotate(total_sold=Sum('quantity'))
+        .order_by('-total_sold')[:10]
+    )
+
+    context = {
+        'sales_data': sales_data,
+        'top_products': top_products,
+        'top_categories': top_categories,
+        'top_brands': top_brands,
+        'filter_type': filter_type,
+    }
+    return render(request, 'admin_dashboard.html', context)
