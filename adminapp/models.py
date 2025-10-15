@@ -139,7 +139,6 @@ class ProductSizeStock(models.Model):
 
 
 class CategoryOffer(models.Model):
-    # Renamed to plural; related_name for reverse from Category
     categories = models.ManyToManyField(Category, related_name='category_offers')
     name = models.CharField(max_length=100)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2)  
@@ -153,13 +152,12 @@ class CategoryOffer(models.Model):
         now = timezone.now()
         return self.is_active and self.valid_from <= now <= self.valid_to
 
-    # Fixed: Use self.name since multiple categories
+    
     def __str__(self):
         return f"{self.name} - {self.discount_percentage}%"
 
 
 class ProductOffer(models.Model):
-    # Renamed to plural; related_name for reverse from Product
     products = models.ManyToManyField(Product, related_name='product_offers')
     name = models.CharField(max_length=100)
     discount_percentage = models.DecimalField(max_digits=5, decimal_places=2)
@@ -173,6 +171,5 @@ class ProductOffer(models.Model):
         now = timezone.now()
         return self.is_active and self.valid_from <= now <= self.valid_to
 
-    # Fixed: Use self.name since multiple products
     def __str__(self):
         return f"{self.name} - {self.discount_percentage}%"

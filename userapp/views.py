@@ -1021,7 +1021,6 @@ def checkout_view(request):
     coupon_discount = Decimal('0')
 
     for item in cart_items:
-        # Updated: Use dynamic final_price and savings (includes offers)
         unit_price = item.product.price
         unit_savings = item.product.get_savings()
         quantity = item.quantity
@@ -1110,7 +1109,7 @@ def apply_coupon(request):
             cart = Cart.objects.get(user=user)
             cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
             
-            # Updated: Recalculate subtotal with dynamic offers
+            
             subtotal = Decimal('0')
             total_discount = Decimal('0')
             for item in cart_items:
@@ -1185,7 +1184,6 @@ def place_order(request):
         messages.error(request, "Your cart is empty.")
         return redirect('cart_view')
 
-    
     subtotal = Decimal('0.00')
     product_discount = Decimal('0.00')
     coupon_discount = Decimal('0.00')
@@ -1199,6 +1197,7 @@ def place_order(request):
         product_discount += unit_savings * quantity
         logger.debug(f"Item: {item.product.name}, Final Price: {unit_price}, Savings: {unit_savings}, Qty: {quantity}, Subtotal: {unit_price * quantity}, Discount: {unit_savings * quantity}")
 
+    # ✅ Handle applied coupon
     if 'applied_coupon_id' in request.session:
         try:
             applied_coupon = Coupon.objects.get(
@@ -1219,7 +1218,7 @@ def place_order(request):
             del request.session['applied_coupon_id']
             applied_coupon = None
 
-    taxable_amount = subtotal - product_discount - coupon_discount  
+    taxable_amount = subtotal - product_discount - coupon_discount
     tax = taxable_amount * Decimal('0.05')
     shipping_cost = Decimal('0.00')
     total_amount = taxable_amount + tax + shipping_cost
@@ -1232,11 +1231,13 @@ def place_order(request):
 
     try:
         with transaction.atomic():
+            # ✅ Check stock first
             for item in cart_items:
                 size_stock = item.size_stock
                 if size_stock.quantity < item.quantity:
                     raise ValueError(f"Insufficient stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} available, {item.quantity} requested")
 
+            # 🟢 CASH ON DELIVERY
             if payment_method == 'cod':
                 unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
                 order = Order.objects.create(
@@ -1279,19 +1280,13 @@ def place_order(request):
                 cart.items.all().delete()
                 return redirect('order_success', order_id=order.id)
 
+            # 🟢 WALLET PAYMENT
             elif payment_method == 'wallet':
                 wallet, _ = Wallet.objects.get_or_create(user=request.user)
                 if wallet.balance >= total_amount:
                     wallet.balance -= total_amount
                     wallet.save()
-                    WalletTransaction.objects.create(
-                        wallet=wallet,
-                        order=order,  
-                        amount=total_amount,
-                        transaction_type='debit',
-                        description=f"Payment for Order {unique_order_id}",
-                        transaction_id=f"TXN-{uuid.uuid4().hex[:8].upper()}"
-                    )
+
                     unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
                     order = Order.objects.create(
                         user=request.user,
@@ -1307,6 +1302,15 @@ def place_order(request):
                         total_amount=total_amount,
                         status='confirmed',
                         payment_status='paid'
+                    )
+
+                    WalletTransaction.objects.create(
+                        wallet=wallet,
+                        order=order,
+                        amount=total_amount,
+                        transaction_type='debit',
+                        description=f"Payment for Order {unique_order_id}",
+                        transaction_id=f"TXN-{uuid.uuid4().hex[:8].upper()}"
                     )
 
                     if applied_coupon:
@@ -1335,8 +1339,8 @@ def place_order(request):
                 else:
                     raise ValueError("Insufficient wallet balance.")
 
+            # 🟢 RAZORPAY PAYMENT
             elif payment_method == 'razorpay':
-                
                 request.session['pending_order_data'] = {
                     'address_id': address_id,
                     'subtotal': str(subtotal),
@@ -1353,20 +1357,19 @@ def place_order(request):
                         'quantity': item.quantity,
                     } for item in cart_items]
                 }
-                
 
                 razorpay_order = razorpay_client.order.create({
                     "amount": razorpay_amount,
                     "currency": "INR",
                     "payment_capture": "1"
                 })
+
                 return render(request, "razorpay_checkout.html", {
                     "razorpay_order": razorpay_order,
                     "razorpay_key": settings.RAZORPAY_KEY_ID,
                     "amount": razorpay_amount,
                     "currency": "INR",
                     "csrf_token": get_token(request)
-                    
                 })
 
             else:
@@ -1376,6 +1379,7 @@ def place_order(request):
         logger.error(f"Order creation failed: {str(e)}", exc_info=True)
         messages.error(request, f"An error occurred while placing the order: {str(e)}")
         return redirect('checkout')
+
 
 @csrf_exempt
 @require_http_methods(["POST"])

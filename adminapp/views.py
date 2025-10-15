@@ -1162,14 +1162,6 @@ def toggle_coupon(request, coupon_id):
 
 
 #----------------------------------Offer Management----------------------------------------#
-import pytz
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib import messages
-from django.utils import timezone
-from datetime import datetime
-import re
-
-from .models import ProductOffer, CategoryOffer, Product, Category
 
 @superuser_required
 def list_offers(request):
