@@ -4,76 +4,116 @@
 {% load static %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-100 px-4 py-6">
+<div class="min-h-screen bg-gray-50 px-4 py-6">
     <div class="max-w-7xl mx-auto">
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-900">Transaction Detail: {{ transaction.transaction_id }}</h2>
-            <a href="{% url 'admin_wallet_list' %}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md font-medium">Back to List</a>
+            <h2 class="text-2xl font-bold text-gray-900 flex items-center">
+                <i data-lucide="wallet-2" class="w-6 h-6 mr-2 text-indigo-500"></i>
+                Transaction Detail (Admin View): {{ transaction.transaction_id }}
+            </h2>
+            <a href="{% url 'admin_wallet_list' %}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md font-medium transition-colors">Back to List</a>
         </div>
         
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 mb-6">
             <!-- User Details -->
-            <div class="bg-white shadow rounded-lg p-6">
-                <h4 class="text-lg font-medium text-gray-900 mb-4">User Details</h4>
+            <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+                <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                    <i data-lucide="user" class="w-5 h-5 mr-2 text-indigo-400"></i>
+                    User Details
+                </h4>
                 <dl class="space-y-4">
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Username</dt>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i data-lucide="user-check" class="w-4 h-4 text-gray-400 mr-2"></i>
+                            <dt class="text-sm font-medium text-gray-500">Username</dt>
+                        </div>
                         <dd class="text-sm text-gray-900">{{ user.username }}</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Email</dt>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i data-lucide="mail" class="w-4 h-4 text-gray-400 mr-2"></i>
+                            <dt class="text-sm font-medium text-gray-500">Email</dt>
+                        </div>
                         <dd class="text-sm text-gray-900">{{ user.email }}</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Mobile</dt>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i data-lucide="phone" class="w-4 h-4 text-gray-400 mr-2"></i>
+                            <dt class="text-sm font-medium text-gray-500">Mobile</dt>
+                        </div>
                         <dd class="text-sm text-gray-900">{{ user.mobile|default:"N/A" }}</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Date Joined</dt>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i data-lucide="calendar" class="w-4 h-4 text-gray-400 mr-2"></i>
+                            <dt class="text-sm font-medium text-gray-500">Date Joined</dt>
+                        </div>
                         <dd class="text-sm text-gray-900">{{ user.date_joined|date:"Y-m-d H:i" }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Current Balance</dt>
-                        <dd class="text-sm font-semibold text-green-600">₹{{ user.wallet.balance }}</dd>
                     </div>
                 </dl>
             </div>
             
             <!-- Transaction Details -->
-            <div class="bg-white shadow rounded-lg p-6">
-                <h4 class="text-lg font-medium text-gray-900 mb-4">Transaction Details</h4>
+            <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+                <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center border-b border-gray-100 pb-3">
+                    <i data-lucide="credit-card" class="w-5 h-5 mr-2 text-indigo-400"></i>
+                    Transaction Details
+                </h4>
                 <dl class="space-y-4">
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">ID</dt>
-                        <dd class="text-sm text-gray-900">{{ transaction.transaction_id }}</dd>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i data-lucide="hash" class="w-4 h-4 text-gray-400 mr-2"></i>
+                            <dt class="text-sm font-medium text-gray-500">ID</dt>
+                        </div>
+                        <dd class="text-sm text-gray-900 font-mono">{{ transaction.transaction_id }}</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Date</dt>
-                        <dd class="text-sm text-gray-900">{{ transaction.created_at|date:"Y-m-d H:i:s" }}</dd>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i data-lucide="calendar" class="w-4 h-4 text-gray-400 mr-2"></i>
+                            <dt class="text-sm font-medium text-gray-500">Date</dt>
+                        </div>
+                        <dd class="text-sm text-gray-900">{{ transaction.created_at|date:"M d, Y H:i:s" }}</dd>
                     </div>
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Type</dt>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            {% if transaction.admin_type == 'credit' %}
+                                <i data-lucide="arrow-up-circle" class="w-4 h-4 text-green-400 mr-2"></i>
+                            {% else %}
+                                <i data-lucide="arrow-down-circle" class="w-4 h-4 text-red-400 mr-2"></i>
+                            {% endif %}
+                            <dt class="text-sm font-medium text-gray-500">Type</dt>
+                        </div>
                         <dd class="text-sm">
-                            {% if transaction.transaction_type == 'credit' %}
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Credit</span>
+                            {% if transaction.admin_type == 'credit' %}
+                                <span class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-50 text-green-700 border border-green-200">
+                                    <i data-lucide="arrow-up" class="w-3 h-3 mr-1"></i>Credit
+                                </span>
                             {% else %}
-                                <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Debit</span>
+                                <span class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-50 text-red-700 border border-red-200">
+                                    <i data-lucide="arrow-down" class="w-3 h-3 mr-1"></i>Debit
+                                </span>
                             {% endif %}
                         </dd>
                     </div>
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Amount</dt>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <i data-lucide="banknote" class="w-4 h-4 text-gray-400 mr-2"></i>
+                            <dt class="text-sm font-medium text-gray-500">Amount</dt>
+                        </div>
                         <dd class="text-sm font-semibold">
-                            {% if transaction.transaction_type == 'credit' %}
-                                <span class="text-green-600">+₹{{ transaction.amount }}</span>
+                            {% if transaction.admin_type == 'credit' %}
+                                <span class="text-green-600 flex items-center">+₹{{ transaction.amount }}</span>
                             {% else %}
-                                <span class="text-red-600">-₹{{ transaction.amount }}</span>
+                                <span class="text-red-600 flex items-center">-₹{{ transaction.amount }}</span>
                             {% endif %}
                         </dd>
                     </div>
-                    <div class="flex justify-between">
-                        <dt class="text-sm font-medium text-gray-500">Description</dt>
-                        <dd class="text-sm text-gray-900">{{ transaction.description|default:"N/A" }}</dd>
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center">
+                            <i data-lucide="file-text" class="w-4 h-4 text-gray-400 mr-2"></i>
+                            <dt class="text-sm font-medium text-gray-500">Description</dt>
+                        </div>
+                        <dd class="text-xs text-gray-900 break-words">{{ transaction.admin_description }}</dd>
                     </div>
                 </dl>
             </div>
@@ -81,22 +121,32 @@
         
         <!-- Source of Transaction -->
         {% if transaction.order %}
-        <div class="bg-white shadow rounded-lg p-6">
-            <h4 class="text-lg font-medium text-gray-900 mb-4">Source of Transaction</h4>
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+            <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <i data-lucide="shopping-bag" class="w-5 h-5 mr-2 text-gray-400"></i>
+                Source of Transaction
+            </h4>
             <p class="text-gray-700 mb-4">Associated with <strong>Order #{{ transaction.order.order_id }}</strong>.</p>
             {% if is_return_or_cancel %}
                 <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
-                    <p class="text-yellow-800"><strong>Note:</strong> This transaction is due to a returned or canceled product.</p>
+                    <p class="text-yellow-800 flex items-center"><i data-lucide="alert-triangle" class="w-4 h-4 mr-2"></i><strong>Note:</strong> This transaction is due to a returned or canceled product (refund issued).</p>
                 </div>
-                <a href="{% url 'admin_order_detail' transaction.order.id %}" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md font-medium">View Order Details</a>
+                <a href="{% url 'admin_order_detail' transaction.order.id %}" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md font-medium transition-colors inline-flex items-center">
+                    <i data-lucide="eye" class="w-4 h-4 mr-2"></i>View Order Details
+                </a>
             {% else %}
-                <a href="{% url 'admin_order_detail' transaction.order.id %}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md font-medium">View Order Details</a>
+                <a href="{% url 'admin_order_detail' transaction.order.id %}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md font-medium transition-colors inline-flex items-center">
+                    <i data-lucide="eye" class="w-4 h-4 mr-2"></i>View Order Details
+                </a>
             {% endif %}
         </div>
         {% else %}
-        <div class="bg-white shadow rounded-lg p-6">
-            <h4 class="text-lg font-medium text-gray-900 mb-4">Source of Transaction</h4>
-            <p class="text-gray-500">No associated order found. This may be a manual adjustment or referral credit.</p>
+        <div class="bg-white shadow-sm rounded-lg border border-gray-200 p-6">
+            <h4 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <i data-lucide="shopping-bag" class="w-5 h-5 mr-2 text-indigo-400"></i>
+                Source of Transaction
+            </h4>
+            <p class="text-gray-500 flex items-center"><i data-lucide="info" class="w-4 h-4 mr-2 text-gray-400"></i>No associated order found. This may be a manual adjustment or referral credit.</p>
         </div>
         {% endif %}
     </div>

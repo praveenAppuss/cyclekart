@@ -4,123 +4,85 @@
 {% load static %}
 
 {% block content %}
-<div class="min-h-screen bg-gray-100 px-4 py-6">
+<div class="min-h-screen bg-gray-50 px-4 py-6">
     <div class="max-w-7xl mx-auto">
-        <h2 class="text-2xl font-bold text-gray-900 mb-4">Wallet Transactions</h2>
-        
-        <!-- Date Filters -->
-        <div class="bg-white shadow rounded-lg p-4 mb-6">
-            <form method="get" class="flex flex-wrap gap-4 items-end">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                    <input type="date" name="start_date" value="{{ start_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                    <input type="date" name="end_date" value="{{ end_date }}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
-                <div>
-                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md font-medium">Filter</button>
-                    <a href="{% url 'admin_wallet_list' %}" class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-md font-medium ml-2">Clear</a>
-                </div>
-            </form>
+        <div class="mb-6">
+            <h1 class="text-2xl font-semibold text-gray-900">Wallet Transactions</h1>
+            <p class="text-sm text-gray-600 mt-1">View and manage all wallet transactions.</p>
         </div>
         
         <!-- Transactions Table -->
-        <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction ID</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for transaction in transactions %}
                         <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ transaction.transaction_id }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ transaction.created_at|date:"Y-m-d H:i" }}</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ transaction.wallet.user.username }} ({{ transaction.wallet.user.email }})</td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                {% if transaction.transaction_type == 'credit' %}
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ transaction.transaction_id }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ transaction.created_at|date:"Y-m-d H:i" }}</td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">{{ transaction.wallet.user.username }}<br><span class="text-xs text-gray-500">({{ transaction.wallet.user.email }})</span></td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                {% if transaction.admin_type == 'credit' %}
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Credit</span>
                                 {% else %}
                                     <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Debit</span>
                                 {% endif %}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                {% if transaction.transaction_type == 'credit' %}
-                                    +₹{{ transaction.amount }}
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-semibold">
+                                {% if transaction.admin_type == 'credit' %}
+                                    <span class="text-green-600">+₹{{ transaction.amount }}</span>
                                 {% else %}
-                                    -₹{{ transaction.amount }}
+                                    <span class="text-red-600">-₹{{ transaction.amount }}</span>
                                 {% endif %}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <a href="{% url 'admin_wallet_detail' transaction.transaction_id %}" class="text-indigo-600 hover:text-indigo-900">View</a>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                                <a href="{% url 'admin_wallet_detail' transaction.transaction_id %}" class="text-indigo-600 hover:text-indigo-900 text-xs">View</a>
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="px-6 py-4 text-center text-gray-500">No transactions found.</td>
+                            <td colspan="6" class="px-4 py-4 text-center text-gray-500 text-sm">No transactions found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
-        
+
         <!-- Pagination -->
         {% if transactions.has_other_pages %}
-        <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 mt-4 rounded-b-lg">
-            <div class="flex-1 flex justify-between sm:hidden">
-                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Previous</a>
-                <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">Next</a>
-            </div>
-            <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                    <p class="text-sm text-gray-700">
-                        Showing <span class="font-medium">{{ transactions.start_index }}</span> to <span class="font-medium">{{ transactions.end_index }}</span> of 
-                        <span class="font-medium">{{ transactions.paginator.count }}</span> results
-                    </p>
-                </div>
-                <div>
-                    <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                        {% if transactions.has_previous %}
-                            <a href="?page={{ transactions.previous_page_number }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
-                               class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                <span class="sr-only">Previous</span>
-                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                </svg>
-                            </a>
-                        {% endif %}
-                        
-                        {% for num in transactions.paginator.page_range %}
-                            {% if transactions.number == num %}
-                                <a href="#" class="relative inline-flex items-center px-4 py-2 border border-indigo-500 text-sm font-medium rounded-md z-10 bg-indigo-50 text-indigo-600">{{ num }}</a>
-                            {% elif num > transactions.number|add:'-3' and num < transactions.number|add:'3' %}
-                                <a href="?page={{ num }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
-                                   class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">{{ num }}</a>
-                            {% endif %}
-                        {% endfor %}
-                        
-                        {% if transactions.has_next %}
-                            <a href="?page={{ transactions.next_page_number }}{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}" 
-                               class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                <span class="sr-only">Next</span>
-                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                                </svg>
-                            </a>
-                        {% endif %}
-                    </nav>
-                </div>
-            </div>
+        <div class="mt-4 flex justify-center">
+            <ul class="inline-flex items-center space-x-1 text-sm">
+                {% if transactions.number > 1 %}
+                <li><a href="?page=1" class="px-2 py-1 border rounded hover:bg-gray-100">« First</a></li>
+                <li><a href="?page={{ transactions.previous_page_number }}" class="px-2 py-1 border rounded hover:bg-gray-100">‹ Prev</a></li>
+                {% endif %}
+                {% for num in transactions.paginator.page_range %}
+                    {% if num == 1 or num == transactions.paginator.num_pages or num >= transactions.number|add:"-2" and num <= transactions.number|add:"2" %}
+                    {% if num == transactions.number %}
+                        <li><span class="px-3 py-1 bg-blue-600 text-white rounded">{{ num }}</span></li>
+                    {% else %}
+                        <li><a href="?page={{ num }}" class="px-2 py-1 border rounded hover:bg-gray-100">{{ num }}</a></li>
+                    {% endif %}
+                    {% elif num == transactions.number|add:"-3" or num == transactions.number|add:"3" %}
+                    <li><span class="px-2">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                {% if transactions.number < transactions.paginator.num_pages %}
+                <li><a href="?page={{ transactions.next_page_number }}" class="px-2 py-1 border rounded hover:bg-gray-100">Next ›</a></li>
+                <li><a href="?page={{ transactions.paginator.num_pages }}" class="px-2 py-1 border rounded hover:bg-gray-100">Last »</a></li>
+                {% endif %}
+            </ul>
         </div>
         {% endif %}
     </div>

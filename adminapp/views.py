@@ -1759,12 +1759,20 @@ def admin_dashboard(request):
 @superuser_required
 def admin_wallet_list(request):
     transactions = WalletTransaction.objects.select_related('wallet__user', 'order').order_by('-created_at')
-    start_date = request.GET.get('start_date')
-    end_date = request.GET.get('end_date')
-    if start_date:
-        transactions = transactions.filter(created_at__date__gte=start_date)
-    if end_date:
-        transactions = transactions.filter(created_at__date__lte=end_date)
+    transactions = list(transactions)
+    
+    for tx in transactions:
+        if tx.transaction_type == 'credit':  
+            tx.admin_type = 'debit'
+            tx.admin_description = f"Refund to {tx.wallet.user.email}"
+        else:  
+            tx.admin_type = 'credit'
+            tx.admin_description = f"Received from {tx.wallet.user.email}"
+        
+        if tx.order:
+            tx.admin_description += f" for Order #{tx.order.order_id}"
+        else:
+            tx.admin_description += " (Manual adjustment or referral)"
     
     paginator = Paginator(transactions, 8)
     page_number = request.GET.get('page')
@@ -1772,19 +1780,26 @@ def admin_wallet_list(request):
 
     return render(request, 'admin_wallet_list.html', {
         'transactions': page_obj,
-        'start_date': start_date,
-        'end_date': end_date,
     })
 
 @superuser_required
 def admin_wallet_detail(request, transaction_id):
     transaction = get_object_or_404(WalletTransaction, transaction_id=transaction_id)
     user = transaction.wallet.user
-    is_return_or_cancel = False
+    
+    if transaction.transaction_type == 'credit':  
+        transaction.admin_type = 'debit'
+        transaction.admin_description = f"Refund to {user.email}"
+    else:  
+        transaction.admin_type = 'credit'
+        transaction.admin_description = f"Received from {user.email}"
+    
     if transaction.order:
-        order_statuses = ['cancelled', 'returned']
-        if transaction.transaction_type == 'credit' and transaction.order.status in order_statuses:
-            is_return_or_cancel = True
+        transaction.admin_description += f" for Order #{transaction.order.order_id}"
+        is_return_or_cancel = (transaction.admin_type == 'debit')
+    else:
+        transaction.admin_description += " (Manual adjustment or referral)"
+        is_return_or_cancel = False
     
     return render(request, 'admin_wallet_detail_view.html', {
         'transaction': transaction,
