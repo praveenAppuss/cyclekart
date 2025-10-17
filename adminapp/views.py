@@ -1752,3 +1752,42 @@ def admin_dashboard(request):
         'filter_type': filter_type,
     }
     return render(request, 'admin_dashboard.html', context)
+
+
+#---------------------Admin Wallet Management------------------------#
+
+@superuser_required
+def admin_wallet_list(request):
+    transactions = WalletTransaction.objects.select_related('wallet__user', 'order').order_by('-created_at')
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    if start_date:
+        transactions = transactions.filter(created_at__date__gte=start_date)
+    if end_date:
+        transactions = transactions.filter(created_at__date__lte=end_date)
+    
+    paginator = Paginator(transactions, 8)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'admin_wallet_list.html', {
+        'transactions': page_obj,
+        'start_date': start_date,
+        'end_date': end_date,
+    })
+
+@superuser_required
+def admin_wallet_detail(request, transaction_id):
+    transaction = get_object_or_404(WalletTransaction, transaction_id=transaction_id)
+    user = transaction.wallet.user
+    is_return_or_cancel = False
+    if transaction.order:
+        order_statuses = ['cancelled', 'returned']
+        if transaction.transaction_type == 'credit' and transaction.order.status in order_statuses:
+            is_return_or_cancel = True
+    
+    return render(request, 'admin_wallet_detail_view.html', {
+        'transaction': transaction,
+        'user': user,
+        'is_return_or_cancel': is_return_or_cancel,
+    })

@@ -44,5 +44,6 @@ urlpatterns = [
     path('toggle_category_offer/<int:offer_id>/', views.toggle_category_offer, name='toggle_category_offer'),
     path('sales-report/', views.sales_report, name='sales_report'),
     path('sales-report/download-csv/', views.download_sales_report_csv, name='download_sales_report_csv'),
-
+    path('admin/wallet/transactions/', views.admin_wallet_list, name='admin_wallet_list'),
+    path('admin/wallet/transactions/<str:transaction_id>/', views.admin_wallet_detail, name='admin_wallet_detail'),
 ]
