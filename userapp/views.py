@@ -445,15 +445,42 @@ def profile_view(request):
         'default_address': default_address,
     })
 
-
-
 @login_required
+@require_http_methods(["POST"])
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
 def upload_profile_image(request):
-    if request.method == 'POST' and request.FILES.get('profile_image'):
-        request.user.profile_image = request.FILES['profile_image']
+    if request.FILES.get('profile_image'):
+        profile_image = request.FILES['profile_image']
+        # Validate file type: only images
+        if not profile_image.content_type.startswith('image/'):
+            messages.error(request, "Only image files are allowed (e.g., JPG, PNG, GIF).")
+            return redirect('profile')
+        
+        # Optional: Additional size check, e.g., max 5MB
+        if profile_image.size > 5 * 1024 * 1024:
+            messages.error(request, "Image file is too large (max 5MB).")
+            return redirect('profile')
+        
+        request.user.profile_image = profile_image
         request.user.save()
+        messages.success(request, "Profile image updated successfully.")
+    
+    return redirect('profile')
+
+@login_required
+@require_http_methods(["POST"])
+@cache_control(no_store=True, no_cache=True, must_revalidate=True)
+@never_cache
+def delete_profile_image(request):
+    if request.user.profile_image:
+        # Delete the file from storage (optional, but good practice)
+        request.user.profile_image.delete(save=False)
+        request.user.profile_image = None
+        request.user.save()
+        messages.success(request, "Profile image deleted successfully.")
+    else:
+        messages.info(request, "No profile image to delete.")
     return redirect('profile')
 
 @login_required

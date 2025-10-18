@@ -12,6 +12,7 @@ urlpatterns = [
     path('product/<int:product_id>/', views.product_detail, name='product_detail'),
     path('profile/', views.profile_view, name='profile'),
     path('upload_profile_image/',views.upload_profile_image,name='upload_profile_image'),
+    path('profile/delete-image/', views.delete_profile_image, name='delete_profile_image'),
     path('update-profile/', views.update_profile, name='update_profile'),
     path('profile/resend-otp/', views.resend_profile_otp, name='resend_profile_otp'),
     path('addresses/', views.address_list, name='address_list'),
