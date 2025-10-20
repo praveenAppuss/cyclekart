@@ -2,6 +2,8 @@ import csv
 from datetime import datetime, timedelta
 from decimal import Decimal
 import re
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side
 from django.forms import DecimalField
 from django.db.models import Sum, F, ExpressionWrapper
 from django.db.models import ExpressionWrapper, F, Sum, DecimalField
@@ -1623,22 +1625,18 @@ def download_sales_report_csv(request):
 
     if filter_type == 'today':
         start_date = today
-        end_date = today
     elif filter_type == 'week':
         start_date = today - timedelta(days=7)
-        end_date = today
     elif filter_type == 'month':
         start_date = today.replace(day=1)
-        end_date = today
     elif filter_type == 'year':
         start_date = today.replace(month=1, day=1)
-        end_date = today
     elif filter_type == 'custom' and from_date_str and to_date_str:
         try:
             start_date = datetime.strptime(from_date_str, '%Y-%m-%d').date()
             end_date = datetime.strptime(to_date_str, '%Y-%m-%d').date()
         except ValueError:
-            start_date = end_date = today  
+            start_date = end_date = today
 
     orders_queryset = Order.objects.filter(
         status='delivered',
@@ -1659,35 +1657,79 @@ def download_sales_report_csv(request):
     for item in order_items_qs:
         total_product_savings += item.product.get_savings() * item.quantity
 
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = 'attachment; filename="sales_report.csv"'
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sales Report"
 
-    writer = csv.writer(response)
-    writer.writerow(['Sales Report'])
-    writer.writerow(['Filter', filter_type])
-    writer.writerow(['Date Range', f'{start_date} to {end_date}'])
-    writer.writerow([])
-    writer.writerow(['Summary'])
-    writer.writerow(['Total Orders', total_orders])
-    writer.writerow(['Total Quantity Sold', total_qty])
-    writer.writerow(['Total Item Sales', f'Rs.{total_item_sales}'])
-    writer.writerow(['Total Coupon Discount', f'Rs.{total_discount}'])
-    writer.writerow(['Total Product Discount', f'Rs.{total_product_savings}'])
-    writer.writerow(['Total Order Amount', f'Rs.{total_order_amount}'])
-    writer.writerow([])
-    writer.writerow(['Order ID', 'Date', 'User', 'Total Amount', 'Coupon Code', 'Coupon Discount'])
+    bold = Font(bold=True)
+    center = Alignment(horizontal="center", vertical="center")
+    left_align = Alignment(horizontal="left", vertical="center")
+    border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    ws["A1"] = "Sales Report"
+    ws["A1"].font = Font(bold=True, size=14)
+
+    ws.append(["Filter", filter_type])
+    ws.append(["Date Range", f"{start_date} to {end_date}"])
+    ws.append([])
+    ws.append(["Summary"])
+    ws.append(["Total Orders", total_orders])
+    ws.append(["Total Quantity Sold", total_qty])
+    ws.append(["Total Item Sales", f"Rs.{total_item_sales}"])
+    ws.append(["Total Coupon Discount", f"Rs.{total_discount}"])
+    ws.append(["Total Product Discount", f"Rs.{total_product_savings}"])
+    ws.append(["Total Order Amount", f"Rs.{total_order_amount}"])
+    ws.append([])
+
+    summary_start = 2
+    summary_end = ws.max_row - 1  
+
+    for row in ws.iter_rows(min_row=summary_start, max_row=summary_end, min_col=1, max_col=2):
+        for cell in row:
+            cell.border = border
+            cell.alignment = left_align
+            if cell.col_idx == 1:
+                cell.font = bold
+
+    headers = ["Order ID", "Date", "User", "Total Amount", "Coupon Code", "Coupon Discount"]
+    ws.append(headers)
+
+    for col in ws[ws.max_row]:
+        col.font = bold
+        col.alignment = center
+        col.border = border
+
 
     for order in orders_queryset:
-        writer.writerow([
+        row = [
             order.order_id,
-            order.created_at.strftime('%Y-%m-%d'),
+            order.created_at.strftime('%d-%m-%Y'),
             order.user.username,
-            f'Rs.{order.total_amount}',
-            order.coupon_code or '-',
-            f'Rs.{order.coupon_discount or Decimal("0.00")}'
-        ])
+            f"Rs.{order.total_amount}",
+            order.coupon_code or "-",
+            f"Rs.{order.coupon_discount or Decimal('0.00')}"
+        ]
+        ws.append(row)
 
+    
+    for row in ws.iter_rows(min_row=ws.min_row + 13, max_row=ws.max_row, min_col=1, max_col=6):
+        for cell in row:
+            cell.border = border
+            cell.alignment = center
+
+    
+    for column_cells in ws.columns:
+        length = max(len(str(cell.value)) if cell.value else 0 for cell in column_cells)
+        ws.column_dimensions[column_cells[0].column_letter].width = length + 4
+
+    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = 'attachment; filename="sales_report.xlsx"'
+    wb.save(response)
     return response
+
 
 
 
