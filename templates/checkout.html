@@ -78,25 +78,25 @@
                         <h2 class="text-base font-semibold mb-2">Payment Methods</h2>
                         <p class="text-sm text-gray-500 mb-4">Select one payment method</p>
                         <div class="space-y-3 text-sm">
-                            <label class="flex items-center gap-2 text-sm">
+                            <label class="flex items-center gap-2 text-sm" id="cod-label">
                                 {% if final_total > 1000 %}
-                                <input type="radio" disabled class="accent-blue-600">
+                                <input type="radio" disabled class="accent-blue-600" id="cod-radio">
                                 <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
                                 <span class="line-through text-gray-400">Cash on Delivery</span>
-                                <span class="text-red-500 text-xs ml-2">(COD not available for orders above ₹1000)</span>
+                                <span class="text-red-500 text-xs ml-2 cod-notice" id="cod-notice">(COD not available for orders above ₹1000)</span>
                                 {% else %}
-                                <input type="radio" name="payment_method" value="cod" class="accent-blue-600" checked>
+                                <input type="radio" name="payment_method" value="cod" class="accent-blue-600" checked id="cod-radio">
                                 <i data-lucide="banknote" class="w-4 h-4 text-gray-600"></i>
                                 <span>Cash on Delivery</span>
                                 {% endif %}
                             </label>
                             <label class="flex items-center gap-2 text-sm">
-                                <input type="radio" name="payment_method" value="wallet" class="accent-blue-600">
+                                <input type="radio" name="payment_method" value="wallet" class="accent-blue-600" id="wallet-radio">
                                 <i data-lucide="wallet" class="w-4 h-4 text-gray-600"></i>
                                 <span>Wallet</span>
                             </label>
                             <label class="flex items-center gap-2 text-sm">
-                                <input type="radio" name="payment_method" value="razorpay" class="accent-blue-600">
+                                <input type="radio" name="payment_method" value="razorpay" class="accent-blue-600" id="razorpay-radio">
                                 <i data-lucide="credit-card" class="w-4 h-4 text-gray-600"></i>
                                 <span>Pay Online (Razorpay)</span>
                             </label>
@@ -134,26 +134,24 @@
                 </div>
 
                 <!-- Price Breakdown -->
-                <div class="space-y-2 text-sm text-slate-700 mt-6">
+                <div class="space-y-2 text-sm text-slate-700 mt-6" id="price-breakdown">
                     <div class="flex justify-between">
                         <span>Subtotal:</span>
-                        <span>₹{{ subtotal|floatformat:2 }}</span>
+                        <span id="subtotal-val">₹{{ subtotal|floatformat:2 }}</span>
                     </div>
-                    <div class="flex justify-between text-green-600">
+                    <div class="flex justify-between text-green-600" id="product-discount-row">
                         <span>Product Discount:</span>
-                        <span>-₹{{ total_discount|floatformat:2 }}</span>
+                        <span id="total-discount-val">-₹{{ total_discount|floatformat:2 }}</span>
                     </div>
                     {% if applied_coupon %}
-                    
-                    <div class="flex justify-between text-green-600">
+                    <div class="flex justify-between text-green-600" id="coupon-discount-row">
                         <span>Coupon Discount :</span>
-                        <span>-₹{{ coupon_discount|floatformat:2 }}</span>
+                        <span id="coupon-discount-val">-₹{{ coupon_discount|floatformat:2 }}</span>
                     </div>
-                    
                     {% endif %}
                     <div class="flex justify-between">
                         <span>Tax (5%):</span>
-                        <span>₹{{ taxes|floatformat:2 }}</span>
+                        <span id="taxes-val">₹{{ taxes|floatformat:2 }}</span>
                     </div>
                     <div class="flex justify-between">
                         <span>Shipping:</span>
@@ -162,7 +160,7 @@
                     <hr class="my-2">
                     <div class="flex justify-between font-bold text-base text-slate-900">
                         <span>Total:</span>
-                        <span>₹{{ final_total|floatformat:2 }}</span>
+                        <span id="final-total-val">₹{{ final_total|floatformat:2 }}</span>
                     </div>
                 </div>
 
@@ -179,7 +177,7 @@
                         <div>
                             <p class="text-sm font-semibold">COUPONS</p>
                             <p class="text-xs">1 Coupon applied</p>
-                            <p class="text-xs text-green-600">You saved additional ₹{{ applied_coupon.discount_amount|floatformat:0 }}</p>
+                            <p class="text-xs text-green-600" id="savings-val">You saved additional ₹{{ applied_coupon.discount_amount|floatformat:0 }}</p>
                         </div>
                         <form method="POST" action="{% url 'remove_coupon' %}" id="remove-coupon-form">
                             {% csrf_token %}
@@ -190,57 +188,65 @@
                         </form>
                     </div>
                     {% else %}
-                    <div class="flex justify-between items-center mb-4">
-                        <div class="text-sm text-gray-500 italic">
-                            (If you have any coupons)
+                    <div id="no-coupon-section">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="text-sm text-gray-500 italic">
+                                (If you have any coupons)
+                            </div>
+                            <button id="view-coupons" class="text-sm underline cursor-pointer text-gray-500 hover:text-gray-900">
+                                View Coupons
+                            </button>
                         </div>
-                        <button id="view-coupons" class="text-sm underline cursor-pointer text-gray-500 hover:text-gray-900">
-                            View Coupons
-                        </button>
-                    </div>
-                    <div id="couponDropdown" class="hidden mt-4 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
-                        <h4 class="text-sm font-semibold text-gray-600 mb-4">Available Coupons</h4>
-                        <ul class="space-y-3">
-                            {% if coupons %}
-                            {% for coupon in coupons %}
-                            <li class="flex items-center justify-between gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition border border-gray-100 {% if coupon_status|get_item:coupon.id %}opacity-50{% endif %}">
-                                <div class="flex-1">
-                                    <p class="font-semibold text-blue-700 text-sm {% if coupon_status|get_item:coupon.id %}line-through text-red-500{% endif %}">{{ coupon.code }}</p>
-                                    <p class="text-xs text-gray-500">₹{{ coupon.discount_amount|floatformat:2 }} off</p>
-                                    <p class="text-xs text-gray-500">Min: ₹{{ coupon.minimum_order_amount|floatformat:2 }}</p>
-                                    <p class="text-xs text-gray-500">Valid till: {{ coupon.valid_to|date:"M d, Y" }}</p>
-                                </div>
-                                {% if taxable_amount >= coupon.minimum_order_amount and not coupon_status|get_item:coupon.id %}
-                                <form method="POST" action="{% url 'apply_coupon' %}" class="coupon-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="coupon_code" value="{{ coupon.code }}">
-                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm">
-                                        Apply
-                                    </button>
-                                </form>
-                                {% elif coupon_status|get_item:coupon.id %}
-                                <span class="text-xs text-red-500">Already Used</span>
+                        <div id="couponDropdown" class="hidden mt-4 bg-white rounded-xl shadow-lg p-6 border border-gray-100">
+                            <h4 class="text-sm font-semibold text-gray-600 mb-4">Available Coupons</h4>
+                            <ul class="space-y-3">
+                                {% if coupons %}
+                                {% for coupon in coupons %}
+                                <li class="flex items-center justify-between gap-4 p-4 rounded-lg bg-gray-50 hover:bg-gray-100 transition border border-gray-100 {% if coupon_status|get_item:coupon.id %}opacity-50{% endif %}">
+                                    <div class="flex-1">
+                                        <p class="font-semibold text-blue-700 text-sm {% if coupon_status|get_item:coupon.id %}line-through text-red-500{% endif %}">{{ coupon.code }}</p>
+                                        <p class="text-xs text-gray-500">₹{{ coupon.discount_amount|floatformat:2 }} off</p>
+                                        <p class="text-xs text-gray-500">Min: ₹{{ coupon.minimum_order_amount|floatformat:2 }}</p>
+                                        <p class="text-xs text-gray-500">Valid till: {{ coupon.valid_to|date:"M d, Y" }}</p>
+                                    </div>
+                                    {% if taxable_amount >= coupon.minimum_order_amount and not coupon_status|get_item:coupon.id %}
+                                    <form method="POST" action="{% url 'apply_coupon' %}" class="coupon-form">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="coupon_code" value="{{ coupon.code }}">
+                                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition shadow-sm">
+                                            Apply
+                                        </button>
+                                    </form>
+                                    {% elif coupon_status|get_item:coupon.id %}
+                                    <span class="text-xs text-red-500">Already Used</span>
+                                    {% else %}
+                                    <span class="text-xs text-red-500">Not eligible</span>
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
                                 {% else %}
-                                <span class="text-xs text-red-500">Not eligible</span>
+                                <p class="text-gray-500 text-sm text-center">No active available coupons.</p>
                                 {% endif %}
-                            </li>
-                            {% endfor %}
-                            {% else %}
-                            <p class="text-gray-500 text-sm text-center">No active available coupons.</p>
-                            {% endif %}
-                        </ul>
+                            </ul>
+                        </div>
                     </div>
                     {% endif %}
 
-                    <!-- Coupon Error Message -->
-                    {% if coupon_error %}
-                    <p class="text-red-500 text-sm mt-2">{{ coupon_error }}</p>
-                    {% endif %}
-                    <!-- Display Django Messages -->
-                    {% if messages %}
-                    {% for message in messages %}
-                    <p class="text-red-500 text-sm mt-2">{{ message }}</p>
-                    {% endfor %}
+                    <!-- Hidden JS for Django Messages & Coupon Error (injects array for toasts) -->
+                    {% if messages or coupon_error %}
+                    <script>
+                        // Collect all messages into an array for SweetAlert
+                        const djangoMessages = [
+                            {% if coupon_error %}
+                                {type: 'error', text: '{{ coupon_error|escapejs }}'},
+                            {% endif %}
+                            {% if messages %}
+                                {% for message in messages %}
+                                    {type: '{% if "success" in message.tags %}success{% elif "error" in message.tags %}error{% elif "warning" in message.tags %}warning{% else %}info{% endif %}', text: '{{ message.message|escapejs }}'},
+                                {% endfor %}
+                            {% endif %}
+                        ];
+                    </script>
                     {% endif %}
                 </div>
             </div>
@@ -313,6 +319,192 @@
         document.getElementById("country").value = option.dataset.country;
     }
 
+    // SweetAlert Toast Function
+    function showSweetAlert(message, type) {
+        const iconMap = {
+            'success': 'success',
+            'error': 'error',
+            'info': 'info',
+            'warning': 'warning'
+        };
+        const icon = iconMap[type] || 'info';
+        Swal.fire({
+            text: message,
+            icon: icon,
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000,
+            timerProgressBar: true,
+            customClass: {
+                popup: 'swal2-small'
+            }
+        });
+    }
+
+    // NEW: Update Payment Options based on final_total
+    function updatePaymentOptions(finalTotal) {
+        const codRadio = document.getElementById('cod-radio');
+        const codLabel = document.getElementById('cod-label');
+        const codNotice = document.getElementById('cod-notice');
+        const isOver1000 = finalTotal > 1000;
+
+        if (isOver1000) {
+            codRadio.disabled = true;
+            codRadio.checked = false;
+            if (!codNotice) {
+                const noticeSpan = document.createElement('span');
+                noticeSpan.className = 'text-red-500 text-xs ml-2 cod-notice';
+                noticeSpan.id = 'cod-notice';
+                noticeSpan.textContent = '(COD not available for orders above ₹1000)';
+                const codSpan = codLabel.querySelector('span:not(.cod-notice)');
+                codSpan.insertAdjacentElement('afterend', noticeSpan);
+                const existingNotice = document.getElementById('cod-notice');
+                if (existingNotice) existingNotice.remove();
+            }
+            // Default to wallet if COD was checked
+            if (codRadio.checked) {
+                document.getElementById('wallet-radio').checked = true;
+            }
+        } else {
+            codRadio.disabled = false;
+            const notice = document.querySelector('.cod-notice');
+            if (notice) notice.remove();
+        }
+    }
+
+    // NEW: Update Price Breakdown
+    function updatePrices(totals) {
+        document.getElementById('subtotal-val').textContent = `₹${totals.subtotal.toFixed(2)}`;
+        document.getElementById('total-discount-val').textContent = `-₹${totals.total_discount.toFixed(2)}`;
+        document.getElementById('taxes-val').textContent = `₹${totals.taxes.toFixed(2)}`;
+        document.getElementById('final-total-val').textContent = `₹${totals.final_total.toFixed(2)}`;
+
+        const couponRow = document.getElementById('coupon-discount-row');
+        const couponDiscount = totals.coupon_discount;
+        if (couponDiscount > 0) {
+            if (!couponRow) {
+                const productDiscountRow = document.getElementById('product-discount-row');
+                const newRow = document.createElement('div');
+                newRow.className = 'flex justify-between text-green-600';
+                newRow.id = 'coupon-discount-row';
+                newRow.innerHTML = `
+                    <span>Coupon Discount :</span>
+                    <span id="coupon-discount-val">-₹${couponDiscount.toFixed(2)}</span>
+                `;
+                productDiscountRow.insertAdjacentElement('afterend', newRow);
+            } else {
+                document.getElementById('coupon-discount-val').textContent = `-₹${couponDiscount.toFixed(2)}`;
+            }
+        } else if (couponRow) {
+            couponRow.remove();
+        }
+
+        // Update savings in applied section if visible
+        const savingsVal = document.getElementById('savings-val');
+        if (savingsVal) {
+            savingsVal.textContent = `You saved additional ₹${Math.round(couponDiscount)}`;
+        }
+
+        updatePaymentOptions(totals.final_total);
+    }
+
+    // NEW: Handle Apply Success (dynamic insert)
+    function handleApplySuccess(data) {
+        showSweetAlert(data.message, 'success');
+
+        // Hide no-coupon section
+        const noCouponSection = document.getElementById('no-coupon-section');
+        if (noCouponSection) noCouponSection.style.display = 'none';
+
+        // Create/insert applied section
+        let appliedSection = document.getElementById('applied-coupon-section');
+        if (!appliedSection) {
+            appliedSection = document.createElement('div');
+            appliedSection.className = 'bg-gray-100 rounded-md p-3 flex justify-between items-center';
+            appliedSection.id = 'applied-coupon-section';
+            const couponSection = document.querySelector('.mt-6.pt-6.border-t');
+            couponSection.insertBefore(appliedSection, noCouponSection);
+        }
+        const coupon = data.coupon;
+        appliedSection.innerHTML = `
+            <div>
+                <p class="text-sm font-semibold">COUPONS</p>
+                <p class="text-xs">1 Coupon applied</p>
+                <p class="text-xs text-green-600" id="savings-val">You saved additional ₹${Math.round(coupon.discount_amount)}</p>
+            </div>
+            <form method="POST" action="{% url 'remove_coupon' %}" id="remove-coupon-form">
+                {% csrf_token %}
+                <input type="hidden" name="coupon_code" value="${coupon.code}">
+                <button type="submit" class="text-red-600 text-sm border border-red-600 px-3 py-1 rounded hover:bg-red-100">
+                    Remove
+                </button>
+            </form>
+        `;
+
+        // Re-attach event listener to new remove form
+        const newRemoveForm = appliedSection.querySelector('#remove-coupon-form');
+        if (newRemoveForm) {
+            newRemoveForm.addEventListener('submit', handleCouponSubmit);
+        }
+
+        updatePrices(data.updated_totals);
+    }
+
+    // NEW: Handle Remove Success (dynamic remove)
+    function handleRemoveSuccess(data) {
+        showSweetAlert(data.message, 'success');
+
+        // Remove applied section
+        const appliedSection = document.getElementById('applied-coupon-section');
+        if (appliedSection) appliedSection.remove();
+
+        // Show no-coupon section
+        const noCouponSection = document.getElementById('no-coupon-section');
+        if (noCouponSection) noCouponSection.style.display = 'block';
+
+        updatePrices(data.updated_totals);
+    }
+
+    // UPDATED: Unified Coupon Submit Handler
+    function handleCouponSubmit(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        const url = form.action;
+        const isRemove = form.id === 'remove-coupon-form';
+
+        fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                if (isRemove) {
+                    handleRemoveSuccess(data);
+                } else {
+                    handleApplySuccess(data);
+                }
+            } else {
+                showSweetAlert(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Coupon AJAX Error:', error);
+            showSweetAlert('An error occurred while processing the coupon. Please try again.', 'error');
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         const urlParams = new URLSearchParams(window.location.search);
         const newAddressId = urlParams.get('new_address_id');
@@ -356,64 +548,25 @@
             }
         });
 
-        // AJAX for Coupon Apply/Remove
-        document.querySelectorAll('.coupon-form, #remove-coupon-form').forEach(form => {
-            form.addEventListener('submit', function (e) {
-                e.preventDefault();
-                const formData = new FormData(form);
-                const url = form.action;
-
-                fetch(url, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': formData.get('csrfmiddlewaretoken'),
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (data.success) {
-                        // Reload page on success for both apply and remove
-                        window.location.reload();
-                    } else {
-                        // Display error message
-                        const errorMessage = document.createElement('p');
-                        errorMessage.className = 'text-red-500 text-sm mt-2';
-                        errorMessage.textContent = data.message || 'An error occurred.';
-                        form.parentElement.appendChild(errorMessage);
-                        setTimeout(() => errorMessage.remove(), 5000);
-                    }
-                })
-                .catch(error => {
-                    console.error('Coupon AJAX Error:', error);
-                    const errorMessage = document.createElement('p');
-                    errorMessage.className = 'text-red-500 text-sm mt-2';
-                    errorMessage.textContent = 'An error occurred while processing the coupon. Please try again.';
-                    form.parentElement.appendChild(errorMessage);
-                    setTimeout(() => errorMessage.remove(), 5000);
-                });
-            });
-        });
-
-        // Display Django messages after page load
-        const messages = document.querySelectorAll('.messages .message');
-        if (messages.length > 0) {
-            messages.forEach(msg => {
-                const errorMessage = document.createElement('p');
-                errorMessage.className = 'text-red-500 text-sm mt-2';
-                errorMessage.textContent = msg.textContent;
-                document.querySelector('.mt-6.pt-6.border-t').appendChild(errorMessage);
-                setTimeout(() => errorMessage.remove(), 5000);
+        // Handle Django Messages on Page Load
+        if (typeof djangoMessages !== 'undefined' && djangoMessages.length > 0) {
+            djangoMessages.forEach(msg => {
+                showSweetAlert(msg.text, msg.type);
             });
         }
+
+        // Initial payment options update
+        const initialFinalTotal = parseFloat('{{ final_total|floatformat:2 }}');
+        updatePaymentOptions(initialFinalTotal);
+
+        // Attach unified handler to all coupon forms
+        document.querySelectorAll('.coupon-form, #remove-coupon-form').forEach(form => {
+            form.addEventListener('submit', handleCouponSubmit);
+        });
     });
 </script>
 
+<!-- Include SweetAlert2 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 {% endblock %}

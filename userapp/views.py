@@ -1096,7 +1096,6 @@ def checkout_view(request):
         logger.debug(f"Subtotal: {subtotal}, Total Discount: {total_discount}, Coupon Discount: {coupon_discount}, Taxable Amount: {taxable_amount}, Net Taxable Amount: {net_taxable_amount}, Taxes: {taxes}, Final Total: {final_total}")
         logger.debug(f"Current time: {current_time} (IST: {current_time.astimezone(ist)}), Taxable Amount: {taxable_amount}")
 
-    # FIXED: Remove erroneous id__in=used_coupon_ids from filter to show all valid coupons, then exclude used ones
     used_coupon_ids = {uc.coupon_id for uc in UsedCoupon.objects.filter(user=user)}
     current_time = timezone.now()  
     eligible_for_coupons = taxable_amount > Decimal('0')
@@ -1105,9 +1104,9 @@ def checkout_view(request):
         valid_from__lte=current_time,
         valid_to__gte=current_time,
         is_deleted=False
-    ).exclude(id__in=used_coupon_ids)  # Now correctly excludes only used ones
+    ).exclude(id__in=used_coupon_ids)  
     coupon_status = {coupon.id: coupon.id in used_coupon_ids for coupon in coupons}
-    logger.debug(f"Found {coupons.count()} available coupons after filtering")  # Optional: For debugging
+    logger.debug(f"Found {coupons.count()} available coupons after filtering")  
 
     context = {
         'addresses': addresses,
@@ -1133,7 +1132,6 @@ def checkout_view(request):
 
 
 @login_required(login_url='user_login')
-@cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
 @require_http_methods(["POST"])
 def apply_coupon(request):
@@ -1147,7 +1145,6 @@ def apply_coupon(request):
             cart = Cart.objects.get(user=user)
             cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
             
-            
             subtotal = Decimal('0')
             total_discount = Decimal('0')
             for item in cart_items:
@@ -1157,7 +1154,6 @@ def apply_coupon(request):
                 subtotal += unit_price * quantity
                 total_discount += unit_savings * quantity
             taxable_amount = subtotal - total_discount
-            logger.debug(f"Taxable Amount in apply_coupon: {taxable_amount}")
 
             coupon = Coupon.objects.get(
                 code=coupon_code,
@@ -1171,13 +1167,33 @@ def apply_coupon(request):
                 return JsonResponse({'success': False, 'message': 'This coupon has already been used.'})
 
             min_order_amount = Decimal(str(coupon.minimum_order_amount))
-            logger.debug(f"Minimum order amount: {min_order_amount}")
             if min_order_amount > taxable_amount:
                 return JsonResponse({'success': False, 'message': 'Minimum order amount not met for this coupon.'})
 
+           
             request.session['applied_coupon_id'] = coupon.id  
             request.session['coupon_discount'] = str(coupon.discount_amount)
-            return JsonResponse({'success': True, 'message': 'Coupon applied successfully!', 'coupon_discount': float(coupon.discount_amount)})
+
+            updated_coupon_discount = Decimal(str(coupon.discount_amount))
+            updated_taxable = taxable_amount - updated_coupon_discount
+            updated_tax = updated_taxable * Decimal('0.05')
+            updated_final_total = updated_taxable + updated_tax
+
+            return JsonResponse({
+                'success': True, 
+                'message': 'Coupon applied successfully!', 
+                'coupon': {
+                    'code': coupon.code,
+                    'discount_amount': float(coupon.discount_amount)
+                },
+                'updated_totals': {
+                    'subtotal': float(subtotal),
+                    'total_discount': float(total_discount),
+                    'coupon_discount': float(updated_coupon_discount),
+                    'taxes': float(updated_tax),
+                    'final_total': float(updated_final_total)
+                }
+            })
         except Coupon.DoesNotExist:
             return JsonResponse({'success': False, 'message': 'Invalid or expired coupon code.'})
     return JsonResponse({'success': False, 'message': 'Invalid request method.'})
@@ -1185,15 +1201,43 @@ def apply_coupon(request):
 
 @login_required(login_url='user_login')
 @never_cache
+@require_http_methods(["POST"])
 def remove_coupon(request):
     if request.method == 'POST':
         if 'applied_coupon_id' in request.session:  
             del request.session['applied_coupon_id']
             del request.session['coupon_discount']
-            return JsonResponse({'success': True, 'message': 'Coupon removed successfully!', 'reload': True})
+
+            user = request.user
+            cart = Cart.objects.get(user=user)
+            cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
+            
+            subtotal = Decimal('0')
+            total_discount = Decimal('0')
+            for item in cart_items:
+                unit_price = item.product.price
+                unit_savings = item.product.get_savings()
+                quantity = item.quantity
+                subtotal += unit_price * quantity
+                total_discount += unit_savings * quantity
+            taxable_amount = subtotal - total_discount
+            updated_coupon_discount = Decimal('0')
+            updated_tax = taxable_amount * Decimal('0.05')
+            updated_final_total = taxable_amount + updated_tax
+
+            return JsonResponse({
+                'success': True, 
+                'message': 'Coupon removed successfully!', 
+                'updated_totals': {
+                    'subtotal': float(subtotal),
+                    'total_discount': float(total_discount),
+                    'coupon_discount': 0.0,
+                    'taxes': float(updated_tax),
+                    'final_total': float(updated_final_total)
+                }
+            })
         return JsonResponse({'success': False, 'message': 'No coupon applied.'})
     return JsonResponse({'success': False, 'message': 'Invalid request method.'})
-    
     
     
 razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
