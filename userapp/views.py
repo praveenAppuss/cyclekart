@@ -1051,8 +1051,8 @@ def checkout_view(request):
     for item in cart_items:
         unit_price = item.product.get_final_price()  
         quantity = item.quantity
-        item_total = unit_price * quantity
         original_price = item.product.price
+        item_total = original_price * quantity
         unit_savings = (original_price - unit_price) * quantity
         subtotal += item_total
         total_discount += unit_savings

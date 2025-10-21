@@ -1,44 +1,17 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Razorpay Payment</title>
+
     <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
-    <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f8f9fa; }
-        #container { text-align: center; }
-        #error-message { color: red; }
-        #status-message { color: blue; }
-    </style>
-</head>
-<body>
-    <div id="container">
-        <h2 id="processing-text">Processing Payment for Order {{ order.order_id }}...</h2>
-        <div id="error-message" style="display: none;"></div>
-        <div id="status-message"></div>
-    </div>
+
 
     <script>
-        console.log("Order ID available:", "{{ order.id }}"); 
         const options = {
             "key": "{{ razorpay_key }}",
-            "amount": {{ amount }}, 
+            "amount": {{ amount }},
             "currency": "INR",
             "name": "CycleKart",
             "description": "Order Payment for {{ order.order_id }}",
             "order_id": "{{ razorpay_order.id }}",
+
             "handler": function (response) {
-                document.getElementById("status-message").textContent = "Payment successful, sending to server...";
-                console.log("Razorpay response:", response); 
-                if (!response.razorpay_payment_id || !response.razorpay_order_id || !response.razorpay_signature) {
-                    console.error("Incomplete Razorpay response:", response);
-                    document.getElementById("error-message").textContent = "Incomplete payment data. Redirecting...";
-                    document.getElementById("error-message").style.display = "block";
-                    setTimeout(() => {
-                        window.location.href = "{% url 'payment_failed' %}";
-                    }, 3000);
-                    return;
-                }
                 fetch("{% url 'payment_handler' %}", {
                     method: "POST",
                     headers: {
@@ -51,41 +24,26 @@
                         razorpay_signature: response.razorpay_signature,
                         order_id: "{{ order.id }}"
                     })
-                }).then(res => {
-                    console.log("Fetch response status:", res.status);
-                    return res.json();
-                }).then(data => {
-                    console.log("Fetch response data:", data);
+                })
+                .then(res => res.json())
+                .then(data => {
                     if (data.status === "success") {
-                        window.location.href = data.redirect_url;
+                        window.location.replace(data.redirect_url);
                     } else {
-                        document.getElementById("error-message").textContent = "Server error: " + (data.message || "Payment failed. Redirecting...");
-                        document.getElementById("error-message").style.display = "block";
-                        setTimeout(() => {
-                            window.location.href = "{% url 'payment_failed' %}";
-                        }, 3000);
+                        window.location.replace("{% url 'payment_failed' %}");
                     }
-                }).catch(error => {
-                    console.error("Fetch error:", error);
-                    document.getElementById("error-message").textContent = "Network error during payment processing. Redirecting...";
-                    document.getElementById("error-message").style.display = "block";
-                    setTimeout(() => {
-                        window.location.href = "{% url 'payment_failed' %}";
-                    }, 3000);
+                })
+                .catch(() => {
+                    window.location.replace("{% url 'payment_failed' %}");
                 });
             },
+
             "modal": {
                 "ondismiss": function() {
-                    console.log("Modal dismissed");
-                    // Removed invalid getDismissReason() to prevent errors
-                    document.getElementById("processing-text").style.display = "none";  // Hide processing text
-                    document.getElementById("error-message").textContent = "Payment cancelled or timed out. Redirecting to payment failed...";
-                    document.getElementById("error-message").style.display = "block";
-                    setTimeout(() => {
-                        window.location.href = "{% url 'payment_failed' %}";
-                    }, 3000);
+                    window.location.replace("{% url 'payment_failed' %}");
                 }
             },
+
             "theme": {
                 "color": "#3399cc"
             }
@@ -93,21 +51,10 @@
 
         const rzp = new Razorpay(options);
 
-        rzp.on('payment.failed', function (response) {
-            console.error("Payment failed event:", response.error);
-            document.getElementById("processing-text").style.display = "none";
-            document.getElementById("error-message").textContent = `Payment failed: ${response.error.description}. Redirecting...`;
-            document.getElementById("error-message").style.display = "block";
-            setTimeout(() => {
-                window.location.href = "{% url 'payment_failed' %}";
-            }, 3000);
+        rzp.on('payment.failed', function () {
+            window.location.replace("{% url 'payment_failed' %}");
         });
 
         rzp.open();
-        // Hide processing text after modal opens (give it a second to load)
-        setTimeout(() => {
-            document.getElementById("processing-text").style.display = "none";
-        }, 1000);
     </script>
-</body>
-</html>
+
