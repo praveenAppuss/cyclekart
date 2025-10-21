@@ -777,17 +777,15 @@ def cart_view(request):
     for item in cart_items:
         product = item.product
 
-        # Always use the original price for subtotal
         item_unit_price = product.price
         item.subtotal = item_unit_price * item.quantity
         total_subtotal += item.subtotal
 
-        # Calculate savings based on offers/discounts
-        item_unit_savings = product.get_savings()  # price - final_price
+        item_unit_savings = product.get_savings()  
         item.savings = item_unit_savings * item.quantity
         total_discount += item.savings
 
-        # Image and availability
+        
         item.image = (
             item.color_variant.images.first().image.url
             if item.color_variant and item.color_variant.images.exists()
@@ -797,7 +795,7 @@ def cart_view(request):
         item.max_quantity = min(item.stock, 5)
         item.size_display = item.size_stock.get_size_display()
 
-        # Availability check
+        
         if (
             product.is_deleted or not product.is_active or
             product.category.is_deleted or not product.category.is_active or
@@ -808,7 +806,7 @@ def cart_view(request):
         else:
             item.is_available = True
 
-    # Totals
+    
     taxable_amount = total_subtotal - total_discount
     taxes = taxable_amount * TAX_RATE
     final_total = taxable_amount + taxes
@@ -848,7 +846,6 @@ def update_cart_quantity(request, cart_item_id):
 
     cart_item.save()
 
-    # Recalculate using product's offer logic
     cart = cart_item.cart
     cart_items = cart.items.select_related('product', 'size_stock').all()
 
@@ -862,7 +859,7 @@ def update_cart_quantity(request, cart_item_id):
         storage = messages.get_messages(request)
         message = ''
         for msg in storage:
-            message = msg.message  # Get the last message
+            message = msg.message  
         return JsonResponse({
             'success': True,
             'quantity': cart_item.quantity,
@@ -1037,7 +1034,12 @@ def checkout_view(request):
     
     try:
         cart = Cart.objects.get(user=user)
-        cart_items = CartItem.objects.filter(cart=cart).select_related('product', 'color_variant', 'size_stock')
+        cart_items = CartItem.objects.filter(cart=cart).select_related(
+            'product', 'color_variant', 'size_stock'
+        ).prefetch_related(
+            'product__product_offers',  
+            'product__category__category_offers'  
+        )
     except Cart.DoesNotExist:
         cart = None
         cart_items = []
@@ -1045,58 +1047,66 @@ def checkout_view(request):
     subtotal = Decimal('0')
     total_discount = Decimal('0')
     total_quantity = 0
-    coupon_discount = Decimal('0')
 
     for item in cart_items:
-        unit_price = item.product.price
-        unit_savings = item.product.get_savings()
+        unit_price = item.product.get_final_price()  
         quantity = item.quantity
         item_total = unit_price * quantity
-        item_discount = unit_savings * quantity
+        original_price = item.product.price
+        unit_savings = (original_price - unit_price) * quantity
         subtotal += item_total
-        total_discount += item_discount
+        total_discount += unit_savings
         total_quantity += quantity
-        logger.debug(f"Item: {item.product.name}, Final Price: {unit_price}, Savings: {unit_savings}, Qty: {quantity}, Item Total: {item_total}, Item Discount: {item_discount}")
+        if logger.isEnabledFor(logging.DEBUG):  
+            logger.debug(f"Item: {item.product.name}, Final Price: {unit_price}, Savings: {unit_savings}, Qty: {quantity}, Item Total: {item_total}")
 
     shipping_cost = Decimal('0')
-    taxable_amount = subtotal - total_discount  
+    taxable_amount = subtotal  
     applied_coupon = None
     coupon_error = None
+    coupon_discount = Decimal('0')
 
     if 'applied_coupon_id' in request.session:
         try:
-            applied_coupon = Coupon.objects.get(id=request.session['applied_coupon_id'], active=True, is_deleted=False)
-            if Decimal(str(applied_coupon.minimum_order_amount)) > taxable_amount:
+            applied_coupon = Coupon.objects.get(
+                id=request.session['applied_coupon_id'], 
+                active=True, 
+                is_deleted=False
+            )
+            min_order = Decimal(applied_coupon.minimum_order_amount)  
+            if min_order > taxable_amount:
                 coupon_error = "Minimum order amount not met for this coupon."
-                del request.session['applied_coupon_id']
-                del request.session['coupon_discount']
+                request.session.pop('applied_coupon_id', None)
+                request.session.pop('coupon_discount', None)
                 applied_coupon = None
             else:
-                coupon_discount = Decimal(str(applied_coupon.discount_amount))
+                coupon_discount = Decimal(applied_coupon.discount_amount)
         except Coupon.DoesNotExist:
-            del request.session['applied_coupon_id']
-            del request.session['coupon_discount']
+            request.session.pop('applied_coupon_id', None)
+            request.session.pop('coupon_discount', None)
             applied_coupon = None
 
-    net_taxable_amount = taxable_amount - coupon_discount  
+    net_taxable_amount = taxable_amount - coupon_discount
     taxes = net_taxable_amount * Decimal('0.05')  
     final_total = net_taxable_amount + shipping_cost + taxes
-    logger.debug(f"Subtotal: {subtotal}, Total Discount: {total_discount}, Coupon Discount: {coupon_discount}, Taxable Amount: {taxable_amount}, Net Taxable Amount: {net_taxable_amount}, Taxes: {taxes}, Final Total: {final_total}")
 
-    current_time = timezone.now()
-    ist = pytz.timezone('Asia/Kolkata')
+    if logger.isEnabledFor(logging.DEBUG):
+        current_time = timezone.now()
+        ist = pytz.timezone('Asia/Kolkata')
+        logger.debug(f"Subtotal: {subtotal}, Total Discount: {total_discount}, Coupon Discount: {coupon_discount}, Taxable Amount: {taxable_amount}, Net Taxable Amount: {net_taxable_amount}, Taxes: {taxes}, Final Total: {final_total}")
+        logger.debug(f"Current time: {current_time} (IST: {current_time.astimezone(ist)}), Taxable Amount: {taxable_amount}")
+
+    used_coupon_ids = {uc.coupon_id for uc in UsedCoupon.objects.filter(user=user)}
+    current_time = timezone.now()  
     eligible_for_coupons = taxable_amount > Decimal('0')
     coupons = Coupon.objects.filter(
         active=True,
         valid_from__lte=current_time,
         valid_to__gte=current_time,
-        is_deleted=False
-    ).exclude(used_by__user=user)
-
-    used_coupons = {uc.coupon_id for uc in UsedCoupon.objects.filter(user=user)}
-    coupon_status = {coupon.id: coupon.id in used_coupons for coupon in coupons}
-
-    logger.debug(f"Current time: {current_time} (IST: {current_time.astimezone(ist)}), Taxable Amount: {taxable_amount}, Coupons Count: {coupons.count()}")
+        is_deleted=False,
+        id__in=used_coupon_ids  
+    ).exclude(id__in=used_coupon_ids)  
+    coupon_status = {coupon.id: coupon.id in used_coupon_ids for coupon in coupons}
 
     context = {
         'addresses': addresses,
@@ -1113,8 +1123,8 @@ def checkout_view(request):
         'coupons': coupons,
         'coupon_error': coupon_error,
         'eligible_for_coupons': eligible_for_coupons,
-        'taxable_amount': taxable_amount,  
-        'net_taxable_amount': net_taxable_amount,  
+        'taxable_amount': taxable_amount,
+        'net_taxable_amount': net_taxable_amount,
         'coupon_status': coupon_status,
     }
 
@@ -1224,7 +1234,6 @@ def place_order(request):
         product_discount += unit_savings * quantity
         logger.debug(f"Item: {item.product.name}, Final Price: {unit_price}, Savings: {unit_savings}, Qty: {quantity}, Subtotal: {unit_price * quantity}, Discount: {unit_savings * quantity}")
 
-    # ✅ Handle applied coupon
     if 'applied_coupon_id' in request.session:
         try:
             applied_coupon = Coupon.objects.get(
@@ -1258,13 +1267,11 @@ def place_order(request):
 
     try:
         with transaction.atomic():
-            # ✅ Check stock first
             for item in cart_items:
                 size_stock = item.size_stock
                 if size_stock.quantity < item.quantity:
                     raise ValueError(f"Insufficient stock for {item.product.name} (Size {size_stock.size}): {size_stock.quantity} available, {item.quantity} requested")
 
-            # 🟢 CASH ON DELIVERY
             if payment_method == 'cod':
                 unique_order_id = f"ORDER-{uuid.uuid4().hex[:8].upper()}"
                 order = Order.objects.create(
@@ -1307,7 +1314,6 @@ def place_order(request):
                 cart.items.all().delete()
                 return redirect('order_success', order_id=order.id)
 
-            # 🟢 WALLET PAYMENT
             elif payment_method == 'wallet':
                 wallet, _ = Wallet.objects.get_or_create(user=request.user)
                 if wallet.balance >= total_amount:
@@ -1366,7 +1372,7 @@ def place_order(request):
                 else:
                     raise ValueError("Insufficient wallet balance.")
 
-            # 🟢 RAZORPAY PAYMENT
+            
             elif payment_method == 'razorpay':
                 request.session['pending_order_data'] = {
                     'address_id': address_id,
