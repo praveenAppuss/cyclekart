@@ -1096,6 +1096,7 @@ def checkout_view(request):
         logger.debug(f"Subtotal: {subtotal}, Total Discount: {total_discount}, Coupon Discount: {coupon_discount}, Taxable Amount: {taxable_amount}, Net Taxable Amount: {net_taxable_amount}, Taxes: {taxes}, Final Total: {final_total}")
         logger.debug(f"Current time: {current_time} (IST: {current_time.astimezone(ist)}), Taxable Amount: {taxable_amount}")
 
+    # FIXED: Remove erroneous id__in=used_coupon_ids from filter to show all valid coupons, then exclude used ones
     used_coupon_ids = {uc.coupon_id for uc in UsedCoupon.objects.filter(user=user)}
     current_time = timezone.now()  
     eligible_for_coupons = taxable_amount > Decimal('0')
@@ -1103,10 +1104,10 @@ def checkout_view(request):
         active=True,
         valid_from__lte=current_time,
         valid_to__gte=current_time,
-        is_deleted=False,
-        id__in=used_coupon_ids  
-    ).exclude(id__in=used_coupon_ids)  
+        is_deleted=False
+    ).exclude(id__in=used_coupon_ids)  # Now correctly excludes only used ones
     coupon_status = {coupon.id: coupon.id in used_coupon_ids for coupon in coupons}
+    logger.debug(f"Found {coupons.count()} available coupons after filtering")  # Optional: For debugging
 
     context = {
         'addresses': addresses,
