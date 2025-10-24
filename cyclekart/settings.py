@@ -32,6 +32,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cloudinary_storage',
+    'cloudinary',
     'django.contrib.sites',  # Required for allauth
 
     # Allauth apps
@@ -190,6 +192,23 @@ USE_TZ = True
 
 # ------------------ Static Files ------------------
 STATIC_URL = 'static/'
+
+# Cloudinary config (keep as-is)
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': config('CLOUDINARY_API_KEY'),
+    'API_SECRET': config('CLOUDINARY_API_SECRET')
+}
+
+# NEW: STORAGES for Django 5.1+ (replaces DEFAULT_FILE_STORAGE)
+STORAGES = {
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",  # Keeps static local
+    },
+}
 
 
 MEDIA_URL = '/media/'
