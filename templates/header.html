@@ -88,8 +88,8 @@
       <nav class="hidden md:flex items-center gap-4 text-sm font-medium text-gray-700 lg:gap-6">
         <a href="{% url 'user_home' %}" class="hover:text-blue-700">Home</a>
         <a href="{% url 'userproduct_list' %}" class="hover:text-blue-700">Explore All</a>
-        <a href="#" class="hover:text-blue-700">About</a>
-        <a href="#" class="hover:text-blue-700">Contact</a>
+        <a href="{% url 'about' %}" class="hover:text-blue-700">About</a>
+        <a href="{% url 'contact' %}" class="hover:text-blue-700">Contact</a>
         {% if user.is_authenticated %}
           <a href="{% url 'user_logout' %}" class="text-red-500 hover:text-red-700">Logout</a>
         {% endif %}
@@ -174,8 +174,8 @@
     <div id="mobileMenu" class="md:hidden hidden bg-white border-t border-gray-200 px-4 py-4 text-sm font-medium text-gray-700 sm:px-6">
       <a href="{% url 'user_home' %}" class="block py-2 hover:text-blue-700">Home</a>
       <a href="{% url 'userproduct_list' %}" class="block py-2 hover:text-blue-700">Explore All</a>
-      <a href="#" class="block py-2 hover:text-blue-700">About</a>
-      <a href="#" class="block py-2 hover:text-blue-700">Contact</a>
+      <a href="{% url 'about' %}" class="block py-2 hover:text-blue-700">About</a>
+      <a href="{% url 'contact' %}" class="block py-2 hover:text-blue-700">Contact</a>
       {% if user.is_authenticated %}
         <a href="{% url 'user_logout' %}" class="block py-2 text-red-500 hover:text-red-700">Logout</a>
       {% endif %}

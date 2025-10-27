@@ -39,7 +39,7 @@ from django.http import HttpResponse, JsonResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
 from django.db.models import Q, F, FloatField, ExpressionWrapper, Case, When, Value, IntegerField,Min,Max,Sum
-from .forms import AddressForm
+from .forms import AddressForm, ContactForm
 import json
 from django.db.models import Exists, OuterRef
 from django.utils.safestring import mark_safe
@@ -2033,3 +2033,32 @@ def apply_referral(request):
     messages.error(request, 'Invalid request method.')
     return redirect('user_home')
     
+
+@never_cache
+def about(request):
+    if request.method == 'POST':
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            name = form.cleaned_data['name']
+            email = form.cleaned_data['email']
+            subject = form.cleaned_data['subject']
+            message = form.cleaned_data['message']
+            
+            email_body = f"Name: {name}\nEmail: {email}\nSubject: {subject}\nMessage:\n{message}"
+            
+            send_mail(
+                subject=f"Contact Form: {subject}",
+                message=email_body,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.DEFAULT_FROM_EMAIL],  
+                fail_silently=False,
+            )
+            
+            messages.success(request, 'Your message has been sent successfully! We will get back to you soon.')
+            return redirect('about')  
+        else:
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = ContactForm()
+    
+    return render(request, 'about.html', {'form': form})

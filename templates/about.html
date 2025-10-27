@@ -1,0 +1,105 @@
+{% extends 'header.html' %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block content %}
+<!-- Hero Section with Cycle Background -->
+<section class="relative min-h-screen bg-cover bg-center bg-no-repeat" style="background-image: url('{% static 'images/back.png' %}');">
+  <div class="absolute inset-0 bg-black/50"></div> <!-- Dark overlay for text readability -->
+  <div class="relative z-10 flex items-center justify-center min-h-screen">
+    <div class="text-center text-white px-6">
+      <h1 class="text-5xl md:text-6xl font-bold mb-4">About CycleKart</h1>
+      <p class="text-xl md:text-2xl mb-8 max-w-3xl mx-auto">
+        We're passionate about sustainable mobility. Discover our story, mission, and how we're revolutionizing urban cycling with quality bikes and accessories.
+      </p>
+      <a href="#contact" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition duration-300">
+        Get in Touch
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Contact Form Section -->
+<section id="contact" class="py-20 bg-white">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">Contact Us</h2>
+      <p class="text-lg text-gray-600 max-w-2xl mx-auto">
+        Have questions about our bikes, orders, or anything else? We'd love to hear from you!
+      </p>
+    </div>
+
+    <div class="max-w-lg mx-auto">
+      <!-- Custom SweetAlert Trigger for Messages -->
+      {% if messages %}
+        {% for message in messages %}
+          <script>
+            document.addEventListener('DOMContentLoaded', function() {
+              showSweetAlert('{{ message }}', '{% if message.tags == "error" %}error{% else %}success{% endif %}');
+            });
+          </script>
+        {% endfor %}
+      {% endif %}
+
+      <form method="post" action="{% url 'contact' %}" class="space-y-6">
+        {% csrf_token %}
+        
+        <div>
+          <label for="{{ form.name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">Name</label>
+          {{ form.name|add_class:"w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" }}
+          {% if form.name.errors %}
+            <p class="mt-1 text-sm text-red-600">{{ form.name.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+          {{ form.email|add_class:"w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" }}
+          {% if form.email.errors %}
+            <p class="mt-1 text-sm text-red-600">{{ form.email.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.subject.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">Subject</label>
+          {{ form.subject|add_class:"w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" }}
+          {% if form.subject.errors %}
+            <p class="mt-1 text-sm text-red-600">{{ form.subject.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <div>
+          <label for="{{ form.message.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">Message</label>
+          {{ form.message|add_class:"w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent h-32" }}
+          {% if form.message.errors %}
+            <p class="mt-1 text-sm text-red-600">{{ form.message.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition duration-300">
+          Send Message
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- Embedded SweetAlert Function -->
+<script>
+  function showSweetAlert(message, type) {
+    Swal.fire({
+      text: message,
+      icon: type,
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 1500,
+      timerProgressBar: true,
+      customClass: {
+        popup: 'swal2-small'
+      }
+    });
+  }
+</script>
+
+{% endblock %}

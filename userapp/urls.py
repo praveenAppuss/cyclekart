@@ -45,6 +45,7 @@ urlpatterns = [
     path("password/", views.change_password, name="change_password"),
     path('referral/', views.referral_view, name='referral'),
     path('apply-referral/', views.apply_referral, name='apply_referral'),
-    
+    path('about/', views.about, name='about'),
+    path('contact/', views.about, name='contact'),
 
 ]
