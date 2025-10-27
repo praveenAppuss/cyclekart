@@ -31,15 +31,15 @@ from django.shortcuts import get_object_or_404
 from django.contrib.messages import get_messages
 from django.contrib import messages
 from adminapp.models import Product,Category,Brand,ProductSizeStock,ProductColorVariant
-from userapp.models import Coupon, CustomUser,Address,Cart,CartItem, ReturnRequest, UsedCoupon,Wishlist,Order,OrderItem,Wallet,WalletTransaction
+from userapp.models import Coupon, CustomUser,Address,Cart,CartItem, ReturnRequest, Review, UsedCoupon,Wishlist,Order,OrderItem,Wallet,WalletTransaction
 import re
 from django.views.decorators.cache import never_cache
 from .utils import no_cache_view,calculate_cart_total
 from django.http import HttpResponse, JsonResponse
 from django.template.loader import get_template
 from xhtml2pdf import pisa
-from django.db.models import Q, F, FloatField, ExpressionWrapper, Case, When, Value, IntegerField,Min,Max,Sum
-from .forms import AddressForm, ContactForm
+from django.db.models import Q, F, FloatField, ExpressionWrapper, Case, When, Value, IntegerField,Min,Max,Sum,Avg
+from .forms import AddressForm, ContactForm, ReviewForm
 import json
 from django.db.models import Exists, OuterRef
 from django.utils.safestring import mark_safe
@@ -49,6 +49,8 @@ from django.contrib.auth.forms import PasswordChangeForm
 from allauth.socialaccount.models import SocialAccount
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponseBadRequest
+from django.template.loader import render_to_string
+
 
 User = get_user_model()
 
@@ -395,7 +397,6 @@ def product_detail(request, product_id):
 
     final_price = product.get_final_price()
     savings = product.get_savings()
-    
     best_discount = product.get_best_discount()  
 
     related_products = Product.objects.filter(
@@ -417,6 +418,51 @@ def product_detail(request, product_id):
 
     wishlist_items = Wishlist.objects.filter(user=request.user, color_variant__product=product) if request.user.is_authenticated else []
 
+
+    avg_rating = product.average_rating
+    reviews = product.reviews.select_related('user').order_by('-created_at')
+    reviews_count = product.reviews.count()
+    full_stars = int(avg_rating)
+    half_star = 1 if avg_rating - full_stars >= 0.5 else 0
+    empty_stars = 5 - full_stars - half_star
+    star_display = {
+        'full': range(full_stars),
+        'half': half_star,
+        'empty': range(empty_stars)
+    }
+
+    has_purchased = OrderItem.objects.filter(
+        order__user=request.user, 
+        product=product, 
+        order__status='delivered'
+    ).exists() if request.user.is_authenticated else False
+    already_reviewed = Review.objects.filter(user=request.user, product=product).exists()
+    can_review = request.user.is_authenticated and has_purchased and not already_reviewed
+
+    form = ReviewForm()
+    initial_rating = 0
+    if request.method == 'POST' and can_review:
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.user = request.user
+            review.product = product
+            review.save()
+            messages.success(request, "Thank you for your review!")
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                review_html = render_to_string('review_item.html', {'review': review})
+                new_avg = product.average_rating
+                new_count = reviews_count + 1
+                return JsonResponse({
+                    'success': True, 
+                    'review_html': review_html,
+                    'new_avg': float(new_avg),
+                    'new_count': new_count
+                })
+            return redirect('product_detail', product_id=product_id)
+        else:
+            initial_rating = int(form.data.get('rating', 0))
+
     context = {
         'product': product,
         'color_variants': color_variants,
@@ -425,6 +471,13 @@ def product_detail(request, product_id):
         'savings': savings,         
         'best_discount': best_discount,  
         'wishlist_items': wishlist_items,
+        'reviews': reviews,
+        'form': form,
+        'can_review': can_review,
+        'avg_rating': avg_rating,
+        'reviews_count': reviews_count,
+        'star_display': star_display,
+        'initial_rating': initial_rating,
     }
     return render(request, 'product_detail.html', context)
 

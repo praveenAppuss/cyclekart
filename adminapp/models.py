@@ -2,6 +2,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.db import models
 from django.utils.text import slugify
 from django.utils import timezone
+from django.db.models import Avg
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -94,6 +95,15 @@ class Product(models.Model):
         )
         category_discount = max([o.discount_percentage for o in category_offers], default=0)
         return max(product_discount, category_discount)
+    
+    @property
+    def average_rating(self):
+        avg = self.reviews.aggregate(avg=Avg('rating'))['avg']
+        return avg if avg else 0
+
+    @property
+    def reviews_count(self):
+        return self.reviews.count()
 
     def __str__(self):
         return self.name
@@ -119,9 +129,9 @@ class ProductImage(models.Model):
 
 class ProductSizeStock(models.Model):
     SIZE_CHOICES = [
-        ('S', 'Small'),
-        ('M', 'Medium'),
-        ('L', 'Large'),
+        ('S', 'S'),
+        ('M', 'M'),
+        ('L', 'L'),
     ]
 
     color_variant = models.ForeignKey(ProductColorVariant, on_delete=models.CASCADE, related_name='size_stocks', null=True, blank=True)

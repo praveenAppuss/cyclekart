@@ -1,5 +1,5 @@
 from django import forms
-from .models import Address
+from .models import Address, Review
 
 class AddressForm(forms.ModelForm):
     class Meta:
@@ -17,3 +17,15 @@ class ContactForm(forms.Form):
         if '@' not in email:
             raise forms.ValidationError('Enter a valid email address.')
         return email
+
+class ReviewForm(forms.ModelForm):
+    class Meta:
+        model = Review
+        fields = ['rating', 'comment']
+        widgets = {
+            'comment': forms.Textarea(attrs={'rows': 3, 'class': 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500'}),
+            'rating': forms.HiddenInput(),  # Hidden, set via JS
+        }
+        labels = {
+            'comment': 'Your Review',
+        }

@@ -1,3 +1,8 @@
+<!-- Updated product_detail.html -->
+<!-- Add this to <head> or extra CSS block for Font Awesome (optional; using SVG for consistency) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+<!-- In the template, replace the existing content block with this (key changes: rating near title, tabs after description, reviews section, JS updates) -->
 {% extends 'header.html' %}
 {% load static %}
 
@@ -52,43 +57,49 @@
         <div class="space-y-6">
           <h1 class="text-3xl font-semibold text-gray-900">{{ product.name }}</h1>
 
-          <!-- Rating and Stock -->
+          <!-- Dynamic Rating Display (replaces static) -->
           <div class="flex items-center justify-between text-sm">
             <div class="flex items-center space-x-2">
-              {% for i in "12345" %}
-                {% if forloop.counter <= 4 %}
-                  <svg class="w-4 h-3 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+              <div class="flex text-yellow-400">
+                {% for _ in star_display.full %}
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                   </svg>
-                {% else %}
-                  <svg class="w-4 h-3 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z" />
+                {% endfor %}
+                {% if star_display.half %}
+                  <svg class="w-4 h-4 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" clip-path="url(#half-clip)" />
+                    <defs><clipPath id="half-clip"><rect x="0" y="0" width="10" height="20"/></clipPath></defs>
                   </svg>
                 {% endif %}
-              {% endfor %}
-              <span class="text-indigo-600">(0 Reviews)</span>
+                {% for _ in star_display.empty %}
+                  <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 20 20">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.049 2.929l.384 1.375c.044.154.14.316.282.343l1.377.63-1.38 1.337a.568.568 0 00-.18.557l.43 1.295a.55.55 0 01-.81.638l-1.285-.528a.562.562 0 00-.63.16l-1.14 1.16a.562.562 0 00.18.557l1.38 1.337-.544 1.989a.558.558 0 001.003.606l1.3-.789 1.3.789a.558.558 0 001.003-.606l-.544-1.989 1.38-1.337a.568.568 0 00-.18-.557l-1.38-1.337.384-1.375a.558.558 0 00-.63-.16l-1.285.528a.562.562 0 01-.81-.638l.43-1.295a.558.558 0 00-.18-.557l-1.38-1.337 1.377-.63a1 1 0 00.282-.343L9.049 2.929z" />
+                  </svg>
+                {% endfor %}
+              </div>
+              <span class="text-indigo-600">({{ reviews_count }} Review{{ reviews_count|pluralize }})</span>
             </div>
             <span id="stockStatus" class="text-xs font-medium px-2 py-1 rounded-full"></span>
           </div>
 
-          <!-- Price -->
           <!-- Price Section -->
-<div class="text-2xl font-bold text-gray-900">
-  {% if final_price < product.price %}
-    <span>₹{{ final_price|floatformat:0 }}</span>
-    <span class="text-sm text-red-500 line-through ml-2">₹{{ product.price|floatformat:0 }}</span>
-    {% if savings > 0 %}
-      <span class="text-green-500 text-sm ml-2">
-        You save ₹{{ savings|floatformat:0 }}
-        {% if best_discount > 0 %}
-          ({{ best_discount }}% off)
-        {% endif %}
-      </span>
-    {% endif %}
-  {% else %}
-    <span>₹{{ product.price|floatformat:0 }}</span>
-  {% endif %}
-</div>
+          <div class="text-2xl font-bold text-gray-900">
+            {% if final_price < product.price %}
+              <span>₹{{ final_price|floatformat:0 }}</span>
+              <span class="text-sm text-red-500 line-through ml-2">₹{{ product.price|floatformat:0 }}</span>
+              {% if savings > 0 %}
+                <span class="text-green-500 text-sm ml-2">
+                  You save ₹{{ savings|floatformat:0 }}
+                  {% if best_discount > 0 %}
+                    ({{ best_discount }}% off)
+                  {% endif %}
+                </span>
+              {% endif %}
+            {% else %}
+              <span>₹{{ product.price|floatformat:0 }}</span>
+            {% endif %}
+          </div>
 
           <!-- Available Colors -->
           <div>
@@ -171,64 +182,149 @@
         </div>
       </div>
 
-      <!-- Description -->
+      <!-- Tabs: Details | Reviews -->
       <div class="mt-8 pt-6 border-t border-gray-200 mx-6">
-        <h3 class="text-lg font-medium text-gray-900 mb-4">Details</h3>
-        <p class="text-gray-600">{{ product.description|default:'No description available' }}</p>
+        <div class="flex border-b border-gray-200 mb-4">
+          <button id="detailsTab" class="text-sm font-semibold text-gray-900 pb-4 border-b-2 border-indigo-600 mr-8 focus:outline-none">Details</button>
+          <button id="reviewsTab" class="text-sm text-gray-600 pb-4 hover:text-gray-900 focus:outline-none">Reviews ({{ reviews_count }})</button>
+        </div>
+
+        <!-- Tab Contents -->
+        <div id="detailsContent">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">Details</h3>
+          <p class="text-gray-600">{{ product.description|default:'No description available' }}</p>
+        </div>
+
+        <div id="reviewsContent" class="hidden">
+          <!-- Average Rating Summary -->
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-900">Customer Reviews</h3>
+            <div class="flex items-center space-x-2 mt-2">
+              <span class="text-3xl font-bold text-gray-900">{{ avg_rating|floatformat:1 }}</span>
+              <div class="flex text-yellow-400">
+                {% for _ in star_display.full %}
+                  <i class="fas fa-star text-xl"></i>
+                {% endfor %}
+                {% if star_display.half %}
+                  <i class="fas fa-star-half-alt text-xl"></i>
+                {% endif %}
+                {% for _ in star_display.empty %}
+                  <i class="far fa-star text-xl text-gray-300"></i>
+                {% endfor %}
+              </div>
+            </div>
+            <p class="text-gray-600 text-sm">{{ reviews_count }} Review{{ reviews_count|pluralize }}</p>
+          </div>
+
+          <!-- Existing Reviews -->
+          <div id="reviewsList" class="space-y-6 mb-8">
+            {% for review in reviews %}
+              {% include 'review_item.html' with review=review %}
+            {% empty %}
+              <p class="text-gray-500 text-center py-8">No reviews yet. Be the first to review this product!</p>
+            {% endfor %}
+          </div>
+
+          <!-- Review Form (if eligible) -->
+          {% if can_review %}
+            <div class="border-t border-gray-200 pt-6">
+              <h4 class="text-md font-semibold mb-4">Leave a Review</h4>
+              <form method="POST" id="reviewForm" class="space-y-4">
+                {% csrf_token %}
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">Your Rating</label>
+                  <div class="flex space-x-1 text-yellow-500" id="starContainer">
+  {% for i in "12345" %}
+    <i class="fas fa-star text-2xl cursor-pointer hover:text-yellow-600 transition-colors 
+              {% if initial_rating >= forloop.counter %}filled{% else %}empty{% endif %}"
+       data-value="{{ forloop.counter }}"></i>
+  {% endfor %}
+</div>
+<input type="hidden" name="rating" id="ratingInput" value="{{ initial_rating }}">
+                  {% if form.rating.errors %}
+                    <p class="text-red-600 text-sm mt-1">{{ form.rating.errors.0 }}</p>
+                  {% endif %}
+                </div>
+                <div>
+                  {{ form.comment.label_tag }}
+                  {{ form.comment }}
+                  {% if form.comment.errors %}
+                    <p class="text-red-600 text-sm mt-1">{{ form.comment.errors.0 }}</p>
+                  {% endif %}
+                </div>
+                <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors">Submit Review</button>
+              </form>
+            </div>
+          {% elif user.is_authenticated %}
+            <p class="text-gray-500 text-center py-8">You must purchase and receive this product to leave a review.</p>
+          {% else %}
+            <p class="text-gray-500 text-center py-8">Log in to leave a review.</p>
+          {% endif %}
+        </div>
       </div>
 
       <!-- Related Products Section -->
-<!-- Related Products Section -->
-<div class="mt-12 border-t border-gray-200 pt-8 pb-8 mx-6">
-  <h2 class="text-2xl font-semibold text-gray-800 mb-6">You May Also Like</h2>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
-    {% for item in related_products %}
-    <a href="{% url 'product_detail' item.id %}" class="group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-gray-200 transition-all duration-300">
-      <!-- Product Image -->
-      <div class="aspect-square bg-gray-50/50 overflow-hidden relative">
-        <img 
-          src="{{ item.thumbnail.url }}" 
-          alt="{{ item.name }}" 
-          class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300"
-        >
-        <!-- Quick View Button -->
-        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
-          <button class="bg-white text-gray-900 px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 shadow-lg">
-            Quick View
-          </button>
+      <div class="mt-12 border-t border-gray-200 pt-8 pb-8 mx-6">
+        <h2 class="text-2xl font-semibold text-gray-800 mb-6">You May Also Like</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+          {% for item in related_products %}
+          <a href="{% url 'product_detail' item.id %}" class="group bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg hover:border-gray-200 transition-all duration-300">
+            <!-- Product Image -->
+            <div class="aspect-square bg-gray-50/50 overflow-hidden relative">
+              <img 
+                src="{{ item.thumbnail.url }}" 
+                alt="{{ item.name }}" 
+                class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-300"
+              >
+              <!-- Quick View Button -->
+              <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
+                <button class="bg-white text-gray-900 px-3 py-1.5 rounded-md text-xs font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 shadow-lg">
+                  Quick View
+                </button>
+              </div>
+            </div>
+            
+            <!-- Product Info -->
+            <div class="p-3">
+              <h3 class="font-medium text-gray-900 text-sm mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
+                {{ item.name }}
+              </h3>
+              <div class="flex items-center justify-between">
+                {% with final_price=item.get_final_price savings=item.get_savings %}
+                  {% if final_price < item.price %}
+                    <p class="text-base font-semibold text-gray-900">₹{{ final_price|floatformat:0 }}</p>
+                    <p class="text-xs text-red-400 line-through">₹{{ item.price|floatformat:0 }}</p>
+                  {% else %}
+                    <p class="text-base font-semibold text-gray-900">₹{{ item.price|floatformat:0 }}</p>
+                  {% endif %}
+                {% endwith %}
+              </div>
+            </div>
+          </a>
+          {% empty %}
+          <div class="col-span-full text-center py-8 text-gray-500">
+            <p>No related products found.</p>
+          </div>
+          {% endfor %}
         </div>
       </div>
-      
-      <!-- Product Info -->
-      <div class="p-3">
-        <h3 class="font-medium text-gray-900 text-sm mb-1 line-clamp-2 group-hover:text-gray-700 transition-colors">
-          {{ item.name }}
-        </h3>
-        <div class="flex items-center justify-between">
-          {% with final_price=item.get_final_price savings=item.get_savings %}
-            {% if final_price < item.price %}
-              <p class="text-base font-semibold text-gray-900">₹{{ final_price|floatformat:0 }}</p>
-              <p class="text-xs text-red-400 line-through">₹{{ item.price|floatformat:0 }}</p>
-            {% else %}
-              <p class="text-base font-semibold text-gray-900">₹{{ item.price|floatformat:0 }}</p>
-            {% endif %}
-          {% endwith %}
-        </div>
-      </div>
-    </a>
-    {% empty %}
-    <div class="col-span-full text-center py-8 text-gray-500">
-      <p>No related products found.</p>
-    </div>
-    {% endfor %}
-  </div>
-</div>
     </div>
   </div>
 </div>
 
-<!-- CSS for lens, zoom, size options, and wishlist -->
+<!-- Create a new file: templates/review_item.html -->
+<!-- Partial for individual review (used in loop and AJAX) -->
+<!-- <div id="reviewsList" class="space-y-6 mb-8">
+  {% for review in reviews %}
+    {% include 'review_item.html' with review=review %}
+  {% empty %}
+    <p class="text-gray-500 text-center py-8">No reviews yet. Be the first to review this product!</p>
+  {% endfor %}
+</div> -->
+
+<!-- CSS for lens, zoom, size options, wishlist, tabs, stars, etc. (merged <style> block) -->
 <style>
+  
   #lens {
     width: 100px;
     height: 100px;
@@ -281,9 +377,36 @@
     fill: #ef4444;
     stroke: #ef4444;
   }
+  #starContainer i.filled {
+  color: #fbbf24;
+  }
+  #starContainer i.empty {
+    color: #d1d5db;
+  }
+  #starContainer i:hover,
+  #starContainer i:hover ~ i {
+    color: #fbbf24 !important;
+  }
+
+  /* Tabs styles */
+  #detailsTab.active, #reviewsTab.active {
+    @apply text-gray-900 border-b-2 border-indigo-600;
+  }
+  #detailsContent, #reviewsContent {
+    @apply transition-opacity duration-300;
+  }
+  #reviewsContent.hidden {
+    display: none;
+  }
+  /* Star hover for form */
+  #starContainer i:hover,
+  #starContainer i:hover ~ i {
+    color: #fbbf24 !important;
+  }
+  /* Half-star clip-path fix if needed */
 </style>
 
-<!-- JavaScript -->
+<!-- Merged JavaScript (includes existing + tabs/review logic) -->
 <script>
   // Pass color_variants and wishlist status from view to JavaScript
   const colorVariants = [
@@ -576,6 +699,119 @@
     updateStockStatus();
     updateWishlistButton();
     updateStockAndButtons();
+
+    // Tab functionality
+    const detailsTab = document.getElementById('detailsTab');
+    const reviewsTab = document.getElementById('reviewsTab');
+    const detailsContent = document.getElementById('detailsContent');
+    const reviewsContent = document.getElementById('reviewsContent');
+
+    function showDetails() {
+      detailsTab.classList.add('border-b-2', 'border-indigo-600', 'text-gray-900');
+      reviewsTab.classList.remove('border-b-2', 'border-indigo-600', 'text-gray-900');
+      detailsContent.classList.remove('hidden');
+      reviewsContent.classList.add('hidden');
+    }
+
+    function showReviews() {
+      reviewsTab.classList.add('border-b-2', 'border-indigo-600', 'text-gray-900');
+      detailsTab.classList.remove('border-b-2', 'border-indigo-600', 'text-gray-900');
+      reviewsContent.classList.remove('hidden');
+      detailsContent.classList.add('hidden');
+    }
+
+    if (detailsTab && reviewsTab && detailsContent && reviewsContent) {
+      detailsTab.addEventListener('click', showDetails);
+      reviewsTab.addEventListener('click', showReviews);
+      // Default to details tab
+      showDetails();
+    }
+
+    // Review form star interaction
+    const stars = document.querySelectorAll('#starContainer i');
+    const ratingInput = document.getElementById('ratingInput');
+
+    function updateStars(selectedValue) {
+      stars.forEach((star, index) => {
+        if (index < selectedValue) {
+          star.style.color = '#fbbf24';
+          star.classList.add('fas');
+          star.classList.remove('far');
+        } else {
+          star.style.color = '#d1d5db';
+          star.classList.remove('fas');
+          star.classList.add('far');
+        }
+      });
+    }
+
+    if (stars.length > 0) {
+      stars.forEach(star => {
+        star.addEventListener('click', () => {
+          const value = parseInt(star.dataset.value);
+          ratingInput.value = value;
+          updateStars(value);
+        });
+        star.addEventListener('mouseover', () => {
+          updateStars(parseInt(star.dataset.value));
+        });
+        star.addEventListener('mouseout', () => {
+          updateStars(parseInt(ratingInput.value) || 0);
+        });
+      });
+
+      // Initial stars
+      updateStars({{ initial_rating }});
+    }
+
+    // AJAX Review Submit
+    const reviewForm = document.getElementById('reviewForm');
+    if (reviewForm) {
+      reviewForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!ratingInput.value || parseInt(ratingInput.value) < 1) {
+          showSweetAlert('Please select a rating.', 'warning');
+          return;
+        }
+
+        const formData = new FormData(reviewForm);
+        try {
+          const response = await fetch('', {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          const data = await response.json();
+          if (data.success) {
+            // Append new review
+            const reviewsList = document.getElementById('reviewsList');
+            reviewsList.insertAdjacentHTML('afterbegin', data.review_html);
+            
+            // Update average display
+            const avgDisplay = reviewsContent.querySelector('.text-3xl');
+            const countDisplay = reviewsContent.querySelector('p.text-gray-600:last-child');
+            avgDisplay.textContent = data.new_avg.toFixed(1);
+            countDisplay.textContent = `${data.new_count} Review${data.new_count !== 1 ? 's' : ''}`;
+            // Update tab count
+            reviewsTab.textContent = `Reviews (${data.new_count})`;
+            // Update top rating display
+            const topAvg = document.querySelector('.text-3xl.font-bold.text-gray-900');
+            if (topAvg) topAvg.textContent = data.new_avg.toFixed(1);
+            const topCount = document.querySelector('span.text-indigo-600');
+            if (topCount) topCount.textContent = `(${data.new_count} Review${data.new_count !== 1 ? 's' : ''})`;
+            
+            reviewForm.reset();
+            ratingInput.value = '0';
+            updateStars(0);
+            showSweetAlert('Review submitted successfully!', 'success');
+          } else {
+            showSweetAlert('Error submitting review.', 'error');
+          }
+        } catch (error) {
+          showSweetAlert('An error occurred. Please try again.', 'error');
+        }
+      });
+    }
 
     // Auto-hide initial messages (if any)
     {% if messages %}
