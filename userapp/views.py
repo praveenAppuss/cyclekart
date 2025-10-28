@@ -1114,7 +1114,7 @@ def checkout_view(request):
             logger.debug(f"Item: {item.product.name}, Final Price: {unit_price}, Savings: {unit_savings}, Qty: {quantity}, Item Total: {item_total}")
 
     shipping_cost = Decimal('0')
-    taxable_amount = subtotal  
+    taxable_amount = subtotal -total_discount 
     applied_coupon = None
     coupon_error = None
     coupon_discount = Decimal('0')
