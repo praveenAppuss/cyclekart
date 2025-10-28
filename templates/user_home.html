@@ -2,191 +2,212 @@
 {% load static %}
 
 {% block content %}
-<!-- Hero Section -->
-<section class="bg-gray-100 py-8 px-4 sm:py-10 sm:px-6">
-  <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 sm:gap-10">
-    <!-- Left Text -->
-    <div class="w-full md:w-1/2 text-center md:text-left">
-      <h1 class="text-3xl sm:text-4xl font-bold text-gray-800 mb-4">Welcome to CycleKart</h1>
-      <p class="text-gray-600 text-base sm:text-lg mb-6">Explore our premium collection of bicycles. Find your perfect ride today!</p>
-      <a href="{% url 'userproduct_list' %}" class="inline-block bg-blue-700 text-white py-2 px-4 sm:px-5 rounded hover:bg-blue-800 transition">Shop Now</a>
-    </div>
-
-    <!-- Right Image -->
-    <div class="w-full md:w-1/2 text-center mt-6 md:mt-0">
-      <img src="{% static 'images/back.png' %}" alt="CycleKart Banner" 
-           class="w-64 h-64 sm:w-80 sm:h-80 mx-auto object-contain"
-           onerror="this.style.display='none'">
-    </div>
-  </div>
-</section>
-
-<!-- Featured Products Section -->
-<section class="py-8 px-4 sm:py-10 sm:px-6 bg-white">
-  <div class="max-w-6xl mx-auto">
-    <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 text-center mb-6">Featured Products</h2>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-      {% for item in featured_with_variants %}
-      <div class="bg-white rounded-2xl shadow-md hover:shadow-lg transition duration-300 overflow-hidden flex flex-col">
-        <a href="{% url 'product_detail' item.product.id %}" class="block">
-          <!-- Product Image -->
-          <div class="h-48 sm:h-52 lg:h-60 bg-gray-100 relative flex items-center justify-center overflow-hidden rounded-t-2xl">
-            {% if item.product.thumbnail %}
-              <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}"
-                   class="object-cover w-full h-full transition-transform duration-300 hover:scale-105"
-                   onerror="this.src='{% static 'images/no_image.png' %}'">
-            {% else %}
-              <img src="{% static 'images/no_image.png' %}" alt="No image"
-                   class="object-contain w-full h-full bg-gray-200">
-            {% endif %}
-          </div>
-        </a>
-
-        <!-- Product Info -->
-        <div class="p-3 sm:p-4 lg:p-5 flex flex-col flex-1">
-          <h3 class="text-base sm:text-lg font-semibold mb-1 text-gray-800">
-            <a href="{% url 'product_detail' item.product.id %}" class="hover:text-green-600">
-              {{ item.product.name }}
-            </a>
-          </h3>
-          <p class="text-gray-600 text-xs sm:text-sm mb-2 line-clamp-2">
-            {{ item.product.description|truncatewords:15 }}
-          </p>
-
-          <!-- Price and Discount Info -->
-          <div class="mb-3 sm:mb-4">
-            {% with final_price=item.product.get_final_price savings=item.product.get_savings best_discount=item.product.get_best_discount %}
-              {% if final_price < item.product.price %}
-              <div class="flex items-center space-x-2 sm:space-x-6 flex-wrap">
-                <span class="text-base sm:text-lg font-bold text-dark-600">₹{{ final_price|floatformat:0 }}</span>
-                <span class="text-xs sm:text-sm text-red-500 line-through">₹{{ item.product.price|floatformat:0 }}</span>
-                
-              </div>
-              {% else %}
-                <span class="text-base sm:text-lg font-bold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
-              {% endif %}
-            {% endwith %}
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="flex justify-between items-center space-x-2 mt-auto">
-            <a href="{% url 'product_detail' item.product.id %}" class="flex-1">
-              <button type="button"
-                class="w-full bg-black text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-1.5 sm:py-2 rounded-md hover:bg-gray-800 transition duration-200">
-                View Details
-              </button>
-            </a>
-
-            {% if request.user.is_authenticated %}
-            {% if item.first_variant %}
-            <button type="button" class="wishlist-toggle p-1.5 sm:p-2 rounded-full hover:bg-gray-200 transition" data-variant-id="{{ item.first_variant.id }}">
-              <i data-lucide="heart" class="w-4 sm:w-5 h-4 sm:h-5 transition {% if item.first_variant.id in wishlist_variant_ids %}fill-current text-red-500{% else %}text-gray-700{% endif %}"></i>
-            </button>
-            {% endif %}
-            {% endif %}
-          </div>
+<section class="bg-gray-900 py-20 px-4 sm:py-28 sm:px-6 relative overflow-hidden">
+    <div class="absolute inset-0 z-0 opacity-10">
         </div>
-      </div>
-      {% empty %}
-      <p class="text-center text-gray-600">No featured products right now.</p>
-      {% endfor %}
+
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-16 relative z-10">
+        <div class="w-full md:w-1/2 text-center md:text-left text-white">
+            <h1 class="text-5xl sm:text-6xl lg:text-7xl font-serif font-extrabold mb-6 tracking-tight leading-tight">
+                Experience <span class="text-amber-500">Excellence</span>.
+            </h1>
+            <p class="text-gray-300 text-lg sm:text-2xl mb-10 max-w-lg leading-relaxed font-light">
+                Meticulously crafted for performance and prestige. Each journey is an affirmation of superior design.
+            </p>
+            <a href="{% url 'userproduct_list' %}" class="inline-block bg-amber-600 text-white font-semibold tracking-wider py-4 px-14 rounded-full shadow-lg hover:bg-amber-700 transition duration-300 transform hover:scale-105">
+                Discover Our Collection
+            </a>
+        </div>
+
+        <div class="w-full md:w-1/2 flex justify-center items-center relative">
+            <div class="relative w-full max-w-md lg:max-w-lg">
+                <img src="{% static 'images/back.png' %}" alt="CycleKart Premium Bicycle" 
+                    class="w-full h-auto object-contain drop-shadow-2xl transition-transform duration-500 ease-in-out hover:scale-105"
+                    onerror="this.style.display='none'">
+                <div class="absolute -inset-4 bg-amber-800 opacity-20 rounded-full blur-3xl z-0"></div>
+            </div>
+        </div>
     </div>
-  </div>
 </section>
 
-<!-- Call to Action Section -->
-<section class="py-8 px-4 sm:py-10 sm:px-6 bg-gray-500 text-white text-center">
-  <h2 class="text-xl sm:text-2xl font-semibold mb-4">Start Your Cycling Adventure!</h2>
-  <p class="text-base sm:text-lg mb-6">Discover eco-friendly rides for health and travel.</p>
-  <a href="{% url 'userproduct_list' %}" class="inline-block bg-white text-blue-600 py-2 px-4 sm:px-5 rounded hover:bg-gray-200 transition">
-    Explore Now
-  </a>
+
+
+<section class="py-16 px-4 sm:py-24 sm:px-6 bg-gray-100">
+    <div class="max-w-7xl mx-auto">
+        <h2 class="text-3xl sm:text-4xl font-serif font-bold text-gray-900 text-center mb-12">Curated Selections</h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {% for item in featured_with_variants %}
+            <div class="bg-white rounded-lg shadow-xl hover:shadow-2xl transition duration-500 overflow-hidden flex flex-col group border border-gray-200">
+                <a href="{% url 'product_detail' item.product.id %}" class="block">
+                    <div class="h-56 lg:h-64 bg-gray-50 relative flex items-center justify-center overflow-hidden">
+                        {% if item.product.thumbnail %}
+                          <img src="{{ item.product.thumbnail.url }}" alt="{{ item.product.name }}"
+                                class="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
+                                onerror="this.src='{% static 'images/no_image.png' %}'">
+                        {% else %}
+                          <img src="{% static 'images/no_image.png' %}" alt="No image"
+                                class="object-contain w-full h-full bg-gray-200">
+                        {% endif %}
+                    </div>
+                </a>
+
+                <div class="p-5 sm:p-6 flex flex-col flex-1">
+                    <h3 class="text-xl font-serif font-bold mb-1 text-gray-900 leading-snug">
+                        <a href="{% url 'product_detail' item.product.id %}" class="hover:text-amber-700 transition">
+                            {{ item.product.name }}
+                        </a>
+                    </h3>
+                    <p class="text-gray-500 text-sm mb-4 line-clamp-2">
+                        {{ item.product.description|truncatewords:10 }}
+                    </p>
+
+                    <div class="mb-4 mt-auto">
+                        {% with final_price=item.product.get_final_price savings=item.product.get_savings best_discount=item.product.get_best_discount %}
+                          {% if final_price < item.product.price %}
+                            <div class="flex items-center space-x-3">
+                                <span class="text-xl font-bold text-amber-700">₹{{ final_price|floatformat:0 }}</span>
+                                <span class="text-sm text-gray-400 line-through">₹{{ item.product.price|floatformat:0 }}</span>
+                            </div>
+                          {% else %}
+                            <span class="text-xl font-bold text-gray-900">₹{{ item.product.price|floatformat:0 }}</span>
+                          {% endif %}
+                        {% endwith %}
+                    </div>
+
+                    <div class="flex justify-between items-center space-x-3">
+                        <a href="{% url 'product_detail' item.product.id %}" class="flex-1">
+                            <button type="button"
+                                class="w-full bg-gray-900 text-white text-sm font-medium tracking-wide px-4 py-2.5 rounded hover:bg-amber-700 transition duration-300 shadow-md">
+                                View Details
+                            </button>
+                        </a>
+
+                        {% if request.user.is_authenticated %}
+                        {% if item.first_variant %}
+                        <button type="button" class="wishlist-toggle p-2 rounded-full border border-gray-300 hover:bg-gray-200 transition shadow-sm" data-variant-id="{{ item.first_variant.id }}">
+                            <i data-lucide="heart" class="w-5 h-5 transition {% if item.first_variant.id in wishlist_variant_ids %}fill-current text-red-600{% else %}text-gray-500 group-hover:text-amber-700{% endif %}"></i>
+                        </button>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-center text-gray-600 col-span-full">No curated products available at this time.</p>
+            {% endfor %}
+        </div>
+    </div>
 </section>
 
-<!-- Hidden CSRF form -->
+
+<section class="py-20 px-4 sm:py-28 sm:px-6 relative overflow-hidden bg-gray-900" 
+         style="background-image: url('{% static 'images/banner.jpg' %}'); background-size: cover; background-position: center;">
+    
+    <div class="absolute inset-0 bg-gray-900 opacity-70"></div>
+
+    <div class="relative max-w-4xl mx-auto text-white text-center z-10">
+        <h2 class="text-3xl sm:text-4xl lg:text-5xl font-serif font-bold mb-5 tracking-tight">
+            Embrace the Open Road.
+        </h2>
+        <p class="text-base sm:text-lg mb-8 max-w-2xl mx-auto font-light opacity-90">
+            It is time to choose quality that lasts and a style that endures. Your next adventure awaits.
+        </p>
+        <a href="{% url 'userproduct_list' %}" class="inline-block bg-amber-700 text-white font-bold py-3 px-10 rounded text-lg shadow-2xl hover:bg-amber-800 transition transform hover:scale-105 duration-300">
+            View All Collections
+        </a>
+    </div>
+</section>
+
 <div style="display: none;">
-  {% csrf_token %}
+    {% csrf_token %}
 </div>
 
-<!-- SweetAlert2 -->
 <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script id="wishlist-data" type="application/json">{{ wishlist_variant_ids|safe }}</script>
 
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const wishlistToggles = document.querySelectorAll(".wishlist-toggle");
-    const wishlistedVariants = JSON.parse(document.getElementById("wishlist-data").textContent);
-    const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
-
-    wishlistToggles.forEach((toggle) => {
-      toggle.addEventListener("click", function () {
-        const variantId = parseInt(this.dataset.variantId);
-        if (!variantId) return;
-
-        const isWishlisted = wishlistedVariants.includes(variantId);
-        const url = `/wishlist/add/${variantId}/`;
-
-        fetch(url, {
-          method: "POST",
-          headers: {
-            "X-CSRFToken": csrfToken,
-            "X-Requested-With": "XMLHttpRequest",
-          },
-        })
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.success) {
-              const icon = this.querySelector('svg');
-              if (data.added) {
-                wishlistedVariants.push(variantId);
-                icon.classList.add('fill-current', 'text-red-500');
-                icon.classList.remove('text-gray-700');
-              } else {
-                const index = wishlistedVariants.indexOf(variantId);
-                if (index > -1) wishlistedVariants.splice(index, 1);
-                icon.classList.remove('fill-current', 'text-red-500');
-                icon.classList.add('text-gray-700');
-              }
-              showSweetAlert(data.message, data.added ? "success" : "info");
-            } else {
-              showSweetAlert(data.message, "error");
-            }
+    // Wishlist and SweetAlert functionality is unchanged
+    document.addEventListener("DOMContentLoaded", function () {
+      const wishlistToggles = document.querySelectorAll(".wishlist-toggle");
+      const wishlistedVariants = JSON.parse(document.getElementById("wishlist-data").textContent);
+      const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+  
+      wishlistToggles.forEach((toggle) => {
+        toggle.addEventListener("click", function () {
+          const variantId = parseInt(this.dataset.variantId);
+          if (!variantId) return;
+  
+          const isWishlisted = wishlistedVariants.includes(variantId);
+          const url = `/wishlist/add/${variantId}/`; 
+  
+          fetch(url, {
+            method: "POST",
+            headers: {
+              "X-CSRFToken": csrfToken,
+              "X-Requested-With": "XMLHttpRequest",
+            },
           })
-          .catch((error) => {
-            showSweetAlert("An error occurred. Please try again.", "error");
-          });
+            .then((response) => response.json())
+            .then((data) => {
+              if (data.success) {
+                const icon = this.querySelector('svg');
+                // The fill/text color logic remains tied to 'red-600' for the visual heart fill
+                // but the hover color reflects the new 'amber-700' in the template CSS.
+                if (data.added) {
+                  wishlistedVariants.push(variantId);
+                  icon.classList.add('fill-current', 'text-red-600');
+                  icon.classList.remove('text-gray-500');
+                } else {
+                  const index = wishlistedVariants.indexOf(variantId);
+                  if (index > -1) wishlistedVariants.splice(index, 1);
+                  icon.classList.remove('fill-current', 'text-red-600');
+                  icon.classList.add('text-gray-500');
+                }
+                showSweetAlert(data.message, data.added ? "success" : "info");
+              } else {
+                showSweetAlert(data.message, "error");
+              }
+            })
+            .catch((error) => {
+              showSweetAlert("An error occurred. Please try again.", "error");
+            });
+        });
       });
+  
+      function showSweetAlert(message, type) {
+        Swal.fire({
+          text: message,
+          icon: type,
+          toast: true,
+          position: "top-end",
+          showConfirmButton: false,
+          timer: 1500,
+          timerProgressBar: true,
+          customClass: {
+            popup: "swal2-small",
+          },
+        });
+      }
     });
-
-    function showSweetAlert(message, type) {
-      Swal.fire({
-        text: message,
-        icon: type,
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false,
-        timer: 1500,
-        timerProgressBar: true,
-        customClass: {
-          popup: "swal2-small",
-        },
-      });
-    }
-  });
 </script>
 
 <style>
-  .fill-current path {
-    fill: currentColor;
-    stroke: none;
-  }
-  .swal2-small {
-    width: 300px !important;
-    padding: 10px !important;
-    font-size: 14px !important;
-  }
+    /* Custom styles for premium look and wishlist icon */
+    /* Added font-serif to the style block for better integration */
+    .font-serif {
+        font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+    }
+    .fill-current path {
+      fill: currentColor;
+      stroke: none;
+    }
+    .swal2-small {
+      width: 300px !important;
+      padding: 10px !important;
+      font-size: 14px !important;
+    }
 </style>
 {% endblock %}

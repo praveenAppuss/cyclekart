@@ -196,6 +196,10 @@ USE_TZ = True
 
 # ------------------ Static Files ------------------
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    BASE_DIR / 'staticfiles',   # ✅ this must match your folder name
+]
+STATIC_ROOT = BASE_DIR / 'static'  # for collectstatic (optional in dev)
 
 # Cloudinary config (keep as-is)
 CLOUDINARY_STORAGE = {
