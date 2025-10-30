@@ -257,7 +257,7 @@ def user_logout(request):
 
 
 
-@login_required(login_url='user_login')
+
 @cache_control(no_store=True, no_cache=True, must_revalidate=True, max_age=0)
 @never_cache
 def user_home(request):
@@ -290,7 +290,7 @@ def user_home(request):
     return render(request, 'user_home.html', context)
 
 
-@login_required(login_url='user_login')
+
 @cache_control(no_store=True, no_cache=True, must_revalidate=True)
 @never_cache
 def user_product_list(request):
@@ -2115,3 +2115,6 @@ def about(request):
         form = ContactForm()
     
     return render(request, 'about.html', {'form': form})
+
+def custom_404(request):
+    return render(request, '404.html', status=404)

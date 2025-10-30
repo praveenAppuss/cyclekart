@@ -1,0 +1,91 @@
+{% extends 'header.html' %}
+{% load static %}
+
+{% block content %}
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        /* Define a subtle animation for background glow or elements */
+        @keyframes subtleGlow {
+            0%, 100% { filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.4)); } /* indigo-500 */
+            50% { filter: drop-shadow(0 0 20px rgba(129, 140, 248, 0.6)); } /* indigo-400 */
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-12px) rotate(1deg); }
+        }
+
+        .animate-subtle-glow {
+            animation: subtleGlow 4s ease-in-out infinite;
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* Set base style for dark mode compatibility */
+        body {
+            background-color: #0d0d1a; /* Very dark charcoal/indigo */
+        }
+    </style>
+    
+    <section class="min-h-screen flex items-center justify-center bg-[#0d0d1a] px-4 py-16 sm:py-24 relative overflow-hidden font-sans">
+        
+        <!-- Subtle Geometric Background Accent (Premium Feel) -->
+        <div class="absolute inset-0 z-0 opacity-10">
+            <div class="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-purple-900/40"></div>
+            <!-- Grid/Dot Pattern Overlay -->
+            <div class="absolute inset-0 bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:16px_16px] [mask-image:radial-gradient(ellipse_50%_50%_at_50%_50%,#000_70%,transparent_100%)]"></div>
+        </div>
+
+        <!-- Main Content Container -->
+        <div class="relative z-10 max-w-xl mx-auto text-center p-8 sm:p-12 bg-gray-900/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-gray-700/50">
+            
+            <!-- Icon/Illustration - Minimalist Broken Link -->
+            <div class="mb-10 flex justify-center">
+                <div class="w-32 h-32 text-indigo-400 animate-subtle-glow">
+                    <!-- Modern Broken Link/Server SVG -->
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="w-full h-full">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                        <line x1="8" y1="8" x2="8" y2="8" stroke="none" class="animate-pulse"/>
+                        <line x1="16" y1="16" x2="16" y2="16" stroke="none" class="animate-pulse delay-700"/>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Error Number -->
+            <h2 class="text-7xl sm:text-8xl font-extrabold mb-4 tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
+                404
+            </h2>
+
+            <!-- Error Title -->
+            <h1 class="text-3xl sm:text-4xl font-bold text-white mb-4">
+                Resource Unavailable
+            </h1>
+            
+            <!-- Error Message -->
+            <p class="text-base sm:text-lg text-gray-400 mb-10 max-w-md mx-auto leading-relaxed">
+                We couldn't locate the file or page you requested. It might have been moved, deleted, or you might have mistyped the address.
+            </p>
+
+            <!-- Call to Action -->
+            <div class="space-y-4 sm:space-x-4 sm:space-y-0 flex flex-col sm:flex-row justify-center">
+                
+                <a href="/" class="inline-flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-full shadow-lg transition duration-300 transform hover:scale-[1.02] active:scale-95 border-b-4 border-indigo-800 hover:border-indigo-900">
+                    <i class="fas fa-home mr-2"></i>
+                    Go to Dashboard
+                </a>
+                
+                <a href="#" onclick="history.back(); return false;" class="inline-flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-gray-300 font-medium py-3 px-8 rounded-full shadow-md transition duration-300 transform hover:scale-[1.02] active:scale-95 border border-gray-600">
+                    <i class="fas fa-arrow-left mr-2"></i>
+                    Back to Safety
+                </a>
+
+            </div>
+
+        </div>
+    </section>
+{% endblock content %}

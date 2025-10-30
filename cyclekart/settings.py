@@ -22,7 +22,7 @@ RAZORPAY_KEY_SECRET = config("RAZORPAY_KEY_SECRET")
 SECURE_CROSS_ORIGIN_OPENER_POLICY="same-origin-allow-popups"
 
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 # ------------------ Installed Apps ------------------
 INSTALLED_APPS = [
