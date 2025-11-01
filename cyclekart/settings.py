@@ -115,13 +115,13 @@ AUTHENTICATION_BACKENDS = [
 
 # ------------------ Allauth Redirects ------------------
 LOGIN_URL = 'user_login'
-LOGIN_REDIRECT_URL = 'user_home'
+LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = 'user_login'
 
 
-LOGIN_REDIRECT_URL = '/user_home/'
-ACCOUNT_LOGIN_REDIRECT_URL = '/user_home/'
-ACCOUNT_SIGNUP_REDIRECT_URL = '/user_home/'
+LOGIN_REDIRECT_URL = '/'
+ACCOUNT_LOGIN_REDIRECT_URL = '/'
+ACCOUNT_SIGNUP_REDIRECT_URL = '/'
 ACCOUNT_LOGOUT_REDIRECT_URL = '/user_login/'
 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
