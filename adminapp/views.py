@@ -31,6 +31,8 @@ from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseServerError
 from django.utils import timezone
 import logging
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side, NamedStyle
+from openpyxl.utils import get_column_letter
 
 logger = logging.getLogger(__name__)
 
@@ -1662,47 +1664,90 @@ def download_sales_report_csv(request):
     ws.title = "Sales Report"
 
     bold = Font(bold=True)
+    bold_white = Font(bold=True, color="FFFFFF")
+    title_font = Font(bold=True, size=16, color="FFFFFF")
+
     center = Alignment(horizontal="center", vertical="center")
     left_align = Alignment(horizontal="left", vertical="center")
+    right_align = Alignment(horizontal="right", vertical="center")
+
     border = Border(
         left=Side(style='thin'), right=Side(style='thin'),
         top=Side(style='thin'), bottom=Side(style='thin')
     )
 
-    ws["A1"] = "Sales Report"
-    ws["A1"].font = Font(bold=True, size=14)
+    
+    title_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")  
+    header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")  
+    summary_header_fill = PatternFill(start_color="C6E0F4", end_color="C6E0F4", fill_type="solid")  
+    summary_fill = PatternFill(start_color="DDEBF7", end_color="DDEBF7", fill_type="solid")  
+    filter_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")  
+    even_row_fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")  
 
+    
+    currency_format = '"₹"#,##0.00'
+    integer_format = '#,##0'
+
+    ws.merge_cells('A1:F1')
+    ws['A1'] = "Sales Report"
+    ws['A1'].font = title_font
+    ws['A1'].alignment = center
+    ws['A1'].fill = title_fill
+    ws['A1'].border = border
+ 
     ws.append(["Filter", filter_type])
     ws.append(["Date Range", f"{start_date} to {end_date}"])
-    ws.append([])
-    ws.append(["Summary"])
-    ws.append(["Total Orders", total_orders])
-    ws.append(["Total Quantity Sold", total_qty])
-    ws.append(["Total Item Sales", f"Rs.{total_item_sales}"])
-    ws.append(["Total Coupon Discount", f"Rs.{total_discount}"])
-    ws.append(["Total Product Discount", f"Rs.{total_product_savings}"])
-    ws.append(["Total Order Amount", f"Rs.{total_order_amount}"])
-    ws.append([])
+    ws.append([])  
+ 
+    for row_num in [2, 3]:
+        for col in ['A', 'B']:
+            cell = ws[f'{col}{row_num}']
+            cell.alignment = left_align
+            cell.fill = filter_fill
+            cell.border = border
+ 
+    ws.append(["Summary"])  
+    ws['A5'].font = bold
+    ws['A5'].alignment = center
+    ws['A5'].fill = summary_header_fill
+    ws['A5'].border = border
 
-    summary_start = 2
-    summary_end = ws.max_row - 1  
-
+    ws.append(["Total Orders", total_orders])  
+    ws.append(["Total Quantity Sold", total_qty])  
+    ws.append(["Total Item Sales", f"Rs.{total_item_sales}"])  
+    ws.append(["Total Coupon Discount", f"Rs.{total_discount}"])  
+    ws.append(["Total Product Discount", f"Rs.{total_product_savings}"])  
+    ws.append(["Total Order Amount", f"Rs.{total_order_amount}"])  
+    ws.append([])  
+ 
+    summary_start = 6
+    summary_end = 11
     for row in ws.iter_rows(min_row=summary_start, max_row=summary_end, min_col=1, max_col=2):
         for cell in row:
             cell.border = border
-            cell.alignment = left_align
-            if cell.col_idx == 1:
+            cell.fill = summary_fill
+            if cell.col_idx == 1:  
                 cell.font = bold
+                cell.alignment = left_align
+            else:  
+                cell.alignment = right_align
+                if 'Rs.' in str(cell.value):  
+                    cell.number_format = currency_format
+                elif isinstance(cell.value, int):  
+                    cell.number_format = integer_format
 
+    
     headers = ["Order ID", "Date", "User", "Total Amount", "Coupon Code", "Coupon Discount"]
     ws.append(headers)
 
-    for col in ws[ws.max_row]:
-        col.font = bold
-        col.alignment = center
-        col.border = border
-
-
+    header_row = 13
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=header_row, column=col_num)
+        cell.font = bold_white
+        cell.alignment = center
+        cell.fill = header_fill
+        cell.border = border
+ 
     for order in orders_queryset:
         row = [
             order.order_id,
@@ -1713,17 +1758,27 @@ def download_sales_report_csv(request):
             f"Rs.{order.coupon_discount or Decimal('0.00')}"
         ]
         ws.append(row)
-
     
-    for row in ws.iter_rows(min_row=ws.min_row + 13, max_row=ws.max_row, min_col=1, max_col=6):
-        for cell in row:
-            cell.border = border
+    data_start_row = 14
+    for row_num in range(data_start_row, ws.max_row + 1):
+        row_fill = even_row_fill if row_num % 2 == 0 else PatternFill(fill_type=None)  
+        for col_num in range(1, 7):
+            cell = ws.cell(row=row_num, column=col_num)
             cell.alignment = center
-
+            cell.border = border
+            cell.fill = row_fill
+            if col_num == 4 or col_num == 6:  
+                cell.number_format = currency_format
+            elif col_num == 1:  
+                cell.alignment = left_align
     
+    col_idx = 1
     for column_cells in ws.columns:
-        length = max(len(str(cell.value)) if cell.value else 0 for cell in column_cells)
-        ws.column_dimensions[column_cells[0].column_letter].width = length + 4
+        lengths = [len(str(cell.value)) for cell in column_cells if cell.value is not None]
+        adjusted_width = min(max(lengths) + 2 if lengths else 10, 20)  
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = adjusted_width
+        col_idx += 1
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Content-Disposition'] = 'attachment; filename="sales_report.xlsx"'
