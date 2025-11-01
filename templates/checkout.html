@@ -118,7 +118,7 @@
                     <div class="flex items-center justify-between">
                         <div class="flex items-center space-x-3">
                             <img src="{% if item.color_variant and item.color_variant.images.first %}{{ item.color_variant.images.first.image.url }}{% else %}{{ item.product.thumbnail.url }}{% endif %}" class="w-10 h-10 object-cover rounded border"
-                                alt="{{ item.product.name }}" onerror="this.src='{% static 'images/placeholder.png' %}'; this.onerror=null;">
+                                alt="{{ item.product.name }}" onerror="this.src='{% static 'images/user.png' %}'; this.onerror=null;">
                             <div>
                                 <p class="text-xs font-small">{{ item.size_stock.size }}</p>
                                 <p class="text-xs text-gray-500">Qty: {{ item.quantity }}</p>
