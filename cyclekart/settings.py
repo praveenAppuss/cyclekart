@@ -21,8 +21,8 @@ RAZORPAY_KEY_SECRET = config("RAZORPAY_KEY_SECRET")
 
 SECURE_CROSS_ORIGIN_OPENER_POLICY="same-origin-allow-popups"
 
-ALLOWED_HOSTS = ['*']
-# ALLOWED_HOSTS = ['cyclekart.shop', 'www.cyclekart.shop']
+ALLOWED_HOSTS = ['cyclekart.shop', 'www.cyclekart.shop', 'localhost', '127.0.0.1']
+
 
 
 # ------------------ Installed Apps ------------------
